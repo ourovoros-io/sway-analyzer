@@ -1,0 +1,14 @@
+[package]
+name = "sway-analyzer"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde = "1.0"
+structopt = { version = "0.3", default-features = false }
+sway-ast = "0.40.1"
+sway-error = "0.40.1"
+sway-parse = "0.40.1"
+sway-types = "0.40.1"
