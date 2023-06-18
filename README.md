@@ -20,4 +20,4 @@ A static analyzer for Sway written in Rust.
 
 | Name | Description |
 |-|-|
-| `storage` | An example visitor that prints the name of each storage field |
+| `storage_not_updated` | Checks for local variables that are read from storage, then modified without being written back to storage. |
