@@ -37,39 +37,6 @@ impl AstVisitor for StorageNotUpdatedVisitor {
     }
 
     fn leave_fn(&mut self, context: &FnContext, project: &mut Project) -> Result<(), Error> {
-        let fn_state = self.fn_states.get_mut(context.item_fn.fn_signature.name.as_str()).unwrap();
-
-        for storage_binding in fn_state.storage_bindings.iter() {
-            if !storage_binding.written {
-                project.report.borrow_mut().add_entry(
-                    context.path,
-                    project.span_to_line(context.path, &storage_binding.variable_name.span())?,
-                    if let Some(shadowing_variable_name) = storage_binding.shadowing_variable_name.as_ref() {
-                        format!(
-                            "Storage bound to local variable `{}` is shadowed{} before being written back to `storage.{}`",
-                            storage_binding.variable_name.as_str(),
-                            if let Some(line) = project.span_to_line(context.path, &shadowing_variable_name.span())? {
-                                format!(" at L{}", line)
-                            } else {
-                                String::new()
-                            },
-                            storage_binding.storage_name.as_str(),
-                        )
-                    } else {
-                        format!(
-                            "Storage bound to local variable `{}` not written back to `storage.{}`",
-                            storage_binding.variable_name.as_str(),
-                            storage_binding.storage_name.as_str(),
-                        )
-                    },
-                );
-            }
-        }
-
-        Ok(())
-    }
-
-    fn visit_statement(&mut self, context: &StatementContext, _project: &mut Project) -> Result<(), Error> {
         let mut has_storage_write_attribute = false;
 
         // Check for `#[storage(write)]` attribute
@@ -117,6 +84,39 @@ impl AstVisitor for StorageNotUpdatedVisitor {
             return Ok(());
         }
 
+        let fn_state = self.fn_states.get_mut(context.item_fn.fn_signature.name.as_str()).unwrap();
+
+        for storage_binding in fn_state.storage_bindings.iter() {
+            if !storage_binding.written {
+                project.report.borrow_mut().add_entry(
+                    context.path,
+                    project.span_to_line(context.path, &storage_binding.variable_name.span())?,
+                    if let Some(shadowing_variable_name) = storage_binding.shadowing_variable_name.as_ref() {
+                        format!(
+                            "Storage bound to local variable `{}` is shadowed{} before being written back to `storage.{}`",
+                            storage_binding.variable_name.as_str(),
+                            if let Some(line) = project.span_to_line(context.path, &shadowing_variable_name.span())? {
+                                format!(" at L{}", line)
+                            } else {
+                                String::new()
+                            },
+                            storage_binding.storage_name.as_str(),
+                        )
+                    } else {
+                        format!(
+                            "Storage bound to local variable `{}` not written back to `storage.{}`",
+                            storage_binding.variable_name.as_str(),
+                            storage_binding.storage_name.as_str(),
+                        )
+                    },
+                );
+            }
+        }
+
+        Ok(())
+    }
+
+    fn visit_statement(&mut self, context: &StatementContext, _project: &mut Project) -> Result<(), Error> {
         let fn_state = self.fn_states.get_mut(context.item_fn.fn_signature.name.as_str()).unwrap();
 
         let get_variable_binding_ident = || -> Option<BaseIdent> {
