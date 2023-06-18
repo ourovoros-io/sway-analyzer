@@ -1,7 +1,7 @@
 use super::{AstVisitor, FnContext, StatementContext};
 use crate::{error::Error, project::Project, utils};
 use std::collections::HashMap;
-use sway_ast::*;
+use sway_ast::{*, attribute::{Attribute, AttributeArg}};
 use sway_types::{BaseIdent, Spanned};
 
 //
@@ -70,6 +70,53 @@ impl AstVisitor for StorageNotUpdatedVisitor {
     }
 
     fn visit_statement(&mut self, context: &StatementContext, _project: &mut Project) -> Result<(), Error> {
+        let mut has_storage_write_attribute = false;
+
+        // Check for `#[storage(write)]` attribute
+        'attribute_check: for attribute_decl in context.fn_attributes {
+            let check_attribute = |attribute: &Attribute| -> bool {
+                let check_attribute_arg = |attribute_arg: &AttributeArg| -> bool {
+                    attribute_arg.name.as_str() == "write" && attribute_arg.value.is_none()
+                };
+
+                if attribute.name.as_str() == "storage" {
+                    if let Some(args) = attribute.args.as_ref() {
+                        for arg in args.inner.value_separator_pairs.iter() {
+                            if check_attribute_arg(&arg.0) {
+                                return true;
+                            }
+                        }
+
+                        if let Some(arg) = args.inner.final_value_opt.as_ref() {
+                            if check_attribute_arg(arg) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+
+                false
+            };
+
+            for attribute in attribute_decl.attribute.inner.value_separator_pairs.iter() {
+                if check_attribute(&attribute.0) {
+                    has_storage_write_attribute = true;
+                    break 'attribute_check;
+                }
+            }
+
+            if let Some(attribute) = attribute_decl.attribute.inner.final_value_opt.as_ref() {
+                if check_attribute(attribute) {
+                    has_storage_write_attribute = true;
+                    break 'attribute_check;
+                }
+            }
+        }
+
+        if !has_storage_write_attribute {
+            return Ok(());
+        }
+
         let fn_state = self.fn_states.get_mut(context.item_fn.fn_signature.name.as_str()).unwrap();
 
         let get_variable_binding_ident = || -> Option<BaseIdent> {

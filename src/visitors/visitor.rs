@@ -1,6 +1,6 @@
 use crate::{error::Error, project::Project};
 use std::path::Path;
-use sway_ast::*;
+use sway_ast::{*, attribute::Annotated};
 
 #[derive(Clone)]
 pub struct ModuleContext<'module> {
@@ -9,174 +9,203 @@ pub struct ModuleContext<'module> {
 }
 
 #[derive(Clone)]
-pub struct ModuleItemContext<'module, 'item> {
+pub struct ModuleItemContext<'module, 'attributes, 'item> {
     pub path: &'module Path,
     pub module: &'module Module,
+    pub attributes: &'attributes [AttributeDecl],
     pub item: &'item ItemKind,
 }
 
 #[derive(Clone)]
-pub struct SubmoduleContext<'module, 'item, 'submodule> {
+pub struct SubmoduleContext<'module, 'item, 'attributes, 'submodule> {
     pub path: &'module Path,
     pub module: &'module Module,
     pub item: &'item ItemKind,
+    pub attributes: &'attributes [AttributeDecl],
     pub submodule: &'submodule Submodule,
 }
 
 #[derive(Clone)]
-pub struct UseContext<'module, 'item, 'item_use> {
+pub struct UseContext<'module, 'item, 'attributes, 'item_use> {
     pub path: &'module Path,
     pub module: &'module Module,
     pub item: &'item ItemKind,
+    pub attributes: &'attributes [AttributeDecl],
     pub item_use: &'item_use ItemUse,
 }
 
 #[derive(Clone)]
-pub struct StructContext<'module, 'item, 'item_struct> {
+pub struct StructContext<'module, 'item, 'attributes, 'item_struct> {
     pub path: &'module Path,
     pub module: &'module Module,
     pub item: &'item ItemKind,
+    pub attributes: &'attributes [AttributeDecl],
     pub item_struct: &'item_struct ItemStruct,
 }
 
 #[derive(Clone)]
-pub struct StructFieldContext<'module, 'item, 'item_struct, 'field> {
+pub struct StructFieldContext<'module, 'item, 'struct_attributes, 'item_struct, 'field_attributes, 'field> {
     pub path: &'module Path,
     pub module: &'module Module,
     pub item: &'item ItemKind,
+    pub struct_attributes: &'struct_attributes [AttributeDecl],
     pub item_struct: &'item_struct ItemStruct,
+    pub field_attributes: &'field_attributes [AttributeDecl],
     pub field: &'field TypeField,
 }
 
 #[derive(Clone)]
-pub struct EnumContext<'module, 'item, 'item_enum> {
+pub struct EnumContext<'module, 'item, 'attributes, 'item_enum> {
     pub path: &'module Path,
     pub module: &'module Module,
     pub item: &'item ItemKind,
+    pub attributes: &'attributes [AttributeDecl],
     pub item_enum: &'item_enum ItemEnum,
 }
 
 #[derive(Clone)]
-pub struct EnumFieldContext<'module, 'item, 'item_enum, 'field> {
+pub struct EnumFieldContext<'module, 'item, 'enum_attributes, 'item_enum, 'field_attributes, 'field> {
     pub path: &'module Path,
     pub module: &'module Module,
     pub item: &'item ItemKind,
+    pub enum_attributes: &'enum_attributes [AttributeDecl],
     pub item_enum: &'item_enum ItemEnum,
+    pub field_attributes: &'field_attributes [AttributeDecl],
     pub field: &'field TypeField,
 }
 
 #[derive(Clone)]
-pub struct FnContext<'module, 'item, 'item_impl, 'item_fn> {
+pub struct FnContext<'module, 'item, 'impl_attributes, 'item_impl, 'fn_attributes, 'item_fn> {
     pub path: &'module Path,
     pub module: &'module Module,
     pub item: &'item ItemKind,
+    pub impl_attributes: Option<&'impl_attributes [AttributeDecl]>,
     pub item_impl: Option<&'item_impl ItemImpl>,
+    pub fn_attributes: &'fn_attributes [AttributeDecl],
     pub item_fn: &'item_fn ItemFn,
 }
 
 #[derive(Clone)]
-pub struct StatementContext<'module, 'item, 'item_impl, 'item_fn, 'statement> {
+pub struct StatementContext<'module, 'item, 'impl_attributes, 'item_impl, 'fn_attributes, 'item_fn, 'statement> {
     pub path: &'module Path,
     pub module: &'module Module,
     pub item: &'item ItemKind,
+    pub impl_attributes: Option<&'impl_attributes [AttributeDecl]>,
     pub item_impl: Option<&'item_impl ItemImpl>,
+    pub fn_attributes: &'fn_attributes [AttributeDecl],
     pub item_fn: &'item_fn ItemFn,
     pub statement: &'statement Statement,
 }
 
 #[derive(Clone)]
-pub struct StatementLetContext<'module, 'item, 'item_impl, 'item_fn, 'statement, 'statement_let> {
+pub struct ExprContext<'module, 'item, 'impl_attributes, 'item_impl, 'fn_attributes, 'item_fn, 'expr> {
     pub path: &'module Path,
     pub module: &'module Module,
     pub item: &'item ItemKind,
+    pub impl_attributes: Option<&'impl_attributes [AttributeDecl]>,
     pub item_impl: Option<&'item_impl ItemImpl>,
+    pub fn_attributes: &'fn_attributes [AttributeDecl],
+    pub item_fn: &'item_fn ItemFn,
+    pub expr: &'expr Expr,
+}
+
+#[derive(Clone)]
+pub struct StatementLetContext<'module, 'item, 'impl_attributes, 'item_impl, 'fn_attributes, 'item_fn, 'statement, 'statement_let> {
+    pub path: &'module Path,
+    pub module: &'module Module,
+    pub item: &'item ItemKind,
+    pub impl_attributes: Option<&'impl_attributes [AttributeDecl]>,
+    pub item_impl: Option<&'item_impl ItemImpl>,
+    pub fn_attributes: &'fn_attributes [AttributeDecl],
     pub item_fn: &'item_fn ItemFn,
     pub statement: &'statement Statement,
     pub statement_let: &'statement_let StatementLet,
 }
 
 #[derive(Clone)]
-pub struct ExprContext<'module, 'item, 'item_impl, 'item_fn, 'expr> {
+pub struct TraitContext<'module, 'item, 'attributes, 'item_trait> {
     pub path: &'module Path,
     pub module: &'module Module,
     pub item: &'item ItemKind,
-    pub item_impl: Option<&'item_impl ItemImpl>,
-    pub item_fn: &'item_fn ItemFn,
-    pub expr: &'expr Expr,
-}
-
-#[derive(Clone)]
-pub struct TraitContext<'module, 'item, 'item_trait> {
-    pub path: &'module Path,
-    pub module: &'module Module,
-    pub item: &'item ItemKind,
+    pub attributes: &'attributes [AttributeDecl],
     pub item_trait: &'item_trait ItemTrait,
 }
 
 #[derive(Clone)]
-pub struct ImplContext<'module, 'item, 'item_impl> {
+pub struct ImplContext<'module, 'item, 'attributes, 'item_impl> {
     pub path: &'module Path,
     pub module: &'module Module,
     pub item: &'item ItemKind,
+    pub attributes: &'attributes [AttributeDecl],
     pub item_impl: &'item_impl ItemImpl,
 }
 
 #[derive(Clone)]
-pub struct AbiContext<'module, 'item, 'item_abi> {
+pub struct AbiContext<'module, 'item, 'attributes, 'item_abi> {
     pub path: &'module Path,
     pub module: &'module Module,
     pub item: &'item ItemKind,
+    pub attributes: &'attributes [AttributeDecl],
     pub item_abi: &'item_abi ItemAbi,
 }
 
 #[derive(Clone)]
-pub struct ConstContext<'module, 'item, 'item_impl, 'item_const> {
+pub struct ConstContext<'module, 'item, 'impl_attributes, 'item_impl, 'const_attributes, 'item_const> {
     pub path: &'module Path,
     pub module: &'module Module,
     pub item: &'item ItemKind,
+    pub impl_attributes: Option<&'impl_attributes [AttributeDecl]>,
     pub item_impl: Option<&'item_impl ItemImpl>,
+    pub const_attributes: &'const_attributes [AttributeDecl],
     pub item_const: &'item_const ItemConst,
 }
 
 #[derive(Clone)]
-pub struct StorageContext<'module, 'item, 'item_storage> {
+pub struct StorageContext<'module, 'item, 'attributes, 'item_storage> {
     pub path: &'module Path,
     pub module: &'module Module,
     pub item: &'item ItemKind,
+    pub attributes: &'attributes [AttributeDecl],
     pub item_storage: &'item_storage ItemStorage,
 }
 
 #[derive(Clone)]
-pub struct StorageFieldContext<'module, 'item, 'item_storage, 'field> {
+pub struct StorageFieldContext<'module, 'item, 'storage_attributes, 'item_storage, 'field_attributes, 'field> {
     pub path: &'module Path,
     pub module: &'module Module,
     pub item: &'item ItemKind,
+    pub storage_attributes: &'storage_attributes [AttributeDecl],
     pub item_storage: &'item_storage ItemStorage,
+    pub field_attributes: &'field_attributes [AttributeDecl],
     pub field: &'field StorageField,
 }
 
 #[derive(Clone)]
-pub struct ConfigurableContext<'module, 'item, 'item_configurable> {
+pub struct ConfigurableContext<'module, 'item, 'attributes, 'item_configurable> {
     pub path: &'module Path,
     pub module: &'module Module,
     pub item: &'item ItemKind,
+    pub attributes: &'attributes [AttributeDecl],
     pub item_configurable: &'item_configurable ItemConfigurable,
 }
 
 #[derive(Clone)]
-pub struct ConfigurableFieldContext<'module, 'item, 'item_configurable, 'field> {
+pub struct ConfigurableFieldContext<'module, 'item, 'configurable_attributes, 'item_configurable, 'field_attributes, 'field> {
     pub path: &'module Path,
     pub module: &'module Module,
     pub item: &'item ItemKind,
+    pub configurable_attributes: &'configurable_attributes [AttributeDecl],
     pub item_configurable: &'item_configurable ItemConfigurable,
+    pub field_attributes: &'field_attributes [AttributeDecl],
     pub field: &'field ConfigurableField,
 }
 
 #[derive(Clone)]
-pub struct TypeAliasContext<'module, 'item, 'item_type_alias> {
+pub struct TypeAliasContext<'module, 'item, 'attributes, 'item_type_alias> {
     pub path: &'module Path,
     pub module: &'module Module,
     pub item: &'item ItemKind,
+    pub attributes: &'attributes [AttributeDecl],
     pub item_type_alias: &'item_type_alias ItemTypeAlias,
 }
 
@@ -261,6 +290,7 @@ impl AstVisitor for AstVisitorRecursive {
             let context = ModuleItemContext {
                 path: context.path,
                 module: context.module,
+                attributes: item.attribute_list.as_slice(),
                 item: &item.value,
             };
             
@@ -290,6 +320,7 @@ impl AstVisitor for AstVisitorRecursive {
                     path: context.path,
                     module: context.module,
                     item: context.item,
+                    attributes: context.attributes,
                     submodule,
                 };
                 
@@ -302,6 +333,7 @@ impl AstVisitor for AstVisitorRecursive {
                     path: context.path,
                     module: context.module,
                     item: context.item,
+                    attributes: context.attributes,
                     item_use,
                 };
                 
@@ -314,6 +346,7 @@ impl AstVisitor for AstVisitorRecursive {
                     path: context.path,
                     module: context.module,
                     item: context.item,
+                    attributes: context.attributes,
                     item_struct,
                 };
                 
@@ -326,6 +359,7 @@ impl AstVisitor for AstVisitorRecursive {
                     path: context.path,
                     module: context.module,
                     item: context.item,
+                    attributes: context.attributes,
                     item_enum,
                 };
                 
@@ -338,7 +372,9 @@ impl AstVisitor for AstVisitorRecursive {
                     path: context.path,
                     module: context.module,
                     item: context.item,
+                    impl_attributes: None,
                     item_impl: None,
+                    fn_attributes: context.attributes,
                     item_fn,
                 };
                 
@@ -351,6 +387,7 @@ impl AstVisitor for AstVisitorRecursive {
                     path: context.path,
                     module: context.module,
                     item: context.item,
+                    attributes: context.attributes,
                     item_trait,
                 };
                 
@@ -363,6 +400,7 @@ impl AstVisitor for AstVisitorRecursive {
                     path: context.path,
                     module: context.module,
                     item: context.item,
+                    attributes: context.attributes,
                     item_impl,
                 };
                 
@@ -375,6 +413,7 @@ impl AstVisitor for AstVisitorRecursive {
                     path: context.path,
                     module: context.module,
                     item: context.item,
+                    attributes: context.attributes,
                     item_abi,
                 };
                 
@@ -387,7 +426,9 @@ impl AstVisitor for AstVisitorRecursive {
                     path: context.path,
                     module: context.module,
                     item: context.item,
+                    impl_attributes: None,
                     item_impl: None,
+                    const_attributes: context.attributes,
                     item_const,
                 };
                 
@@ -400,6 +441,7 @@ impl AstVisitor for AstVisitorRecursive {
                     path: context.path,
                     module: context.module,
                     item: context.item,
+                    attributes: context.attributes,
                     item_storage,
                 };
                 
@@ -412,6 +454,7 @@ impl AstVisitor for AstVisitorRecursive {
                     path: context.path,
                     module: context.module,
                     item: context.item,
+                    attributes: context.attributes,
                     item_configurable,
                 };
                 
@@ -424,6 +467,7 @@ impl AstVisitor for AstVisitorRecursive {
                     path: context.path,
                     module: context.module,
                     item: context.item,
+                    attributes: context.attributes,
                     item_type_alias,
                 };
                 
@@ -480,13 +524,15 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.visit_struct(context, project)?;
         }
         
-        let mut visit_field = |field: &TypeField| -> Result<(), Error> {
+        let mut visit_field = |field: &Annotated<TypeField>| -> Result<(), Error> {
             let context = StructFieldContext {
                 path: context.path,
                 module: context.module,
                 item: context.item,
+                struct_attributes: context.attributes,
                 item_struct: context.item_struct,
-                field,
+                field_attributes: field.attribute_list.as_slice(),
+                field: &field.value,
             };
 
             self.visit_struct_field(&context, project)?;
@@ -496,11 +542,11 @@ impl AstVisitor for AstVisitorRecursive {
         };
 
         for field in context.item_struct.fields.inner.value_separator_pairs.iter() {
-            visit_field(&field.0.value)?;
+            visit_field(&field.0)?;
         }
 
         if let Some(field) = context.item_struct.fields.inner.final_value_opt.as_ref() {
-            visit_field(&field.value)?;
+            visit_field(field)?;
         }
 
         Ok(())
@@ -535,13 +581,15 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.visit_enum(context, project)?;
         }
         
-        let mut visit_field = |field: &TypeField| -> Result<(), Error> {
+        let mut visit_field = |field: &Annotated<TypeField>| -> Result<(), Error> {
             let context = EnumFieldContext {
                 path: context.path,
                 module: context.module,
                 item: context.item,
+                enum_attributes: context.attributes,
                 item_enum: context.item_enum,
-                field,
+                field_attributes: field.attribute_list.as_slice(),
+                field: &field.value,
             };
 
             self.visit_enum_field(&context, project)?;
@@ -551,11 +599,11 @@ impl AstVisitor for AstVisitorRecursive {
         };
 
         for field in context.item_enum.fields.inner.value_separator_pairs.iter() {
-            visit_field(&field.0.value)?;
+            visit_field(&field.0)?;
         }
 
         if let Some(field) = context.item_enum.fields.inner.final_value_opt.as_ref() {
-            visit_field(&field.value)?;
+            visit_field(field)?;
         }
 
         Ok(())
@@ -595,7 +643,9 @@ impl AstVisitor for AstVisitorRecursive {
                 path: context.path,
                 module: context.module,
                 item: context.item,
+                impl_attributes: context.impl_attributes,
                 item_impl: context.item_impl,
+                fn_attributes: context.fn_attributes,
                 item_fn: context.item_fn,
                 statement,
             };
@@ -609,7 +659,9 @@ impl AstVisitor for AstVisitorRecursive {
                 path: context.path,
                 module: context.module,
                 item: context.item,
+                impl_attributes: context.impl_attributes,
                 item_impl: context.item_impl,
+                fn_attributes: context.fn_attributes,
                 item_fn: context.item_fn,
                 expr,
             };
@@ -640,7 +692,9 @@ impl AstVisitor for AstVisitorRecursive {
                     path: context.path,
                     module: context.module,
                     item: context.item,
+                    impl_attributes: context.impl_attributes,
                     item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     statement: context.statement,
                     statement_let,
@@ -659,7 +713,9 @@ impl AstVisitor for AstVisitorRecursive {
                     path: context.path,
                     module: context.module,
                     item: context.item,
+                    impl_attributes: context.impl_attributes,
                     item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     expr,
                 };
@@ -740,7 +796,9 @@ impl AstVisitor for AstVisitorRecursive {
                         path: context.path,
                         module: context.module,
                         item: context.item,
+                        impl_attributes: Some(context.attributes),
                         item_impl: Some(context.item_impl),
+                        fn_attributes: item.attribute_list.as_slice(),
                         item_fn,
                     };
                     
@@ -753,7 +811,9 @@ impl AstVisitor for AstVisitorRecursive {
                         path: context.path,
                         module: context.module,
                         item: context.item,
+                        impl_attributes: Some(context.attributes),
                         item_impl: Some(context.item_impl),
+                        const_attributes: item.attribute_list.as_slice(),
                         item_const,
                     };
                     
@@ -811,13 +871,15 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.visit_storage(context, project)?;
         }
 
-        let mut visit_field = |field: &StorageField| -> Result<(), Error> {
+        let mut visit_field = |field: &Annotated<StorageField>| -> Result<(), Error> {
             let context = StorageFieldContext {
                 path: context.path,
                 module: context.module,
                 item: context.item,
+                storage_attributes: context.attributes,
                 item_storage: context.item_storage,
-                field,
+                field_attributes: field.attribute_list.as_slice(),
+                field: &field.value,
             };
 
             self.visit_storage_field(&context, project)?;
@@ -827,11 +889,11 @@ impl AstVisitor for AstVisitorRecursive {
         };
 
         for field in context.item_storage.fields.inner.value_separator_pairs.iter() {
-            visit_field(&field.0.value)?;
+            visit_field(&field.0)?;
         }
 
         if let Some(field) = context.item_storage.fields.inner.final_value_opt.as_ref() {
-            visit_field(&field.value)?;
+            visit_field(field)?;
         }
         
         Ok(())
@@ -866,13 +928,15 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.visit_configurable(context, project)?;
         }
 
-        let mut visit_field = |field: &ConfigurableField| -> Result<(), Error> {
+        let mut visit_field = |field: &Annotated<ConfigurableField>| -> Result<(), Error> {
             let context = ConfigurableFieldContext {
                 path: context.path,
                 module: context.module,
                 item: context.item,
+                configurable_attributes: context.attributes,
                 item_configurable: context.item_configurable,
-                field,
+                field_attributes: field.attribute_list.as_slice(),
+                field: &field.value,
             };
 
             self.visit_configurable_field(&context, project)?;
@@ -882,11 +946,11 @@ impl AstVisitor for AstVisitorRecursive {
         };
 
         for field in context.item_configurable.fields.inner.value_separator_pairs.iter() {
-            visit_field(&field.0.value)?;
+            visit_field(&field.0)?;
         }
 
         if let Some(field) = context.item_configurable.fields.inner.final_value_opt.as_ref() {
-            visit_field(&field.value)?;
+            visit_field(field)?;
         }
         
         Ok(())
