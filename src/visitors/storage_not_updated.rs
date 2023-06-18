@@ -12,6 +12,7 @@ use sway_types::{BaseIdent, Spanned};
 struct StorageBinding {
     storage_name: BaseIdent,
     variable_name: BaseIdent,
+    shadowing_variable_name: Option<BaseIdent>,
     modified: bool,
     written: bool,
 }
@@ -43,11 +44,24 @@ impl AstVisitor for StorageNotUpdatedVisitor {
                 project.report.borrow_mut().add_entry(
                     context.path,
                     project.span_to_line(context.path, &storage_binding.variable_name.span())?,
-                    format!(
-                        "Storage bound to local variable `{}` not written back to `storage.{}`",
-                        storage_binding.variable_name.as_str(),
-                        storage_binding.storage_name.as_str(),
-                    ),
+                    if let Some(shadowing_variable_name) = storage_binding.shadowing_variable_name.as_ref() {
+                        format!(
+                            "Storage bound to local variable `{}` is shadowed{} before being written back to `storage.{}`",
+                            storage_binding.variable_name.as_str(),
+                            if let Some(line) = project.span_to_line(context.path, &shadowing_variable_name.span())? {
+                                format!(" at L{}", line)
+                            } else {
+                                String::new()
+                            },
+                            storage_binding.storage_name.as_str(),
+                        )
+                    } else {
+                        format!(
+                            "Storage bound to local variable `{}` not written back to `storage.{}`",
+                            storage_binding.variable_name.as_str(),
+                            storage_binding.storage_name.as_str(),
+                        )
+                    },
                 );
             }
         }
@@ -133,27 +147,42 @@ impl AstVisitor for StorageNotUpdatedVisitor {
             Some((storage_idents[1].clone(), variable_idents[0].clone()))
         };
 
-        //
-        // TODO: check for variable binding which isn't from storage but shadows a previous storage binding
-        //
-
+        // Check for `let mut x = storage.x.read();`
         if let Some((storage_name, variable_name)) = get_storage_read_binding_idents() {
+            // Check for variable shadowing
+            if let Some(storage_binding) = fn_state.storage_bindings.iter_mut().rev().find(|x| x.variable_name == variable_name) {
+                storage_binding.shadowing_variable_name = Some(variable_name.clone());
+            }
+
             fn_state.storage_bindings.push(StorageBinding {
                 storage_name,
                 variable_name,
+                shadowing_variable_name: None,
                 modified: false,
                 written: false,
             });
-        } else if let Some(variable_name) = get_reassignment_ident() {
-            if let Some(storage_binding) = fn_state.storage_bindings.iter_mut().find(|x| x.variable_name == variable_name) {
+
+            return Ok(());
+        }
+        
+        // Check for updates to `x`
+        if let Some(variable_name) = get_reassignment_ident() {
+            if let Some(storage_binding) = fn_state.storage_bindings.iter_mut().rev().find(|x| x.variable_name == variable_name) {
                 storage_binding.modified = true;
             }
-        } else if let Some((storage_name, variable_name)) = get_storage_write_idents() {
-            if let Some(storage_binding) = fn_state.storage_bindings.iter_mut().find(|x| x.storage_name == storage_name) {
+
+            return Ok(());
+        }
+        
+        // Check for `storage.x.write(x);`
+        if let Some((storage_name, variable_name)) = get_storage_write_idents() {
+            if let Some(storage_binding) = fn_state.storage_bindings.iter_mut().rev().find(|x| x.storage_name == storage_name) {
                 if variable_name == storage_binding.variable_name {
                     storage_binding.written = true;
                 }
             }
+
+            return Ok(());
         }
 
         Ok(())
