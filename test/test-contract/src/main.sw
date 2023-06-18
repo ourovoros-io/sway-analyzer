@@ -44,10 +44,7 @@ impl TestContract for Contract {
         counter.value += amount;
         // storage.counter_map.insert((), counter);
         
-        let mut counter = storage.counter_map.get(()).read();
-        counter.value += amount * 2;
-        storage.counter_map.insert((), counter);
-
+        let mut counter = Counter { value: amount };
         counter.value
     }
 }

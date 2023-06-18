@@ -72,6 +72,17 @@ impl AstVisitor for StorageNotUpdatedVisitor {
     fn visit_statement(&mut self, context: &StatementContext, _project: &mut Project) -> Result<(), Error> {
         let fn_state = self.fn_states.get_mut(context.item_fn.fn_signature.name.as_str()).unwrap();
 
+        let get_variable_binding_ident = || -> Option<BaseIdent> {
+            let Statement::Let(stmt_let) = context.statement else { return None };
+            
+            let Pattern::Var {
+                name: variable_name,
+                ..
+            } = &stmt_let.pattern else { return None };
+            
+            Some(variable_name.clone())
+        };
+
         let get_storage_read_binding_idents = || -> Option<(BaseIdent, BaseIdent)> {
             let Statement::Let(stmt_let) = context.statement else { return None };
             
@@ -147,13 +158,15 @@ impl AstVisitor for StorageNotUpdatedVisitor {
             Some((storage_idents[1].clone(), variable_idents[0].clone()))
         };
 
-        // Check for `let mut x = storage.x.read();`
-        if let Some((storage_name, variable_name)) = get_storage_read_binding_idents() {
-            // Check for variable shadowing
+        // Check for storage binding variable shadowing
+        if let Some(variable_name) = get_variable_binding_ident() {
             if let Some(storage_binding) = fn_state.storage_bindings.iter_mut().rev().find(|x| x.variable_name == variable_name) {
                 storage_binding.shadowing_variable_name = Some(variable_name.clone());
             }
+        }
 
+        // Check for storage binding declaration, i.e: `let mut x = storage.x.read();`
+        if let Some((storage_name, variable_name)) = get_storage_read_binding_idents() {
             fn_state.storage_bindings.push(StorageBinding {
                 storage_name,
                 variable_name,
@@ -161,28 +174,20 @@ impl AstVisitor for StorageNotUpdatedVisitor {
                 modified: false,
                 written: false,
             });
-
-            return Ok(());
         }
-        
-        // Check for updates to `x`
-        if let Some(variable_name) = get_reassignment_ident() {
+        // Check for updates to storage binding, i.e: `x += 1;`
+        else if let Some(variable_name) = get_reassignment_ident() {
             if let Some(storage_binding) = fn_state.storage_bindings.iter_mut().rev().find(|x| x.variable_name == variable_name) {
                 storage_binding.modified = true;
             }
-
-            return Ok(());
         }
-        
-        // Check for `storage.x.write(x);`
-        if let Some((storage_name, variable_name)) = get_storage_write_idents() {
+        // Check for storage binding update, i.e: `storage.x.write(x);`
+        else if let Some((storage_name, variable_name)) = get_storage_write_idents() {
             if let Some(storage_binding) = fn_state.storage_bindings.iter_mut().rev().find(|x| x.storage_name == storage_name) {
                 if variable_name == storage_binding.variable_name {
                     storage_binding.written = true;
                 }
             }
-
-            return Ok(());
         }
 
         Ok(())
