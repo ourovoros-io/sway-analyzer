@@ -3,210 +3,277 @@ use std::path::Path;
 use sway_ast::{*, attribute::Annotated};
 
 #[derive(Clone)]
-pub struct ModuleContext<'module> {
-    pub path: &'module Path,
-    pub module: &'module Module,
+pub struct ModuleContext<'a> {
+    pub path: &'a Path,
+    pub module: &'a Module,
 }
 
 #[derive(Clone)]
-pub struct ModuleItemContext<'module, 'attributes, 'item> {
-    pub path: &'module Path,
-    pub module: &'module Module,
-    pub attributes: &'attributes [AttributeDecl],
-    pub item: &'item ItemKind,
+pub struct ModuleItemContext<'a> {
+    pub path: &'a Path,
+    pub module: &'a Module,
+    pub attributes: &'a [AttributeDecl],
+    pub item: &'a ItemKind,
 }
 
 #[derive(Clone)]
-pub struct SubmoduleContext<'module, 'item, 'attributes, 'submodule> {
-    pub path: &'module Path,
-    pub module: &'module Module,
-    pub item: &'item ItemKind,
-    pub attributes: &'attributes [AttributeDecl],
-    pub submodule: &'submodule Submodule,
+pub struct SubmoduleContext<'a> {
+    pub path: &'a Path,
+    pub module: &'a Module,
+    pub item: &'a ItemKind,
+    pub attributes: &'a [AttributeDecl],
+    pub submodule: &'a Submodule,
 }
 
 #[derive(Clone)]
-pub struct UseContext<'module, 'item, 'attributes, 'item_use> {
-    pub path: &'module Path,
-    pub module: &'module Module,
-    pub item: &'item ItemKind,
-    pub attributes: &'attributes [AttributeDecl],
-    pub item_use: &'item_use ItemUse,
+pub struct UseContext<'a> {
+    pub path: &'a Path,
+    pub module: &'a Module,
+    pub item: &'a ItemKind,
+    pub attributes: &'a [AttributeDecl],
+    pub item_use: &'a ItemUse,
 }
 
 #[derive(Clone)]
-pub struct StructContext<'module, 'item, 'attributes, 'item_struct> {
-    pub path: &'module Path,
-    pub module: &'module Module,
-    pub item: &'item ItemKind,
-    pub attributes: &'attributes [AttributeDecl],
-    pub item_struct: &'item_struct ItemStruct,
+pub struct StructContext<'a> {
+    pub path: &'a Path,
+    pub module: &'a Module,
+    pub item: &'a ItemKind,
+    pub struct_attributes: &'a [AttributeDecl],
+    pub item_struct: &'a ItemStruct,
 }
 
 #[derive(Clone)]
-pub struct StructFieldContext<'module, 'item, 'struct_attributes, 'item_struct, 'field_attributes, 'field> {
-    pub path: &'module Path,
-    pub module: &'module Module,
-    pub item: &'item ItemKind,
-    pub struct_attributes: &'struct_attributes [AttributeDecl],
-    pub item_struct: &'item_struct ItemStruct,
-    pub field_attributes: &'field_attributes [AttributeDecl],
-    pub field: &'field TypeField,
+pub struct StructFieldContext<'a> {
+    pub path: &'a Path,
+    pub module: &'a Module,
+    pub item: &'a ItemKind,
+    pub struct_attributes: &'a [AttributeDecl],
+    pub item_struct: &'a ItemStruct,
+    pub field_attributes: &'a [AttributeDecl],
+    pub field: &'a TypeField,
 }
 
 #[derive(Clone)]
-pub struct EnumContext<'module, 'item, 'attributes, 'item_enum> {
-    pub path: &'module Path,
-    pub module: &'module Module,
-    pub item: &'item ItemKind,
-    pub attributes: &'attributes [AttributeDecl],
-    pub item_enum: &'item_enum ItemEnum,
+pub struct EnumContext<'a> {
+    pub path: &'a Path,
+    pub module: &'a Module,
+    pub item: &'a ItemKind,
+    pub attributes: &'a [AttributeDecl],
+    pub item_enum: &'a ItemEnum,
 }
 
 #[derive(Clone)]
-pub struct EnumFieldContext<'module, 'item, 'enum_attributes, 'item_enum, 'field_attributes, 'field> {
-    pub path: &'module Path,
-    pub module: &'module Module,
-    pub item: &'item ItemKind,
-    pub enum_attributes: &'enum_attributes [AttributeDecl],
-    pub item_enum: &'item_enum ItemEnum,
-    pub field_attributes: &'field_attributes [AttributeDecl],
-    pub field: &'field TypeField,
+pub struct EnumFieldContext<'a> {
+    pub path: &'a Path,
+    pub module: &'a Module,
+    pub item: &'a ItemKind,
+    pub enum_attributes: &'a [AttributeDecl],
+    pub item_enum: &'a ItemEnum,
+    pub field_attributes: &'a [AttributeDecl],
+    pub field: &'a TypeField,
 }
 
 #[derive(Clone)]
-pub struct FnContext<'module, 'item, 'impl_attributes, 'item_impl, 'fn_attributes, 'item_fn> {
-    pub path: &'module Path,
-    pub module: &'module Module,
-    pub item: &'item ItemKind,
-    pub impl_attributes: Option<&'impl_attributes [AttributeDecl]>,
-    pub item_impl: Option<&'item_impl ItemImpl>,
-    pub fn_attributes: &'fn_attributes [AttributeDecl],
-    pub item_fn: &'item_fn ItemFn,
+pub struct FnContext<'a> {
+    pub path: &'a Path,
+    pub module: &'a Module,
+    pub item: &'a ItemKind,
+    pub impl_attributes: Option<&'a [AttributeDecl]>,
+    pub item_impl: Option<&'a ItemImpl>,
+    pub fn_attributes: &'a [AttributeDecl],
+    pub item_fn: &'a ItemFn,
 }
 
 #[derive(Clone)]
-pub struct StatementContext<'module, 'item, 'impl_attributes, 'item_impl, 'fn_attributes, 'item_fn, 'statement> {
-    pub path: &'module Path,
-    pub module: &'module Module,
-    pub item: &'item ItemKind,
-    pub impl_attributes: Option<&'impl_attributes [AttributeDecl]>,
-    pub item_impl: Option<&'item_impl ItemImpl>,
-    pub fn_attributes: &'fn_attributes [AttributeDecl],
-    pub item_fn: &'item_fn ItemFn,
-    pub statement: &'statement Statement,
+pub struct StatementContext<'a> {
+    pub path: &'a Path,
+    pub module: &'a Module,
+    pub item: &'a ItemKind,
+    pub impl_attributes: Option<&'a [AttributeDecl]>,
+    pub item_impl: Option<&'a ItemImpl>,
+    pub fn_attributes: &'a [AttributeDecl],
+    pub item_fn: &'a ItemFn,
+    pub statement: &'a Statement,
 }
 
 #[derive(Clone)]
-pub struct ExprContext<'module, 'item, 'impl_attributes, 'item_impl, 'fn_attributes, 'item_fn, 'expr> {
-    pub path: &'module Path,
-    pub module: &'module Module,
-    pub item: &'item ItemKind,
-    pub impl_attributes: Option<&'impl_attributes [AttributeDecl]>,
-    pub item_impl: Option<&'item_impl ItemImpl>,
-    pub fn_attributes: &'fn_attributes [AttributeDecl],
-    pub item_fn: &'item_fn ItemFn,
-    pub expr: &'expr Expr,
+pub struct StatementLetContext<'a> {
+    pub path: &'a Path,
+    pub module: &'a Module,
+    pub item: &'a ItemKind,
+    pub impl_attributes: Option<&'a [AttributeDecl]>,
+    pub item_impl: Option<&'a ItemImpl>,
+    pub fn_attributes: &'a [AttributeDecl],
+    pub item_fn: &'a ItemFn,
+    pub statement: &'a Statement,
+    pub statement_let: &'a StatementLet,
 }
 
 #[derive(Clone)]
-pub struct StatementLetContext<'module, 'item, 'impl_attributes, 'item_impl, 'fn_attributes, 'item_fn, 'statement, 'statement_let> {
-    pub path: &'module Path,
-    pub module: &'module Module,
-    pub item: &'item ItemKind,
-    pub impl_attributes: Option<&'impl_attributes [AttributeDecl]>,
-    pub item_impl: Option<&'item_impl ItemImpl>,
-    pub fn_attributes: &'fn_attributes [AttributeDecl],
-    pub item_fn: &'item_fn ItemFn,
-    pub statement: &'statement Statement,
-    pub statement_let: &'statement_let StatementLet,
+pub struct ExprContext<'a> {
+    pub path: &'a Path,
+    pub module: &'a Module,
+    pub item: &'a ItemKind,
+    pub impl_attributes: Option<&'a [AttributeDecl]>,
+    pub item_impl: Option<&'a ItemImpl>,
+    pub fn_attributes: &'a [AttributeDecl],
+    pub item_fn: &'a ItemFn,
+    pub expr: &'a Expr,
 }
 
 #[derive(Clone)]
-pub struct TraitContext<'module, 'item, 'attributes, 'item_trait> {
-    pub path: &'module Path,
-    pub module: &'module Module,
-    pub item: &'item ItemKind,
-    pub attributes: &'attributes [AttributeDecl],
-    pub item_trait: &'item_trait ItemTrait,
+pub struct BlockContext<'a> {
+    pub path: &'a Path,
+    pub module: &'a Module,
+    pub item: &'a ItemKind,
+    pub impl_attributes: Option<&'a [AttributeDecl]>,
+    pub item_impl: Option<&'a ItemImpl>,
+    pub fn_attributes: &'a [AttributeDecl],
+    pub item_fn: &'a ItemFn,
+    pub expr: Option<&'a Expr>,
+    pub block: &'a Braces<CodeBlockContents>,
 }
 
 #[derive(Clone)]
-pub struct ImplContext<'module, 'item, 'attributes, 'item_impl> {
-    pub path: &'module Path,
-    pub module: &'module Module,
-    pub item: &'item ItemKind,
-    pub attributes: &'attributes [AttributeDecl],
-    pub item_impl: &'item_impl ItemImpl,
+pub struct AsmBlockContext<'a> {
+    pub path: &'a Path,
+    pub module: &'a Module,
+    pub item: &'a ItemKind,
+    pub impl_attributes: Option<&'a [AttributeDecl]>,
+    pub item_impl: Option<&'a ItemImpl>,
+    pub fn_attributes: &'a [AttributeDecl],
+    pub item_fn: &'a ItemFn,
+    pub expr: &'a Expr,
+    pub asm: &'a AsmBlock,
 }
 
 #[derive(Clone)]
-pub struct AbiContext<'module, 'item, 'attributes, 'item_abi> {
-    pub path: &'module Path,
-    pub module: &'module Module,
-    pub item: &'item ItemKind,
-    pub attributes: &'attributes [AttributeDecl],
-    pub item_abi: &'item_abi ItemAbi,
+pub struct IfExprContext<'a> {
+    pub path: &'a Path,
+    pub module: &'a Module,
+    pub item: &'a ItemKind,
+    pub impl_attributes: Option<&'a [AttributeDecl]>,
+    pub item_impl: Option<&'a ItemImpl>,
+    pub fn_attributes: &'a [AttributeDecl],
+    pub item_fn: &'a ItemFn,
+    pub expr: &'a Expr,
+    pub if_expr: &'a IfExpr,
 }
 
 #[derive(Clone)]
-pub struct ConstContext<'module, 'item, 'impl_attributes, 'item_impl, 'const_attributes, 'item_const> {
-    pub path: &'module Path,
-    pub module: &'module Module,
-    pub item: &'item ItemKind,
-    pub impl_attributes: Option<&'impl_attributes [AttributeDecl]>,
-    pub item_impl: Option<&'item_impl ItemImpl>,
-    pub const_attributes: &'const_attributes [AttributeDecl],
-    pub item_const: &'item_const ItemConst,
+pub struct MatchExprContext<'a> {
+    pub path: &'a Path,
+    pub module: &'a Module,
+    pub item: &'a ItemKind,
+    pub impl_attributes: Option<&'a [AttributeDecl]>,
+    pub item_impl: Option<&'a ItemImpl>,
+    pub fn_attributes: &'a [AttributeDecl],
+    pub item_fn: &'a ItemFn,
+    pub expr: &'a Expr,
+    pub value: &'a Expr,
+    pub branches: &'a Braces<Vec<MatchBranch>>,
 }
 
 #[derive(Clone)]
-pub struct StorageContext<'module, 'item, 'attributes, 'item_storage> {
-    pub path: &'module Path,
-    pub module: &'module Module,
-    pub item: &'item ItemKind,
-    pub attributes: &'attributes [AttributeDecl],
-    pub item_storage: &'item_storage ItemStorage,
+pub struct WhileExprContext<'a> {
+    pub path: &'a Path,
+    pub module: &'a Module,
+    pub item: &'a ItemKind,
+    pub impl_attributes: Option<&'a [AttributeDecl]>,
+    pub item_impl: Option<&'a ItemImpl>,
+    pub fn_attributes: &'a [AttributeDecl],
+    pub item_fn: &'a ItemFn,
+    pub expr: &'a Expr,
+    pub condition: &'a Expr,
+    pub body: &'a Braces<CodeBlockContents>,
 }
 
 #[derive(Clone)]
-pub struct StorageFieldContext<'module, 'item, 'storage_attributes, 'item_storage, 'field_attributes, 'field> {
-    pub path: &'module Path,
-    pub module: &'module Module,
-    pub item: &'item ItemKind,
-    pub storage_attributes: &'storage_attributes [AttributeDecl],
-    pub item_storage: &'item_storage ItemStorage,
-    pub field_attributes: &'field_attributes [AttributeDecl],
-    pub field: &'field StorageField,
+pub struct TraitContext<'a> {
+    pub path: &'a Path,
+    pub module: &'a Module,
+    pub item: &'a ItemKind,
+    pub attributes: &'a [AttributeDecl],
+    pub item_trait: &'a ItemTrait,
 }
 
 #[derive(Clone)]
-pub struct ConfigurableContext<'module, 'item, 'attributes, 'item_configurable> {
-    pub path: &'module Path,
-    pub module: &'module Module,
-    pub item: &'item ItemKind,
-    pub attributes: &'attributes [AttributeDecl],
-    pub item_configurable: &'item_configurable ItemConfigurable,
+pub struct ImplContext<'a> {
+    pub path: &'a Path,
+    pub module: &'a Module,
+    pub item: &'a ItemKind,
+    pub attributes: &'a [AttributeDecl],
+    pub item_impl: &'a ItemImpl,
 }
 
 #[derive(Clone)]
-pub struct ConfigurableFieldContext<'module, 'item, 'configurable_attributes, 'item_configurable, 'field_attributes, 'field> {
-    pub path: &'module Path,
-    pub module: &'module Module,
-    pub item: &'item ItemKind,
-    pub configurable_attributes: &'configurable_attributes [AttributeDecl],
-    pub item_configurable: &'item_configurable ItemConfigurable,
-    pub field_attributes: &'field_attributes [AttributeDecl],
-    pub field: &'field ConfigurableField,
+pub struct AbiContext<'a> {
+    pub path: &'a Path,
+    pub module: &'a Module,
+    pub item: &'a ItemKind,
+    pub attributes: &'a [AttributeDecl],
+    pub item_abi: &'a ItemAbi,
 }
 
 #[derive(Clone)]
-pub struct TypeAliasContext<'module, 'item, 'attributes, 'item_type_alias> {
-    pub path: &'module Path,
-    pub module: &'module Module,
-    pub item: &'item ItemKind,
-    pub attributes: &'attributes [AttributeDecl],
-    pub item_type_alias: &'item_type_alias ItemTypeAlias,
+pub struct ConstContext<'a> {
+    pub path: &'a Path,
+    pub module: &'a Module,
+    pub item: &'a ItemKind,
+    pub impl_attributes: Option<&'a [AttributeDecl]>,
+    pub item_impl: Option<&'a ItemImpl>,
+    pub const_attributes: &'a [AttributeDecl],
+    pub item_const: &'a ItemConst,
+}
+
+#[derive(Clone)]
+pub struct StorageContext<'a> {
+    pub path: &'a Path,
+    pub module: &'a Module,
+    pub item: &'a ItemKind,
+    pub attributes: &'a [AttributeDecl],
+    pub item_storage: &'a ItemStorage,
+}
+
+#[derive(Clone)]
+pub struct StorageFieldContext<'a> {
+    pub path: &'a Path,
+    pub module: &'a Module,
+    pub item: &'a ItemKind,
+    pub storage_attributes: &'a [AttributeDecl],
+    pub item_storage: &'a ItemStorage,
+    pub field_attributes: &'a [AttributeDecl],
+    pub field: &'a StorageField,
+}
+
+#[derive(Clone)]
+pub struct ConfigurableContext<'a> {
+    pub path: &'a Path,
+    pub module: &'a Module,
+    pub item: &'a ItemKind,
+    pub attributes: &'a [AttributeDecl],
+    pub item_configurable: &'a ItemConfigurable,
+}
+
+#[derive(Clone)]
+pub struct ConfigurableFieldContext<'a> {
+    pub path: &'a Path,
+    pub module: &'a Module,
+    pub item: &'a ItemKind,
+    pub configurable_attributes: &'a [AttributeDecl],
+    pub item_configurable: &'a ItemConfigurable,
+    pub field_attributes: &'a [AttributeDecl],
+    pub field: &'a ConfigurableField,
+}
+
+#[derive(Clone)]
+pub struct TypeAliasContext<'a> {
+    pub path: &'a Path,
+    pub module: &'a Module,
+    pub item: &'a ItemKind,
+    pub attributes: &'a [AttributeDecl],
+    pub item_type_alias: &'a ItemTypeAlias,
 }
 
 #[allow(unused_variables)]
@@ -246,6 +313,21 @@ pub trait AstVisitor {
 
     fn visit_expr(&mut self, context: &ExprContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
     fn leave_expr(&mut self, context: &ExprContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
+
+    fn visit_block(&mut self, context: &BlockContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
+    fn leave_block(&mut self, context: &BlockContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
+
+    fn visit_asm_block(&mut self, context: &AsmBlockContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
+    fn leave_asm_block(&mut self, context: &AsmBlockContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
+
+    fn visit_if_expr(&mut self, context: &IfExprContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
+    fn leave_if_expr(&mut self, context: &IfExprContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
+
+    fn visit_match_expr(&mut self, context: &MatchExprContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
+    fn leave_match_expr(&mut self, context: &MatchExprContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
+
+    fn visit_while_expr(&mut self, context: &WhileExprContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
+    fn leave_while_expr(&mut self, context: &WhileExprContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
 
     fn visit_trait(&mut self, context: &TraitContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
     fn leave_trait(&mut self, context: &TraitContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
@@ -346,7 +428,7 @@ impl AstVisitor for AstVisitorRecursive {
                     path: context.path,
                     module: context.module,
                     item: context.item,
-                    attributes: context.attributes,
+                    struct_attributes: context.attributes,
                     item_struct,
                 };
                 
@@ -529,7 +611,7 @@ impl AstVisitor for AstVisitorRecursive {
                 path: context.path,
                 module: context.module,
                 item: context.item,
-                struct_attributes: context.attributes,
+                struct_attributes: context.struct_attributes,
                 item_struct: context.item_struct,
                 field_attributes: field.attribute_list.as_slice(),
                 field: &field.value,
@@ -638,37 +720,20 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.visit_fn(context, project)?;
         }
 
-        for statement in context.item_fn.body.inner.statements.iter() {
-            let context = StatementContext {
-                path: context.path,
-                module: context.module,
-                item: context.item,
-                impl_attributes: context.impl_attributes,
-                item_impl: context.item_impl,
-                fn_attributes: context.fn_attributes,
-                item_fn: context.item_fn,
-                statement,
-            };
+        let body_context = BlockContext {
+            path: context.path,
+            module: context.module,
+            item: context.item,
+            impl_attributes: context.impl_attributes,
+            item_impl: context.item_impl,
+            fn_attributes: context.fn_attributes,
+            item_fn: context.item_fn,
+            expr: None,
+            block: &context.item_fn.body,
+        };
 
-            self.visit_statement(&context, project)?;
-            self.leave_statement(&context, project)?;
-        }
-
-        if let Some(expr) = context.item_fn.body.inner.final_expr_opt.as_ref() {
-            let context = ExprContext {
-                path: context.path,
-                module: context.module,
-                item: context.item,
-                impl_attributes: context.impl_attributes,
-                item_impl: context.item_impl,
-                fn_attributes: context.fn_attributes,
-                item_fn: context.item_fn,
-                expr,
-            };
-
-            self.visit_expr(&context, project)?;
-            self.leave_expr(&context, project)?;
-        }
+        self.visit_block(&body_context, project)?;
+        self.leave_block(&body_context, project)?;
         
         Ok(())
     }
@@ -756,6 +821,100 @@ impl AstVisitor for AstVisitorRecursive {
         for visitor in self.visitors.iter_mut() {
             visitor.visit_expr(context, project)?;
         }
+
+        match context.expr {
+            Expr::Block(block) => {
+                let context = BlockContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    expr: Some(context.expr),
+                    block,
+                };
+
+                self.visit_block(&context, project)?;
+                self.leave_block(&context, project)?;
+            }
+            
+            Expr::Asm(asm) => {
+                let context = AsmBlockContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    expr: context.expr,
+                    asm,
+                };
+
+                self.visit_asm_block(&context, project)?;
+                self.leave_asm_block(&context, project)?;
+            }
+
+            Expr::If(if_expr) => {
+                let context = IfExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    expr: context.expr,
+                    if_expr,
+                };
+
+                self.visit_if_expr(&context, project)?;
+                self.leave_if_expr(&context, project)?;
+            }
+
+            Expr::Match { value, branches, .. } => {
+                let context = MatchExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    expr: context.expr,
+                    value: value.as_ref(),
+                    branches,
+                };
+
+                self.visit_match_expr(&context, project)?;
+                self.leave_match_expr(&context, project)?;
+            }
+
+            Expr::While { condition, block, .. } => {
+                let context = WhileExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    expr: context.expr,
+                    condition: condition.as_ref(),
+                    body: block,
+                };
+
+                self.visit_while_expr(&context, project)?;
+                self.leave_while_expr(&context, project)?;
+            }
+
+            _ => {
+                // NOTE: every other expression kind can be checked inside
+                // `visit_expr` and `leave_expr` and matching on `context.expr`
+            }
+        }
         
         Ok(())
     }
@@ -763,6 +922,260 @@ impl AstVisitor for AstVisitorRecursive {
     fn leave_expr(&mut self, context: &ExprContext, project: &mut Project) -> Result<(), Error> {
         for visitor in self.visitors.iter_mut() {
             visitor.leave_expr(context, project)?;
+        }
+        
+        Ok(())
+    }
+
+    fn visit_block(&mut self, context: &BlockContext, project: &mut Project) -> Result<(), Error> {
+        for visitor in self.visitors.iter_mut() {
+            visitor.visit_block(context, project)?;
+        }
+
+        for statement in context.block.inner.statements.iter() {
+            let context = StatementContext {
+                path: context.path,
+                module: context.module,
+                item: context.item,
+                impl_attributes: context.impl_attributes,
+                item_impl: context.item_impl,
+                fn_attributes: context.fn_attributes,
+                item_fn: context.item_fn,
+                statement,
+            };
+
+            self.visit_statement(&context, project)?;
+            self.leave_statement(&context, project)?;
+        }
+
+        if let Some(expr) = context.block.inner.final_expr_opt.as_ref() {
+            let context = ExprContext {
+                path: context.path,
+                module: context.module,
+                item: context.item,
+                impl_attributes: context.impl_attributes,
+                item_impl: context.item_impl,
+                fn_attributes: context.fn_attributes,
+                item_fn: context.item_fn,
+                expr: expr.as_ref(),
+            };
+
+            self.visit_expr(&context, project)?;
+            self.leave_expr(&context, project)?;
+        }
+        
+        Ok(())
+    }
+
+    fn leave_block(&mut self, context: &BlockContext, project: &mut Project) -> Result<(), Error> {
+        for visitor in self.visitors.iter_mut() {
+            visitor.leave_block(context, project)?;
+        }
+        
+        Ok(())
+    }
+
+    fn visit_asm_block(&mut self, context: &AsmBlockContext, project: &mut Project) -> Result<(), Error> {
+        for visitor in self.visitors.iter_mut() {
+            visitor.visit_asm_block(context, project)?;
+        }
+
+        //
+        // TODO: visit asm block contents
+        //
+        
+        Ok(())
+    }
+
+    fn leave_asm_block(&mut self, context: &AsmBlockContext, project: &mut Project) -> Result<(), Error> {
+        for visitor in self.visitors.iter_mut() {
+            visitor.leave_asm_block(context, project)?;
+        }
+        
+        Ok(())
+    }
+
+    fn visit_if_expr(&mut self, context: &IfExprContext, project: &mut Project) -> Result<(), Error> {
+        for visitor in self.visitors.iter_mut() {
+            visitor.visit_if_expr(context, project)?;
+        }
+
+        match &context.if_expr.condition {
+            IfCondition::Expr(expr) => {
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    expr: expr.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+            }
+            
+            IfCondition::Let { lhs, rhs, .. } => {
+                //
+                // TODO: visit lhs pattern
+                //
+
+                let rhs_context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    expr: rhs.as_ref(),
+                };
+
+                self.visit_expr(&rhs_context, project)?;
+                self.leave_expr(&rhs_context, project)?;
+            }
+        }
+
+        let then_block_context = BlockContext {
+            path: context.path,
+            module: context.module,
+            item: context.item,
+            impl_attributes: context.impl_attributes,
+            item_impl: context.item_impl,
+            fn_attributes: context.fn_attributes,
+            item_fn: context.item_fn,
+            expr: Some(context.expr),
+            block: &context.if_expr.then_block,
+        };
+
+        self.visit_block(&then_block_context, project)?;
+        self.leave_block(&then_block_context, project)?;
+
+        if let Some(else_opt) = context.if_expr.else_opt.as_ref() {
+            match &else_opt.1 {
+                expr::LoopControlFlow::Continue(if_expr) => {
+                    let context = IfExprContext {
+                        path: context.path,
+                        module: context.module,
+                        item: context.item,
+                        impl_attributes: context.impl_attributes,
+                        item_impl: context.item_impl,
+                        fn_attributes: context.fn_attributes,
+                        item_fn: context.item_fn,
+                        expr: context.expr,
+                        if_expr: if_expr.as_ref(),
+                    };
+
+                    self.visit_if_expr(&context, project)?;
+                    self.leave_if_expr(&context, project)?;
+                }
+                
+                expr::LoopControlFlow::Break(else_block) => {
+                    let else_block_context = BlockContext {
+                        path: context.path,
+                        module: context.module,
+                        item: context.item,
+                        impl_attributes: context.impl_attributes,
+                        item_impl: context.item_impl,
+                        fn_attributes: context.fn_attributes,
+                        item_fn: context.item_fn,
+                        expr: Some(context.expr),
+                        block: else_block,
+                    };
+            
+                    self.visit_block(&else_block_context, project)?;
+                    self.leave_block(&else_block_context, project)?;  
+                }
+            }
+        }
+        
+        Ok(())
+    }
+
+    fn leave_if_expr(&mut self, context: &IfExprContext, project: &mut Project) -> Result<(), Error> {
+        for visitor in self.visitors.iter_mut() {
+            visitor.leave_if_expr(context, project)?;
+        }
+        
+        Ok(())
+    }
+
+    fn visit_match_expr(&mut self, context: &MatchExprContext, project: &mut Project) -> Result<(), Error> {
+        for visitor in self.visitors.iter_mut() {
+            visitor.visit_match_expr(context, project)?;
+        }
+
+        let value_context = ExprContext {
+            path: context.path,
+            module: context.module,
+            item: context.item,
+            impl_attributes: context.impl_attributes,
+            item_impl: context.item_impl,
+            fn_attributes: context.fn_attributes,
+            item_fn: context.item_fn,
+            expr: context.value,
+        };
+
+        self.visit_expr(&value_context, project)?;
+        self.leave_expr(&value_context, project)?;
+
+        //
+        // TODO: visit branches
+        //
+
+        Ok(())
+    }
+
+    fn leave_match_expr(&mut self, context: &MatchExprContext, project: &mut Project) -> Result<(), Error> {
+        for visitor in self.visitors.iter_mut() {
+            visitor.leave_match_expr(context, project)?;
+        }
+        
+        Ok(())
+    }
+
+    fn visit_while_expr(&mut self, context: &WhileExprContext, project: &mut Project) -> Result<(), Error> {
+        for visitor in self.visitors.iter_mut() {
+            visitor.visit_while_expr(context, project)?;
+        }
+
+        let condition_context = ExprContext {
+            path: context.path,
+            module: context.module,
+            item: context.item,
+            impl_attributes: context.impl_attributes,
+            item_impl: context.item_impl,
+            fn_attributes: context.fn_attributes,
+            item_fn: context.item_fn,
+            expr: context.condition,
+        };
+
+        self.visit_expr(&condition_context, project)?;
+        self.leave_expr(&condition_context, project)?;
+
+        let body_context = BlockContext {
+            path: context.path,
+            module: context.module,
+            item: context.item,
+            impl_attributes: context.impl_attributes,
+            item_impl: context.item_impl,
+            fn_attributes: context.fn_attributes,
+            item_fn: context.item_fn,
+            expr: Some(context.expr),
+            block: context.body,
+        };
+
+        self.visit_block(&body_context, project)?;
+        self.leave_block(&body_context, project)?;
+
+        Ok(())
+    }
+
+    fn leave_while_expr(&mut self, context: &WhileExprContext, project: &mut Project) -> Result<(), Error> {
+        for visitor in self.visitors.iter_mut() {
+            visitor.leave_while_expr(context, project)?;
         }
         
         Ok(())

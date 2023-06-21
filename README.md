@@ -20,4 +20,5 @@ A static analyzer for Sway written in Rust.
 
 | Name | Description |
 |-|-|
+| ~~`msg_amount_in_loop`~~ (WIP) | Checks for calls to `msg_amount()` inside a while loop. The value should be stored in a local variable and decremented over each loop iteration. |
 | `storage_not_updated` | Checks for local variables that are read from storage, then modified without being written back to storage. |

@@ -1,5 +1,9 @@
 contract;
 
+use std::call_frames::msg_asset_id;
+use std::context::msg_amount;
+use std::storage::storage_vec::*;
+
 abi TestContract {
     #[storage(write)]
     fn initialize_counter(value: u64) -> u64;
@@ -7,8 +11,8 @@ abi TestContract {
     #[storage(read, write)]
     fn increment_counter(amount: u64) -> u64;
 
-    #[storage(read, write)]
-    fn increment_counter_map(amount: u64) -> u64;
+    #[storage(read, write), payable]
+    fn receive_funds(accounts: Vec<Address>);
 }
 
 struct Counter {
@@ -20,7 +24,7 @@ storage {
         value: 0,
     },
 
-    counter_map: StorageMap<(), Counter> = StorageMap {},
+    balances: StorageMap<Address, StorageMap<ContractId, u64>> = StorageMap {},
 }
 
 impl TestContract for Contract {
@@ -38,13 +42,18 @@ impl TestContract for Contract {
         counter.value
     }
 
-    #[storage(read, write)]
-    fn increment_counter_map(amount: u64) -> u64 {
-        let mut counter = storage.counter_map.get(()).read();
-        counter.value += amount;
-        // storage.counter_map.insert((), counter);
-        
-        let mut counter = Counter { value: amount };
-        counter.value
+    #[storage(read, write), payable]
+    fn receive_funds(accounts: Vec<Address>) {
+        let account_count = accounts.len();
+        let mut i = 0;
+
+        while i < account_count {
+            let balances = storage.balances.get(accounts.get(i).unwrap());
+            let mut balance = balances.get(msg_asset_id()).read();
+            balance += msg_amount();
+            balances.insert(msg_asset_id(), balance);
+
+            i += 1;
+        }
     }
 }

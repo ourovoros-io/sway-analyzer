@@ -2,7 +2,7 @@ use super::{AstVisitor, FnContext, StatementContext};
 use crate::{error::Error, project::Project, utils};
 use std::collections::HashMap;
 use sway_ast::*;
-use sway_types::{BaseIdent, Spanned};
+use sway_types::{BaseIdent, Spanned, Span};
 
 //
 // If a storage value is bound to a mutable local variable, we need to
@@ -11,7 +11,7 @@ use sway_types::{BaseIdent, Spanned};
 
 #[derive(Default)]
 pub struct StorageNotUpdatedVisitor {
-    fn_states: HashMap<String, FnState>,
+    fn_states: HashMap<Span, FnState>,
 }
 
 #[derive(Default)]
@@ -41,8 +41,8 @@ impl AstVisitor for StorageNotUpdatedVisitor {
         // Create the function state
         let fn_signature = context.item_fn.fn_signature.span();
 
-        if !self.fn_states.contains_key(fn_signature.as_str()) {
-            self.fn_states.insert(fn_signature.as_str().to_string(), FnState::default());
+        if !self.fn_states.contains_key(&fn_signature) {
+            self.fn_states.insert(fn_signature, FnState::default());
         }
 
         Ok(())
@@ -56,7 +56,7 @@ impl AstVisitor for StorageNotUpdatedVisitor {
 
         // Get the function state
         let fn_signature = context.item_fn.fn_signature.span();
-        let fn_state = self.fn_states.get(fn_signature.as_str()).unwrap();
+        let fn_state = self.fn_states.get(&fn_signature).unwrap();
 
         // Check all storage bindings to see if they are modified or shadowed without being written back to storage
         for storage_binding in fn_state.storage_bindings.iter() {
@@ -92,7 +92,7 @@ impl AstVisitor for StorageNotUpdatedVisitor {
     fn visit_statement(&mut self, context: &StatementContext, _project: &mut Project) -> Result<(), Error> {
         // Get the function state
         let fn_signature = context.item_fn.fn_signature.span();
-        let fn_state = self.fn_states.get_mut(fn_signature.as_str()).unwrap();
+        let fn_state = self.fn_states.get_mut(&fn_signature).unwrap();
 
         // Check for storage binding variable shadowing
         if let Some(variable_name) = get_variable_binding_ident(context.statement) {
