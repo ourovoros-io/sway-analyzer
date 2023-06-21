@@ -834,6 +834,121 @@ impl AstVisitor for AstVisitorRecursive {
         }
 
         match context.expr {
+            Expr::Error(_) => {}
+            Expr::Path(_) => {}
+            Expr::Literal(_) => {}
+
+            Expr::AbiCast { args, .. } => {
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: args.inner.address.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+            }
+
+            Expr::Struct { fields, .. } => {
+                for field in fields.inner.value_separator_pairs.iter() {
+                    if let Some(field) = field.0.expr_opt.as_ref() {
+                        let context = ExprContext {
+                            path: context.path,
+                            module: context.module,
+                            item: context.item,
+                            impl_attributes: context.impl_attributes,
+                            item_impl: context.item_impl,
+                            fn_attributes: context.fn_attributes,
+                            item_fn: context.item_fn,
+                            blocks: context.blocks.clone(),
+                            expr: field.1.as_ref(),
+                        };
+        
+                        self.visit_expr(&context, project)?;
+                        self.leave_expr(&context, project)?;
+                    }
+                }
+            }
+
+            Expr::Tuple(tuple) => {
+                match &tuple.inner {
+                    ExprTupleDescriptor::Nil => {}
+
+                    ExprTupleDescriptor::Cons { head, tail, .. } => {
+                        let context = ExprContext {
+                            path: context.path,
+                            module: context.module,
+                            item: context.item,
+                            impl_attributes: context.impl_attributes,
+                            item_impl: context.item_impl,
+                            fn_attributes: context.fn_attributes,
+                            item_fn: context.item_fn,
+                            blocks: context.blocks.clone(),
+                            expr: head.as_ref(),
+                        };
+        
+                        self.visit_expr(&context, project)?;
+                        self.leave_expr(&context, project)?;
+
+                        for expr in tail.value_separator_pairs.iter() {
+                            let context = ExprContext {
+                                path: context.path,
+                                module: context.module,
+                                item: context.item,
+                                impl_attributes: context.impl_attributes,
+                                item_impl: context.item_impl,
+                                fn_attributes: context.fn_attributes,
+                                item_fn: context.item_fn,
+                                blocks: context.blocks.clone(),
+                                expr: &expr.0,
+                            };
+            
+                            self.visit_expr(&context, project)?;
+                            self.leave_expr(&context, project)?;
+                        }
+
+                        if let Some(expr) = tail.final_value_opt.as_ref() {
+                            let context = ExprContext {
+                                path: context.path,
+                                module: context.module,
+                                item: context.item,
+                                impl_attributes: context.impl_attributes,
+                                item_impl: context.item_impl,
+                                fn_attributes: context.fn_attributes,
+                                item_fn: context.item_fn,
+                                blocks: context.blocks.clone(),
+                                expr: expr.as_ref(),
+                            };
+            
+                            self.visit_expr(&context, project)?;
+                            self.leave_expr(&context, project)?;
+                        }
+                    }
+                }
+            }
+            Expr::Parens(parens) => {
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: parens.inner.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+            }
+            
             Expr::Block(block) => {
                 let context = BlockContext {
                     path: context.path,
@@ -852,6 +967,78 @@ impl AstVisitor for AstVisitorRecursive {
                 self.leave_block(&context, project)?;
             }
             
+            Expr::Array(array) => {
+                match &array.inner {
+                    ExprArrayDescriptor::Sequence(sequence) => {
+                        for expr in sequence.value_separator_pairs.iter() {
+                            let context = ExprContext {
+                                path: context.path,
+                                module: context.module,
+                                item: context.item,
+                                impl_attributes: context.impl_attributes,
+                                item_impl: context.item_impl,
+                                fn_attributes: context.fn_attributes,
+                                item_fn: context.item_fn,
+                                blocks: context.blocks.clone(),
+                                expr: &expr.0,
+                            };
+            
+                            self.visit_expr(&context, project)?;
+                            self.leave_expr(&context, project)?;
+                        }
+
+                        if let Some(expr) = sequence.final_value_opt.as_ref() {
+                            let context = ExprContext {
+                                path: context.path,
+                                module: context.module,
+                                item: context.item,
+                                impl_attributes: context.impl_attributes,
+                                item_impl: context.item_impl,
+                                fn_attributes: context.fn_attributes,
+                                item_fn: context.item_fn,
+                                blocks: context.blocks.clone(),
+                                expr: expr.as_ref(),
+                            };
+            
+                            self.visit_expr(&context, project)?;
+                            self.leave_expr(&context, project)?;
+                        }
+                    }
+
+                    ExprArrayDescriptor::Repeat { value, length, .. } => {
+                        let context = ExprContext {
+                            path: context.path,
+                            module: context.module,
+                            item: context.item,
+                            impl_attributes: context.impl_attributes,
+                            item_impl: context.item_impl,
+                            fn_attributes: context.fn_attributes,
+                            item_fn: context.item_fn,
+                            blocks: context.blocks.clone(),
+                            expr: value.as_ref(),
+                        };
+        
+                        self.visit_expr(&context, project)?;
+                        self.leave_expr(&context, project)?;
+
+                        let context = ExprContext {
+                            path: context.path,
+                            module: context.module,
+                            item: context.item,
+                            impl_attributes: context.impl_attributes,
+                            item_impl: context.item_impl,
+                            fn_attributes: context.fn_attributes,
+                            item_fn: context.item_fn,
+                            blocks: context.blocks.clone(),
+                            expr: length.as_ref(),
+                        };
+
+                        self.visit_expr(&context, project)?;
+                        self.leave_expr(&context, project)?;
+                    }
+                }
+            }
+            
             Expr::Asm(asm) => {
                 let context = AsmBlockContext {
                     path: context.path,
@@ -867,6 +1054,25 @@ impl AstVisitor for AstVisitorRecursive {
 
                 self.visit_asm_block(&context, project)?;
                 self.leave_asm_block(&context, project)?;
+            }
+
+            Expr::Return { expr_opt, .. } => {
+                if let Some(expr) = expr_opt {
+                    let context = ExprContext {
+                        path: context.path,
+                        module: context.module,
+                        item: context.item,
+                        impl_attributes: context.impl_attributes,
+                        item_impl: context.item_impl,
+                        fn_attributes: context.fn_attributes,
+                        item_fn: context.item_fn,
+                        blocks: context.blocks.clone(),
+                        expr: expr.as_ref(),
+                    };
+    
+                    self.visit_expr(&context, project)?;
+                    self.leave_expr(&context, project)?;
+                }
             }
 
             Expr::If(if_expr) => {
@@ -924,11 +1130,893 @@ impl AstVisitor for AstVisitorRecursive {
                 self.visit_while_expr(&context, project)?;
                 self.leave_while_expr(&context, project)?;
             }
+            
+            Expr::FuncApp { func, args } => {
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: func.as_ref(),
+                };
 
-            _ => {
-                // NOTE: every other expression kind can be checked inside
-                // `visit_expr` and `leave_expr` and matching on `context.expr`
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+
+                for arg in args.inner.value_separator_pairs.iter() {
+                    let context = ExprContext {
+                        path: context.path,
+                        module: context.module,
+                        item: context.item,
+                        impl_attributes: context.impl_attributes,
+                        item_impl: context.item_impl,
+                        fn_attributes: context.fn_attributes,
+                        item_fn: context.item_fn,
+                        blocks: context.blocks.clone(),
+                        expr: &arg.0,
+                    };
+    
+                    self.visit_expr(&context, project)?;
+                    self.leave_expr(&context, project)?;    
+                }
+
+                if let Some(arg) = args.inner.final_value_opt.as_ref() {
+                    let context = ExprContext {
+                        path: context.path,
+                        module: context.module,
+                        item: context.item,
+                        impl_attributes: context.impl_attributes,
+                        item_impl: context.item_impl,
+                        fn_attributes: context.fn_attributes,
+                        item_fn: context.item_fn,
+                        blocks: context.blocks.clone(),
+                        expr: arg.as_ref(),
+                    };
+    
+                    self.visit_expr(&context, project)?;
+                    self.leave_expr(&context, project)?;  
+                }
             }
+
+            Expr::Index { target, arg } => {
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: target.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: arg.inner.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+            }
+
+            Expr::MethodCall { target, contract_args_opt, args, .. } => {
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: target.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+
+                if let Some(opts) = contract_args_opt.as_ref() {
+                    for expr in opts.inner.value_separator_pairs.iter() {
+                        if let Some(expr) = expr.0.expr_opt.as_ref() {
+                            let context = ExprContext {
+                                path: context.path,
+                                module: context.module,
+                                item: context.item,
+                                impl_attributes: context.impl_attributes,
+                                item_impl: context.item_impl,
+                                fn_attributes: context.fn_attributes,
+                                item_fn: context.item_fn,
+                                blocks: context.blocks.clone(),
+                                expr: expr.1.as_ref(),
+                            };
+            
+                            self.visit_expr(&context, project)?;
+                            self.leave_expr(&context, project)?;
+                        }
+                    }
+
+                    if let Some(expr) = opts.inner.final_value_opt.as_ref() {
+                        if let Some(expr) = expr.expr_opt.as_ref() {
+                            let context = ExprContext {
+                                path: context.path,
+                                module: context.module,
+                                item: context.item,
+                                impl_attributes: context.impl_attributes,
+                                item_impl: context.item_impl,
+                                fn_attributes: context.fn_attributes,
+                                item_fn: context.item_fn,
+                                blocks: context.blocks.clone(),
+                                expr: expr.1.as_ref(),
+                            };
+            
+                            self.visit_expr(&context, project)?;
+                            self.leave_expr(&context, project)?;
+                        }
+                    }
+                }
+            
+                for arg in args.inner.value_separator_pairs.iter() {
+                    let context = ExprContext {
+                        path: context.path,
+                        module: context.module,
+                        item: context.item,
+                        impl_attributes: context.impl_attributes,
+                        item_impl: context.item_impl,
+                        fn_attributes: context.fn_attributes,
+                        item_fn: context.item_fn,
+                        blocks: context.blocks.clone(),
+                        expr: &arg.0,
+                    };
+    
+                    self.visit_expr(&context, project)?;
+                    self.leave_expr(&context, project)?;
+                }
+
+                if let Some(arg) = args.inner.final_value_opt.as_ref() {
+                    let context = ExprContext {
+                        path: context.path,
+                        module: context.module,
+                        item: context.item,
+                        impl_attributes: context.impl_attributes,
+                        item_impl: context.item_impl,
+                        fn_attributes: context.fn_attributes,
+                        item_fn: context.item_fn,
+                        blocks: context.blocks.clone(),
+                        expr: arg.as_ref(),
+                    };
+    
+                    self.visit_expr(&context, project)?;
+                    self.leave_expr(&context, project)?;
+                }
+            }
+
+            Expr::FieldProjection { target, .. } => {
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: target.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+            }
+
+            Expr::TupleFieldProjection { target, .. } => {
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: target.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+            }
+
+            Expr::Ref { expr, .. } => {
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: expr.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+            }
+
+            Expr::Deref { expr, .. } => {
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: expr.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+            }
+
+            Expr::Not { expr, .. } => {
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: expr.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+            }
+
+            Expr::Mul { lhs, rhs, .. } => {
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: lhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: rhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+            }
+
+            Expr::Div { lhs, rhs, .. } => {
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: lhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: rhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+            }
+
+            Expr::Pow { lhs, rhs, .. } => {
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: lhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: rhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+            }
+
+            Expr::Modulo { lhs, rhs, .. } => {
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: lhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: rhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+            }
+
+            Expr::Add { lhs, rhs, .. } => {
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: lhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: rhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+            }
+
+            Expr::Sub { lhs, rhs, .. } => {
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: lhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: rhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+            }
+
+            Expr::Shl { lhs, rhs, .. } => {
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: lhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: rhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+            }
+
+            Expr::Shr { lhs, rhs, .. } => {
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: lhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: rhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+            }
+
+            Expr::BitAnd { lhs, rhs, .. } => {
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: lhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: rhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+            }
+
+            Expr::BitXor { lhs, rhs, .. } => {
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: lhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: rhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+            }
+
+            Expr::BitOr { lhs, rhs, .. } => {
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: lhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: rhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+            }
+
+            Expr::Equal { lhs, rhs, .. } => {
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: lhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: rhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+            }
+
+            Expr::NotEqual { lhs, rhs, .. } => {
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: lhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: rhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+            }
+
+            Expr::LessThan { lhs, rhs, .. } => {
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: lhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: rhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+            }
+
+            Expr::GreaterThan { lhs, rhs, .. } => {
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: lhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: rhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+            }
+
+            Expr::LessThanEq { lhs, rhs, .. } => {
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: lhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: rhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+            }
+
+            Expr::GreaterThanEq { lhs, rhs, .. } => {
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: lhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: rhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+            }
+
+            Expr::LogicalAnd { lhs, rhs, .. } => {
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: lhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: rhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+            }
+
+            Expr::LogicalOr { lhs, rhs, .. } => {
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: lhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: rhs.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+            }
+
+            Expr::Reassignment { expr, .. } => {
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr: expr.as_ref(),
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+            }
+
+            Expr::Break { .. } => {}
+            Expr::Continue { .. } => {}
         }
         
         Ok(())
