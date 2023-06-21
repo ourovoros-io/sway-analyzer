@@ -38,7 +38,9 @@ impl TestContract for Contract {
     fn increment_counter(amount: u64) -> u64 {
         let mut counter = storage.counter.read();
         counter.value += amount;
-        // storage.counter.write(counter);
+        {
+            storage.counter.write(counter);
+        }
         counter.value
     }
 

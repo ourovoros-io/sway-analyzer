@@ -1,6 +1,7 @@
 use crate::{error::Error, project::Project};
 use std::path::Path;
 use sway_ast::{*, attribute::Annotated};
+use sway_types::{Span, Spanned};
 
 #[derive(Clone)]
 pub struct ModuleContext<'a> {
@@ -94,6 +95,7 @@ pub struct StatementContext<'a> {
     pub item_impl: Option<&'a ItemImpl>,
     pub fn_attributes: &'a [AttributeDecl],
     pub item_fn: &'a ItemFn,
+    pub blocks: Vec<Span>,
     pub statement: &'a Statement,
 }
 
@@ -106,6 +108,7 @@ pub struct StatementLetContext<'a> {
     pub item_impl: Option<&'a ItemImpl>,
     pub fn_attributes: &'a [AttributeDecl],
     pub item_fn: &'a ItemFn,
+    pub blocks: Vec<Span>,
     pub statement: &'a Statement,
     pub statement_let: &'a StatementLet,
 }
@@ -119,6 +122,7 @@ pub struct ExprContext<'a> {
     pub item_impl: Option<&'a ItemImpl>,
     pub fn_attributes: &'a [AttributeDecl],
     pub item_fn: &'a ItemFn,
+    pub blocks: Vec<Span>,
     pub expr: &'a Expr,
 }
 
@@ -132,6 +136,7 @@ pub struct BlockContext<'a> {
     pub fn_attributes: &'a [AttributeDecl],
     pub item_fn: &'a ItemFn,
     pub expr: Option<&'a Expr>,
+    pub blocks: Vec<Span>,
     pub block: &'a Braces<CodeBlockContents>,
 }
 
@@ -157,6 +162,7 @@ pub struct IfExprContext<'a> {
     pub item_impl: Option<&'a ItemImpl>,
     pub fn_attributes: &'a [AttributeDecl],
     pub item_fn: &'a ItemFn,
+    pub blocks: Vec<Span>,
     pub expr: &'a Expr,
     pub if_expr: &'a IfExpr,
 }
@@ -170,6 +176,7 @@ pub struct MatchExprContext<'a> {
     pub item_impl: Option<&'a ItemImpl>,
     pub fn_attributes: &'a [AttributeDecl],
     pub item_fn: &'a ItemFn,
+    pub blocks: Vec<Span>,
     pub expr: &'a Expr,
     pub value: &'a Expr,
     pub branches: &'a Braces<Vec<MatchBranch>>,
@@ -184,6 +191,7 @@ pub struct WhileExprContext<'a> {
     pub item_impl: Option<&'a ItemImpl>,
     pub fn_attributes: &'a [AttributeDecl],
     pub item_fn: &'a ItemFn,
+    pub blocks: Vec<Span>,
     pub expr: &'a Expr,
     pub condition: &'a Expr,
     pub body: &'a Braces<CodeBlockContents>,
@@ -729,6 +737,7 @@ impl AstVisitor for AstVisitorRecursive {
             fn_attributes: context.fn_attributes,
             item_fn: context.item_fn,
             expr: None,
+            blocks: vec![],
             block: &context.item_fn.body,
         };
 
@@ -761,6 +770,7 @@ impl AstVisitor for AstVisitorRecursive {
                     item_impl: context.item_impl,
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
                     statement: context.statement,
                     statement_let,
                 };
@@ -782,6 +792,7 @@ impl AstVisitor for AstVisitorRecursive {
                     item_impl: context.item_impl,
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
                     expr,
                 };
 
@@ -833,6 +844,7 @@ impl AstVisitor for AstVisitorRecursive {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     expr: Some(context.expr),
+                    blocks: context.blocks.clone(),
                     block,
                 };
 
@@ -866,6 +878,7 @@ impl AstVisitor for AstVisitorRecursive {
                     item_impl: context.item_impl,
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
                     expr: context.expr,
                     if_expr,
                 };
@@ -883,6 +896,7 @@ impl AstVisitor for AstVisitorRecursive {
                     item_impl: context.item_impl,
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
                     expr: context.expr,
                     value: value.as_ref(),
                     branches,
@@ -901,6 +915,7 @@ impl AstVisitor for AstVisitorRecursive {
                     item_impl: context.item_impl,
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
                     expr: context.expr,
                     condition: condition.as_ref(),
                     body: block,
@@ -932,6 +947,9 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.visit_block(context, project)?;
         }
 
+        let mut blocks = context.blocks.clone();
+        blocks.push(context.block.span());
+
         for statement in context.block.inner.statements.iter() {
             let context = StatementContext {
                 path: context.path,
@@ -941,6 +959,7 @@ impl AstVisitor for AstVisitorRecursive {
                 item_impl: context.item_impl,
                 fn_attributes: context.fn_attributes,
                 item_fn: context.item_fn,
+                blocks: blocks.clone(),
                 statement,
             };
 
@@ -957,6 +976,7 @@ impl AstVisitor for AstVisitorRecursive {
                 item_impl: context.item_impl,
                 fn_attributes: context.fn_attributes,
                 item_fn: context.item_fn,
+                blocks: blocks.clone(),
                 expr: expr.as_ref(),
             };
 
@@ -1010,6 +1030,7 @@ impl AstVisitor for AstVisitorRecursive {
                     item_impl: context.item_impl,
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
                     expr: expr.as_ref(),
                 };
 
@@ -1030,6 +1051,7 @@ impl AstVisitor for AstVisitorRecursive {
                     item_impl: context.item_impl,
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
                     expr: rhs.as_ref(),
                 };
 
@@ -1046,6 +1068,7 @@ impl AstVisitor for AstVisitorRecursive {
             item_impl: context.item_impl,
             fn_attributes: context.fn_attributes,
             item_fn: context.item_fn,
+            blocks: context.blocks.clone(),
             expr: Some(context.expr),
             block: &context.if_expr.then_block,
         };
@@ -1064,6 +1087,7 @@ impl AstVisitor for AstVisitorRecursive {
                         item_impl: context.item_impl,
                         fn_attributes: context.fn_attributes,
                         item_fn: context.item_fn,
+                        blocks: context.blocks.clone(),
                         expr: context.expr,
                         if_expr: if_expr.as_ref(),
                     };
@@ -1081,6 +1105,7 @@ impl AstVisitor for AstVisitorRecursive {
                         item_impl: context.item_impl,
                         fn_attributes: context.fn_attributes,
                         item_fn: context.item_fn,
+                        blocks: context.blocks.clone(),
                         expr: Some(context.expr),
                         block: else_block,
                     };
@@ -1115,6 +1140,7 @@ impl AstVisitor for AstVisitorRecursive {
             item_impl: context.item_impl,
             fn_attributes: context.fn_attributes,
             item_fn: context.item_fn,
+            blocks: context.blocks.clone(),
             expr: context.value,
         };
 
@@ -1149,6 +1175,7 @@ impl AstVisitor for AstVisitorRecursive {
             item_impl: context.item_impl,
             fn_attributes: context.fn_attributes,
             item_fn: context.item_fn,
+            blocks: context.blocks.clone(),
             expr: context.condition,
         };
 
@@ -1163,6 +1190,7 @@ impl AstVisitor for AstVisitorRecursive {
             item_impl: context.item_impl,
             fn_attributes: context.fn_attributes,
             item_fn: context.item_fn,
+            blocks: context.blocks.clone(),
             expr: Some(context.expr),
             block: context.body,
         };

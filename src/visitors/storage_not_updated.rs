@@ -16,10 +16,15 @@ pub struct StorageNotUpdatedVisitor {
 
 #[derive(Default)]
 struct FnState {
+    block_states: HashMap<Span, BlockState>,
+}
+
+#[derive(Default)]
+struct BlockState {
     storage_bindings: Vec<StorageBinding>,
 }
 
-impl FnState {
+impl BlockState {
     fn find_last_storage_binding<F>(&mut self, f: F) -> Option<&mut StorageBinding>
     where
         F: FnMut(&&mut StorageBinding) -> bool,
@@ -48,7 +53,22 @@ impl AstVisitor for StorageNotUpdatedVisitor {
         Ok(())
     }
 
-    fn leave_fn(&mut self, context: &FnContext, project: &mut Project) -> Result<(), Error> {
+    fn visit_block(&mut self, context: &super::BlockContext, _project: &mut Project) -> Result<(), Error> {
+        // Get the function state
+        let fn_signature = context.item_fn.fn_signature.span();
+        let fn_state = self.fn_states.get_mut(&fn_signature).unwrap();
+
+        // Create the block state
+        let block_span = context.block.span();
+
+        if !fn_state.block_states.contains_key(&block_span) {
+            fn_state.block_states.insert(block_span, BlockState::default());
+        }
+
+        Ok(())
+    }
+
+    fn leave_block(&mut self, context: &super::BlockContext, project: &mut Project) -> Result<(), Error> {
         // Check for `#[storage(write)]` attribute
         if !utils::check_attribute_decls(context.fn_attributes, "storage", &["write"]) {
             return Ok(());
@@ -58,8 +78,12 @@ impl AstVisitor for StorageNotUpdatedVisitor {
         let fn_signature = context.item_fn.fn_signature.span();
         let fn_state = self.fn_states.get(&fn_signature).unwrap();
 
+        // Get the block state
+        let block_span = context.block.span();
+        let block_state = fn_state.block_states.get(&block_span).unwrap();
+
         // Check all storage bindings to see if they are modified or shadowed without being written back to storage
-        for storage_binding in fn_state.storage_bindings.iter() {
+        for storage_binding in block_state.storage_bindings.iter() {
             if !storage_binding.written {
                 project.report.borrow_mut().add_entry(
                     context.path,
@@ -94,16 +118,20 @@ impl AstVisitor for StorageNotUpdatedVisitor {
         let fn_signature = context.item_fn.fn_signature.span();
         let fn_state = self.fn_states.get_mut(&fn_signature).unwrap();
 
+        // Get the block state
+        let block_span = context.blocks.last().unwrap();
+        let block_state = fn_state.block_states.get_mut(&block_span).unwrap();
+
         // Check for storage binding variable shadowing
         if let Some(variable_name) = get_variable_binding_ident(context.statement) {
-            if let Some(storage_binding) = fn_state.find_last_storage_binding(|x| x.variable_name == variable_name) {
+            if let Some(storage_binding) = block_state.find_last_storage_binding(|x| x.variable_name == variable_name) {
                 storage_binding.shadowing_variable_name = Some(variable_name.clone());
             }
         }
 
         // Check for storage binding declaration, i.e: `let mut x = storage.x.read();`
         if let Some((storage_name, variable_name)) = get_storage_read_binding_idents(context.statement) {
-            fn_state.storage_bindings.push(StorageBinding {
+            block_state.storage_bindings.push(StorageBinding {
                 storage_name,
                 variable_name,
                 shadowing_variable_name: None,
@@ -113,15 +141,25 @@ impl AstVisitor for StorageNotUpdatedVisitor {
         }
         // Check for updates to storage binding, i.e: `x += 1;`
         else if let Some(variable_name) = get_reassignment_ident(context.statement) {
-            if let Some(storage_binding) = fn_state.find_last_storage_binding(|x| x.variable_name == variable_name) {
-                storage_binding.modified = true;
+            for block_span in context.blocks.iter().rev() {
+                let block_state = fn_state.block_states.get_mut(block_span).unwrap();
+
+                if let Some(storage_binding) = block_state.find_last_storage_binding(|x| x.variable_name == variable_name) {
+                    storage_binding.modified = true;
+                    break;
+                }
             }
         }
         // Check for storage binding update, i.e: `storage.x.write(x);`
         else if let Some((storage_name, variable_name)) = get_storage_write_idents(context.statement) {
-            if let Some(storage_binding) = fn_state.find_last_storage_binding(|x| x.storage_name == storage_name) {
-                if variable_name == storage_binding.variable_name {
-                    storage_binding.written = true;
+            for block_span in context.blocks.iter().rev() {
+                let block_state = fn_state.block_states.get_mut(block_span).unwrap();
+
+                if let Some(storage_binding) = block_state.find_last_storage_binding(|x| x.storage_name == storage_name) {
+                    if variable_name == storage_binding.variable_name {
+                        storage_binding.written = true;
+                        break;
+                    }
                 }
             }
         }
