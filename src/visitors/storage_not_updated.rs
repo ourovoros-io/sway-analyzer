@@ -36,6 +36,7 @@ impl BlockState {
 struct StorageBinding {
     storage_name: BaseIdent,
     variable_name: BaseIdent,
+    post_write_name: Option<BaseIdent>,
     shadowing_variable_name: Option<BaseIdent>,
     modified: bool,
     written: bool,
@@ -90,7 +91,7 @@ impl AstVisitor for StorageNotUpdatedVisitor {
                     project.span_to_line(context.path, &storage_binding.variable_name.span())?,
                     if let Some(shadowing_variable_name) = storage_binding.shadowing_variable_name.as_ref() {
                         format!(
-                            "Storage bound to local variable `{}` is shadowed{} before being written back to `storage.{}`",
+                            "Storage bound to local variable `{}` is shadowed{} before being written back to `storage.{}`.",
                             storage_binding.variable_name.as_str(),
                             if let Some(line) = project.span_to_line(context.path, &shadowing_variable_name.span())? {
                                 format!(" at L{}", line)
@@ -101,11 +102,21 @@ impl AstVisitor for StorageNotUpdatedVisitor {
                         )
                     } else {
                         format!(
-                            "Storage bound to local variable `{}` not written back to `storage.{}`",
+                            "Storage bound to local variable `{}` not written back to `storage.{}`.",
                             storage_binding.variable_name.as_str(),
                             storage_binding.storage_name.as_str(),
                         )
                     },
+                );
+            } else if let Some(post_write_name) = storage_binding.post_write_name.as_ref() {
+                project.report.borrow_mut().add_entry(
+                    context.path,
+                    project.span_to_line(context.path, &post_write_name.span())?,
+                    format!(
+                        "Storage bound to local variable `{}` updated after writing back to `storage.{}` without writing updated value.",
+                        storage_binding.variable_name.as_str(),
+                        storage_binding.storage_name.as_str(),
+                    ),
                 );
             }
         }
@@ -134,6 +145,7 @@ impl AstVisitor for StorageNotUpdatedVisitor {
             block_state.storage_bindings.push(StorageBinding {
                 storage_name,
                 variable_name,
+                post_write_name: None,
                 shadowing_variable_name: None,
                 modified: false,
                 written: false,
@@ -146,6 +158,12 @@ impl AstVisitor for StorageNotUpdatedVisitor {
 
                 if let Some(storage_binding) = block_state.find_last_storage_binding(|x| x.variable_name == variable_name) {
                     storage_binding.modified = true;
+
+                    // If the storage binding was previously written, storage is now out of date
+                    if storage_binding.written {
+                        storage_binding.post_write_name = Some(variable_name);
+                    }
+
                     break;
                 }
             }
