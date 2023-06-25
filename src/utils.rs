@@ -119,3 +119,96 @@ fn check_attribute(
 
     results.iter().all(|x| *x == true)
 }
+
+pub fn statement_to_variable_binding_ident(statement: &Statement) -> Option<BaseIdent> {
+    let Statement::Let(StatementLet {
+        pattern,
+        ..
+    }) = statement else { return None };
+    
+    let Pattern::Var {
+        name: variable_name,
+        ..
+    } = pattern else { return None };
+    
+    Some(variable_name.clone())
+}
+
+pub fn statement_to_storage_read_binding_idents(statement: &Statement) -> Option<(BaseIdent, BaseIdent)> {
+    let Statement::Let(StatementLet {
+        pattern,
+        expr,
+        ..
+    }) = statement else { return None };
+    
+    let Pattern::Var {
+        mutable: Some(_),
+        name: variable_name,
+        ..
+    } = pattern else { return None };
+    
+    let storage_idents = fold_expr_base_idents(expr);
+
+    if storage_idents.len() < 3 {
+        return None;
+    }
+
+    if storage_idents[0].as_str() != "storage" {
+        return None;
+    }
+
+    if storage_idents.last().unwrap().as_str() != "read" {
+        return None;
+    }
+
+    let storage_name = &storage_idents[1];
+
+    Some((storage_name.clone(), variable_name.clone()))
+}
+
+pub fn statement_to_reassignment_ident(statement: &Statement) -> Option<BaseIdent> {
+    let Statement::Expr {
+        expr,
+        ..
+    } = statement else { return None };
+
+    let Expr::Reassignment {
+        assignable,
+        ..
+    } = expr else { return None };
+    
+    fold_assignable_base_idents(assignable).first().cloned()
+}
+
+pub fn statement_to_storage_write_idents(statement: &Statement) -> Option<(BaseIdent, BaseIdent)> {
+    let Statement::Expr {
+        expr,
+        ..
+    } = statement else { return None };
+
+    let Expr::MethodCall {
+        args,
+        ..
+    } = expr else { return None };
+
+    let storage_idents = fold_expr_base_idents(expr);
+
+    if storage_idents.len() < 3 {
+        return None;
+    }
+
+    if storage_idents[0].as_str() != "storage" {
+        return None;
+    }
+
+    let ("write" | "insert") = storage_idents.last().unwrap().as_str() else { return None };
+
+    let variable_idents = fold_expr_base_idents(args.inner.final_value_opt.as_ref().unwrap());
+
+    // TODO: need to support paths with multiple idents
+    if variable_idents.len() != 1 {
+        return None;
+    }
+
+    Some((storage_idents[1].clone(), variable_idents[0].clone()))
+}
