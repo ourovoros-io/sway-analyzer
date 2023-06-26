@@ -1,7 +1,7 @@
 use sway_ast::{attribute::Attribute, *};
 use sway_types::BaseIdent;
 
-pub fn fold_expr_base_idents(expr: &Expr) -> Vec<BaseIdent> {
+pub fn fold_expr_idents(expr: &Expr) -> Vec<BaseIdent> {
     let mut result = vec![];
 
     match expr {
@@ -10,21 +10,21 @@ pub fn fold_expr_base_idents(expr: &Expr) -> Vec<BaseIdent> {
         }
 
         Expr::Index { target, .. } => {
-            result.extend(fold_expr_base_idents(target));
+            result.extend(fold_expr_idents(target));
         }
 
         Expr::MethodCall { target, path_seg, .. } => {
-            result.extend(fold_expr_base_idents(target));
+            result.extend(fold_expr_idents(target));
             result.push(path_seg.name.clone());
         }
 
         Expr::FieldProjection { target, name, .. } => {
-            result.extend(fold_expr_base_idents(target));
+            result.extend(fold_expr_idents(target));
             result.push(name.clone());
         }
 
         Expr::TupleFieldProjection { target, .. } => {
-            result.extend(fold_expr_base_idents(target));
+            result.extend(fold_expr_idents(target));
         }
 
         _ => {}
@@ -33,7 +33,7 @@ pub fn fold_expr_base_idents(expr: &Expr) -> Vec<BaseIdent> {
     result
 }
 
-pub fn fold_assignable_base_idents(assignable: &Assignable) -> Vec<BaseIdent> {
+pub fn fold_assignable_idents(assignable: &Assignable) -> Vec<BaseIdent> {
     let mut result = vec![];
 
     match assignable {
@@ -42,16 +42,16 @@ pub fn fold_assignable_base_idents(assignable: &Assignable) -> Vec<BaseIdent> {
         }
 
         Assignable::Index { target, .. } => {
-            result.extend(fold_assignable_base_idents(target));
+            result.extend(fold_assignable_idents(target));
         }
 
         Assignable::FieldProjection { target, name, .. } => {
-            result.extend(fold_assignable_base_idents(target));
+            result.extend(fold_assignable_idents(target));
             result.push(name.clone());
         }
 
         Assignable::TupleFieldProjection { target, .. } => {
-            result.extend(fold_assignable_base_idents(target));
+            result.extend(fold_assignable_idents(target));
         }
     }
 
@@ -147,7 +147,7 @@ pub fn statement_to_storage_read_binding_idents(statement: &Statement) -> Option
         ..
     } = pattern else { return None };
     
-    let storage_idents = fold_expr_base_idents(expr);
+    let storage_idents = fold_expr_idents(expr);
 
     if storage_idents.len() < 3 {
         return None;
@@ -166,7 +166,7 @@ pub fn statement_to_storage_read_binding_idents(statement: &Statement) -> Option
     Some((storage_name.clone(), variable_name.clone()))
 }
 
-pub fn statement_to_reassignment_ident(statement: &Statement) -> Option<BaseIdent> {
+pub fn statement_to_reassignment_idents(statement: &Statement) -> Option<Vec<BaseIdent>> {
     let Statement::Expr {
         expr,
         ..
@@ -177,7 +177,7 @@ pub fn statement_to_reassignment_ident(statement: &Statement) -> Option<BaseIden
         ..
     } = expr else { return None };
     
-    fold_assignable_base_idents(assignable).first().cloned()
+    Some(fold_assignable_idents(assignable))
 }
 
 pub fn statement_to_storage_write_idents(statement: &Statement) -> Option<(BaseIdent, BaseIdent)> {
@@ -191,7 +191,7 @@ pub fn statement_to_storage_write_idents(statement: &Statement) -> Option<(BaseI
         ..
     } = expr else { return None };
 
-    let storage_idents = fold_expr_base_idents(expr);
+    let storage_idents = fold_expr_idents(expr);
 
     if storage_idents.len() < 3 {
         return None;
@@ -203,7 +203,7 @@ pub fn statement_to_storage_write_idents(statement: &Statement) -> Option<(BaseI
 
     let ("write" | "insert") = storage_idents.last().unwrap().as_str() else { return None };
 
-    let variable_idents = fold_expr_base_idents(args.inner.final_value_opt.as_ref().unwrap());
+    let variable_idents = fold_expr_idents(args.inner.final_value_opt.as_ref().unwrap());
 
     // TODO: need to support paths with multiple idents
     if variable_idents.len() != 1 {

@@ -177,16 +177,18 @@ impl AstVisitor for StorageNotUpdatedVisitor {
             });
         }
         // Check for updates to storage binding, i.e: `x += 1;`
-        else if let Some(variable_name) = utils::statement_to_reassignment_ident(context.statement) {
+        else if let Some(variable_names) = utils::statement_to_reassignment_idents(context.statement) {
+            let variable_name = variable_names.first().unwrap();
+            
             for block_span in context.blocks.iter().rev() {
                 let block_state = fn_state.block_states.get_mut(block_span).unwrap();
 
-                if let Some(storage_binding) = block_state.find_last_storage_binding(|x| x.variable_name == variable_name) {
+                if let Some(storage_binding) = block_state.find_last_storage_binding(|x| x.variable_name == *variable_name) {
                     storage_binding.modified = true;
 
                     // If the storage binding was previously written, storage is now out of date
                     if storage_binding.written {
-                        storage_binding.post_write_name = Some(variable_name);
+                        storage_binding.post_write_name = Some(variable_name.clone());
                     }
 
                     break;

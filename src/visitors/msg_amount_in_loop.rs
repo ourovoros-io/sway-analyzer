@@ -63,7 +63,7 @@ impl AstVisitor for MsgAmountInLoopVisitor {
         Ok(())
     }
 
-    fn visit_fn(&mut self, context: &FnContext, _project: &mut Project) -> Result<(), crate::error::Error> {
+    fn visit_fn(&mut self, context: &FnContext, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let module_state = self.module_states.get_mut(context.path.into()).unwrap();
 
@@ -77,7 +77,7 @@ impl AstVisitor for MsgAmountInLoopVisitor {
         Ok(())
     }
 
-    fn visit_block(&mut self, context: &BlockContext, _project: &mut Project) -> Result<(), crate::error::Error> {
+    fn visit_block(&mut self, context: &BlockContext, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let module_state = self.module_states.get_mut(context.path.into()).unwrap();
 
@@ -95,7 +95,7 @@ impl AstVisitor for MsgAmountInLoopVisitor {
         Ok(())
     }
 
-    fn leave_block(&mut self, context: &BlockContext, project: &mut Project) -> Result<(), crate::error::Error> {
+    fn leave_block(&mut self, context: &BlockContext, project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let module_state = self.module_states.get(context.path.into()).unwrap();
 
