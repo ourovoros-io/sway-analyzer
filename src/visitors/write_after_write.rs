@@ -1,4 +1,4 @@
-use super::{AstVisitor, BlockContext, ExprContext, FnContext, ModuleContext, StatementContext};
+use super::{AstVisitor, BlockContext, ExprContext, FnContext, ModuleContext, StatementContext, WhileExprContext};
 use crate::{error::Error, project::Project, utils};
 use std::{collections::HashMap, path::PathBuf};
 use sway_types::{Span, Spanned};
@@ -96,6 +96,34 @@ impl AstVisitor for WriteAfterWriteVisitor {
                         project.span_to_line(context.path, modified_span)?,
                         format!("Variable `{}` consecutively modified without being utilized.", var_span.as_str()),
                     );
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn leave_while_expr(&mut self, context: &WhileExprContext, _project: &mut Project) -> Result<(), Error> {
+        // Get the module state
+        let module_state = self.module_states.get_mut(context.path).unwrap();
+
+        // Get the function state
+        let fn_signature = context.item_fn.fn_signature.span();
+        let fn_state = module_state.fn_states.get_mut(&fn_signature).unwrap();
+
+        // Collect all identifier spans in `context.condition`
+        let var_spans = utils::collect_ident_spans(context.condition);
+
+        // Find the block state each variable state was declared in
+        for var_span in var_spans {
+            for block_span in context.blocks.iter().rev() {
+                // Get the block state
+                let block_state = fn_state.block_states.get_mut(&block_span).unwrap();
+        
+                // Find the variable state and mark it as used
+                if let Some((_, var_state)) = block_state.var_states.iter_mut().find(|(_, var_state)| var_state.name == var_span.as_str()) {
+                    var_state.used = true;
+                    break;
                 }
             }
         }

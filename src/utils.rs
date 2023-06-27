@@ -1,5 +1,224 @@
 use sway_ast::{attribute::Attribute, *};
-use sway_types::BaseIdent;
+use sway_types::{BaseIdent, Span, Spanned};
+
+pub fn collect_ident_spans(expr: &Expr) -> Vec<Span> {
+    let mut spans = vec![];
+
+    match expr {
+        Expr::Path(_) => {
+            spans.push(expr.span());
+        }
+
+        Expr::AbiCast { args, .. } => {
+            spans.extend(collect_ident_spans(args.inner.address.as_ref()));
+        }
+
+        Expr::Struct { fields, .. } => {
+            for field in fields.inner.value_separator_pairs.iter() {
+                if let Some(expr) = field.0.expr_opt.as_ref() {
+                    spans.extend(collect_ident_spans(expr.1.as_ref()));
+                } else {
+                    spans.push(field.0.field_name.span());
+                }
+            }
+        }
+
+        Expr::Tuple(tuple) => {
+            if let ExprTupleDescriptor::Cons { head, tail, .. } = &tuple.inner {
+                spans.extend(collect_ident_spans(head.as_ref()));
+
+                for expr in tail.value_separator_pairs.iter() {
+                    spans.extend(collect_ident_spans(&expr.0));
+                }
+
+                if let Some(expr) = tail.final_value_opt.as_ref() {
+                    spans.extend(collect_ident_spans(expr.as_ref()));
+                }
+            }
+        }
+
+        Expr::Parens(expr) => {
+            spans.extend(collect_ident_spans(expr.inner.as_ref()));
+        }
+        
+        Expr::Array(array) => {
+            match &array.inner {
+                ExprArrayDescriptor::Sequence(sequence) => {
+                    for expr in sequence.value_separator_pairs.iter() {
+                        spans.extend(collect_ident_spans(&expr.0));
+                    }
+        
+                    if let Some(expr) = sequence.final_value_opt.as_ref() {
+                        spans.extend(collect_ident_spans(expr.as_ref()));
+                    }
+                }
+
+                ExprArrayDescriptor::Repeat { value, length, .. } => {
+                    spans.extend(collect_ident_spans(value.as_ref()));
+                    spans.extend(collect_ident_spans(length.as_ref()));
+                }
+            }
+        }
+
+        Expr::Return { expr_opt: Some(expr), .. } => {
+            spans.extend(collect_ident_spans(expr.as_ref()));
+        }
+
+        Expr::FuncApp { func, args } => {
+            spans.extend(collect_ident_spans(func.as_ref()));
+
+            for arg in args.inner.value_separator_pairs.iter() {
+                spans.extend(collect_ident_spans(&arg.0));
+            }
+
+            if let Some(arg) = args.inner.final_value_opt.as_ref() {
+                spans.extend(collect_ident_spans(arg.as_ref()));
+            }
+        }
+
+        Expr::Index { target, arg } => {
+            spans.extend(collect_ident_spans(target.as_ref()));
+            spans.extend(collect_ident_spans(arg.inner.as_ref()));
+        }
+
+        Expr::MethodCall { target, args, .. } => {
+            spans.extend(collect_ident_spans(target.as_ref()));
+            
+            for arg in args.inner.value_separator_pairs.iter() {
+                spans.extend(collect_ident_spans(&arg.0));
+            }
+
+            if let Some(arg) = args.inner.final_value_opt.as_ref() {
+                spans.extend(collect_ident_spans(arg.as_ref()));
+            }
+        }
+
+        Expr::FieldProjection { target, .. } => {
+            spans.push(expr.span());
+            spans.extend(collect_ident_spans(target.as_ref()));
+        }
+
+        Expr::TupleFieldProjection { target, .. } => {
+            spans.push(expr.span());
+            spans.extend(collect_ident_spans(target.as_ref()));
+        }
+
+        Expr::Ref { expr, .. } => {
+            spans.extend(collect_ident_spans(expr.as_ref()));
+        }
+
+        Expr::Deref { expr, .. } => {
+            spans.extend(collect_ident_spans(expr.as_ref()));
+        }
+
+        Expr::Not { expr, .. } => {
+            spans.extend(collect_ident_spans(expr.as_ref()));
+        }
+
+        Expr::Mul { lhs, rhs, .. } => {
+            spans.extend(collect_ident_spans(lhs.as_ref()));
+            spans.extend(collect_ident_spans(rhs.as_ref()));
+        }
+
+        Expr::Div { lhs, rhs, .. } => {
+            spans.extend(collect_ident_spans(lhs.as_ref()));
+            spans.extend(collect_ident_spans(rhs.as_ref()));
+        }
+
+        Expr::Pow { lhs, rhs, .. } => {
+            spans.extend(collect_ident_spans(lhs.as_ref()));
+            spans.extend(collect_ident_spans(rhs.as_ref()));
+        }
+
+        Expr::Modulo { lhs, rhs, .. } => {
+            spans.extend(collect_ident_spans(lhs.as_ref()));
+            spans.extend(collect_ident_spans(rhs.as_ref()));
+        }
+
+        Expr::Add { lhs, rhs, .. } => {
+            spans.extend(collect_ident_spans(lhs.as_ref()));
+            spans.extend(collect_ident_spans(rhs.as_ref()));
+        }
+
+        Expr::Sub { lhs, rhs, .. } => {
+            spans.extend(collect_ident_spans(lhs.as_ref()));
+            spans.extend(collect_ident_spans(rhs.as_ref()));
+        }
+
+        Expr::Shl { lhs, rhs, .. } => {
+            spans.extend(collect_ident_spans(lhs.as_ref()));
+            spans.extend(collect_ident_spans(rhs.as_ref()));
+        }
+
+        Expr::Shr { lhs, rhs, .. } => {
+            spans.extend(collect_ident_spans(lhs.as_ref()));
+            spans.extend(collect_ident_spans(rhs.as_ref()));
+        }
+
+        Expr::BitAnd { lhs, rhs, .. } => {
+            spans.extend(collect_ident_spans(lhs.as_ref()));
+            spans.extend(collect_ident_spans(rhs.as_ref()));
+        }
+
+        Expr::BitXor { lhs, rhs, .. } => {
+            spans.extend(collect_ident_spans(lhs.as_ref()));
+            spans.extend(collect_ident_spans(rhs.as_ref()));
+        }
+
+        Expr::BitOr { lhs, rhs, .. } => {
+            spans.extend(collect_ident_spans(lhs.as_ref()));
+            spans.extend(collect_ident_spans(rhs.as_ref()));
+        }
+
+        Expr::Equal { lhs, rhs, .. } => {
+            spans.extend(collect_ident_spans(lhs.as_ref()));
+            spans.extend(collect_ident_spans(rhs.as_ref()));
+        }
+
+        Expr::NotEqual { lhs, rhs, .. } => {
+            spans.extend(collect_ident_spans(lhs.as_ref()));
+            spans.extend(collect_ident_spans(rhs.as_ref()));
+        }
+
+        Expr::LessThan { lhs, rhs, .. } => {
+            spans.extend(collect_ident_spans(lhs.as_ref()));
+            spans.extend(collect_ident_spans(rhs.as_ref()));
+        }
+
+        Expr::GreaterThan { lhs, rhs, .. } => {
+            spans.extend(collect_ident_spans(lhs.as_ref()));
+            spans.extend(collect_ident_spans(rhs.as_ref()));
+        }
+
+        Expr::LessThanEq { lhs, rhs, .. } => {
+            spans.extend(collect_ident_spans(lhs.as_ref()));
+            spans.extend(collect_ident_spans(rhs.as_ref()));
+        }
+
+        Expr::GreaterThanEq { lhs, rhs, .. } => {
+            spans.extend(collect_ident_spans(lhs.as_ref()));
+            spans.extend(collect_ident_spans(rhs.as_ref()));
+        }
+
+        Expr::LogicalAnd { lhs, rhs, .. } => {
+            spans.extend(collect_ident_spans(lhs.as_ref()));
+            spans.extend(collect_ident_spans(rhs.as_ref()));
+        }
+
+        Expr::LogicalOr { lhs, rhs, .. } => {
+            spans.extend(collect_ident_spans(lhs.as_ref()));
+            spans.extend(collect_ident_spans(rhs.as_ref()));
+        }
+        
+        Expr::Reassignment { expr, .. } => {
+            spans.extend(collect_ident_spans(expr.as_ref()));
+        }
+        
+        _ => {}
+    }
+
+    spans
+}
 
 pub fn fold_expr_idents(expr: &Expr) -> Vec<BaseIdent> {
     let mut result = vec![];

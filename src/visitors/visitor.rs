@@ -1,6 +1,6 @@
 use crate::{error::Error, project::Project};
 use std::path::Path;
-use sway_ast::{*, attribute::Annotated};
+use sway_ast::{*, attribute::Annotated, expr::asm::AsmFinalExpr};
 use sway_types::{Span, Spanned};
 
 #[derive(Clone)]
@@ -154,6 +154,34 @@ pub struct AsmBlockContext<'a> {
 }
 
 #[derive(Clone)]
+pub struct AsmInstructionContext<'a> {
+    pub path: &'a Path,
+    pub module: &'a Module,
+    pub item: &'a ItemKind,
+    pub impl_attributes: Option<&'a [AttributeDecl]>,
+    pub item_impl: Option<&'a ItemImpl>,
+    pub fn_attributes: &'a [AttributeDecl],
+    pub item_fn: &'a ItemFn,
+    pub expr: &'a Expr,
+    pub asm: &'a AsmBlock,
+    pub instruction: &'a Instruction,
+}
+
+#[derive(Clone)]
+pub struct AsmFinalExprContext<'a> {
+    pub path: &'a Path,
+    pub module: &'a Module,
+    pub item: &'a ItemKind,
+    pub impl_attributes: Option<&'a [AttributeDecl]>,
+    pub item_impl: Option<&'a ItemImpl>,
+    pub fn_attributes: &'a [AttributeDecl],
+    pub item_fn: &'a ItemFn,
+    pub expr: &'a Expr,
+    pub asm: &'a AsmBlock,
+    pub final_expr: &'a AsmFinalExpr,
+}
+
+#[derive(Clone)]
 pub struct IfExprContext<'a> {
     pub path: &'a Path,
     pub module: &'a Module,
@@ -180,6 +208,21 @@ pub struct MatchExprContext<'a> {
     pub expr: &'a Expr,
     pub value: &'a Expr,
     pub branches: &'a Braces<Vec<MatchBranch>>,
+}
+
+#[derive(Clone)]
+pub struct MatchBranchContext<'a> {
+    pub path: &'a Path,
+    pub module: &'a Module,
+    pub item: &'a ItemKind,
+    pub impl_attributes: Option<&'a [AttributeDecl]>,
+    pub item_impl: Option<&'a ItemImpl>,
+    pub fn_attributes: &'a [AttributeDecl],
+    pub item_fn: &'a ItemFn,
+    pub blocks: Vec<Span>,
+    pub expr: &'a Expr,
+    pub value: &'a Expr,
+    pub branch: &'a MatchBranch,
 }
 
 #[derive(Clone)]
@@ -328,11 +371,20 @@ pub trait AstVisitor {
     fn visit_asm_block(&mut self, context: &AsmBlockContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
     fn leave_asm_block(&mut self, context: &AsmBlockContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
 
+    fn visit_asm_instruction(&mut self, context: &AsmInstructionContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
+    fn leave_asm_instruction(&mut self, context: &AsmInstructionContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
+
+    fn visit_asm_final_expr(&mut self, context: &AsmFinalExprContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
+    fn leave_asm_final_expr(&mut self, context: &AsmFinalExprContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
+
     fn visit_if_expr(&mut self, context: &IfExprContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
     fn leave_if_expr(&mut self, context: &IfExprContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
 
     fn visit_match_expr(&mut self, context: &MatchExprContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
     fn leave_match_expr(&mut self, context: &MatchExprContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
+
+    fn visit_match_branch(&mut self, context: &MatchBranchContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
+    fn leave_match_branch(&mut self, context: &MatchBranchContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
 
     fn visit_while_expr(&mut self, context: &WhileExprContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
     fn leave_while_expr(&mut self, context: &WhileExprContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
@@ -779,8 +831,16 @@ impl AstVisitor for AstVisitorRecursive {
                 self.leave_statement_let(&context, project)?;
             }
 
-            Statement::Item(_) => {
-                todo!("Can statements really be items?")
+            Statement::Item(item) => {
+                let context = ModuleItemContext {
+                    path: context.path,
+                    module: context.module,
+                    attributes: item.attribute_list.as_slice(),
+                    item: &item.value,
+                };
+
+                self.visit_module_item(&context, project)?;
+                self.leave_module_item(&context, project)?;
             }
 
             Statement::Expr { expr, .. } => {
@@ -2088,16 +2148,80 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.visit_asm_block(context, project)?;
         }
 
-        //
-        // TODO: visit asm block contents
-        //
-        
+        for instruction in context.asm.contents.inner.instructions.iter() {
+            let context = AsmInstructionContext {
+                path: context.path,
+                module: context.module,
+                item: context.item,
+                impl_attributes: context.impl_attributes,
+                item_impl: context.item_impl,
+                fn_attributes: context.fn_attributes,
+                item_fn: context.item_fn,
+                expr: context.expr,
+                asm: context.asm,
+                instruction: &instruction.0,
+            };
+
+            self.visit_asm_instruction(&context, project)?;
+            self.leave_asm_instruction(&context, project)?;
+        }
+
+        if let Some(final_expr) = context.asm.contents.inner.final_expr_opt.as_ref() {
+            let context = AsmFinalExprContext {
+                path: context.path,
+                module: context.module,
+                item: context.item,
+                impl_attributes: context.impl_attributes,
+                item_impl: context.item_impl,
+                fn_attributes: context.fn_attributes,
+                item_fn: context.item_fn,
+                expr: context.expr,
+                asm: context.asm,
+                final_expr,
+            };
+
+            self.visit_asm_final_expr(&context, project)?;
+            self.leave_asm_final_expr(&context, project)?;
+        }
+
         Ok(())
     }
 
     fn leave_asm_block(&mut self, context: &AsmBlockContext, project: &mut Project) -> Result<(), Error> {
         for visitor in self.visitors.iter_mut() {
             visitor.leave_asm_block(context, project)?;
+        }
+        
+        Ok(())
+    }
+
+    fn visit_asm_instruction(&mut self, context: &AsmInstructionContext, project: &mut Project) -> Result<(), Error> {
+        for visitor in self.visitors.iter_mut() {
+            visitor.visit_asm_instruction(context, project)?;
+        }
+        
+        Ok(())
+    }
+
+    fn leave_asm_instruction(&mut self, context: &AsmInstructionContext, project: &mut Project) -> Result<(), Error> {
+        for visitor in self.visitors.iter_mut() {
+            visitor.leave_asm_instruction(context, project)?;
+        }
+        
+        Ok(())
+    }
+
+    fn visit_asm_final_expr(&mut self, context: &AsmFinalExprContext, project: &mut Project) -> Result<(), Error> {
+        for visitor in self.visitors.iter_mut() {
+            visitor.visit_asm_final_expr(context, project)?;
+        }
+        
+        Ok(())
+    }
+
+    fn leave_asm_final_expr(&mut self, context: &AsmFinalExprContext, project: &mut Project) -> Result<(), Error> {
+        for visitor in self.visitors.iter_mut() {
+            visitor.leave_asm_final_expr(context, project)?;
         }
         
         Ok(())
@@ -2128,7 +2252,7 @@ impl AstVisitor for AstVisitorRecursive {
             
             IfCondition::Let { lhs, rhs, .. } => {
                 //
-                // TODO: visit lhs pattern
+                // TODO: visit `lhs` pattern
                 //
 
                 let rhs_context = ExprContext {
@@ -2235,9 +2359,24 @@ impl AstVisitor for AstVisitorRecursive {
         self.visit_expr(&value_context, project)?;
         self.leave_expr(&value_context, project)?;
 
-        //
-        // TODO: visit branches
-        //
+        for branch in context.branches.inner.iter() {
+            let context = MatchBranchContext {
+                path: context.path,
+                module: context.module,
+                item: context.item,
+                impl_attributes: context.impl_attributes,
+                item_impl: context.item_impl,
+                fn_attributes: context.fn_attributes,
+                item_fn: context.item_fn,
+                blocks: context.blocks.clone(),
+                expr: context.expr,
+                value: context.value,
+                branch,
+            };
+
+            self.visit_match_branch(&context, project)?;
+            self.leave_match_branch(&context, project)?;
+        }
 
         Ok(())
     }
@@ -2245,6 +2384,63 @@ impl AstVisitor for AstVisitorRecursive {
     fn leave_match_expr(&mut self, context: &MatchExprContext, project: &mut Project) -> Result<(), Error> {
         for visitor in self.visitors.iter_mut() {
             visitor.leave_match_expr(context, project)?;
+        }
+        
+        Ok(())
+    }
+
+    fn visit_match_branch(&mut self, context: &MatchBranchContext, project: &mut Project) -> Result<(), Error> {
+        for visitor in self.visitors.iter_mut() {
+            visitor.visit_match_branch(context, project)?;
+        }
+
+        //
+        // TODO: visit `context.branch.pattern`
+        //
+
+        match &context.branch.kind {
+            MatchBranchKind::Block { block, .. } => {
+                let context = BlockContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    expr: Some(context.expr),
+                    blocks: context.blocks.clone(),
+                    block,
+                };
+
+                self.visit_block(&context, project)?;
+                self.leave_block(&context, project)?;
+            }
+
+            MatchBranchKind::Expr { expr, .. } => {
+                let context = ExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
+                    blocks: context.blocks.clone(),
+                    expr,
+                };
+
+                self.visit_expr(&context, project)?;
+                self.leave_expr(&context, project)?;
+            }
+        }
+        
+        Ok(())
+    }
+
+    fn leave_match_branch(&mut self, context: &MatchBranchContext, project: &mut Project) -> Result<(), Error> {
+        for visitor in self.visitors.iter_mut() {
+            visitor.leave_match_branch(context, project)?;
         }
         
         Ok(())
