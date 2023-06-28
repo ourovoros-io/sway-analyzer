@@ -41,6 +41,8 @@ impl TestContract for Contract {
         {
             storage.counter.write(counter);
         }
+        counter.value = amount * 2;
+        counter.value = amount * 2;
         counter.value += amount * 2;
         counter.value
     }

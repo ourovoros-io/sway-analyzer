@@ -1,6 +1,7 @@
-use super::{AstVisitor, BlockContext, ExprContext, FnContext, ModuleContext, StatementContext, WhileExprContext};
+use super::{AstVisitor, BlockContext, ExprContext, FnContext, ModuleContext, WhileExprContext};
 use crate::{error::Error, project::Project, utils};
 use std::{collections::HashMap, path::PathBuf};
+use sway_ast::{expr::{ReassignmentOp, ReassignmentOpVariant}, Expr};
 use sway_types::{Span, Spanned};
 
 #[derive(Default)]
@@ -20,13 +21,12 @@ struct FnState {
 
 #[derive(Default)]
 struct BlockState {
-    var_states: HashMap<Span, VarState>,
+    assignable_states: Vec<AssignableState>,
 }
 
-#[derive(Default)]
-struct VarState {
+struct AssignableState {
     name: String,
-    modified_span: Option<Span>,
+    span: Span,
     used: bool,
 }
 
@@ -72,37 +72,6 @@ impl AstVisitor for WriteAfterWriteVisitor {
         Ok(())
     }
 
-    fn leave_block(&mut self, context: &BlockContext, project: &mut Project) -> Result<(), Error> {
-        // Get the module state
-        let module_state = self.module_states.get(context.path.into()).unwrap();
-
-        // Get the function state
-        let fn_signature = context.item_fn.fn_signature.span();
-        let fn_state = module_state.fn_states.get(&fn_signature).unwrap();
-
-        // Get the block state
-        let block_span = context.block.span();
-        let block_state = fn_state.block_states.get(&block_span).unwrap();
-
-        for (var_span, var_state) in block_state.var_states.iter() {
-            if let Some(modified_span) = var_state.modified_span.as_ref() {
-                //
-                // TODO: check state of specific fields/tuple members
-                //
-
-                if !var_state.used {
-                    project.report.borrow_mut().add_entry(
-                        context.path,
-                        project.span_to_line(context.path, modified_span)?,
-                        format!("Variable `{}` consecutively modified without being utilized.", var_span.as_str()),
-                    );
-                }
-            }
-        }
-
-        Ok(())
-    }
-
     fn leave_while_expr(&mut self, context: &WhileExprContext, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let module_state = self.module_states.get_mut(context.path).unwrap();
@@ -121,8 +90,8 @@ impl AstVisitor for WriteAfterWriteVisitor {
                 let block_state = fn_state.block_states.get_mut(&block_span).unwrap();
         
                 // Find the variable state and mark it as used
-                if let Some((_, var_state)) = block_state.var_states.iter_mut().find(|(_, var_state)| var_state.name == var_span.as_str()) {
-                    var_state.used = true;
+                if let Some(assignable_state) = block_state.assignable_states.iter_mut().find(|x| x.name == var_span.as_str()) {
+                    assignable_state.used = true;
                     break;
                 }
             }
@@ -131,7 +100,7 @@ impl AstVisitor for WriteAfterWriteVisitor {
         Ok(())
     }
 
-    fn visit_statement(&mut self, context: &StatementContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_expr(&mut self, context: &ExprContext, project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let module_state = self.module_states.get_mut(context.path).unwrap();
 
@@ -139,71 +108,78 @@ impl AstVisitor for WriteAfterWriteVisitor {
         let fn_signature = context.item_fn.fn_signature.span();
         let fn_state = module_state.fn_states.get_mut(&fn_signature).unwrap();
 
-        // Get the block state
-        let block_span = context.blocks.last().unwrap();
-        let block_state = fn_state.block_states.get_mut(&block_span).unwrap();
+        let mut expr = context.expr;
 
-        // Check if we have encountered a variable declaration
-        if let Some(var_ident) = utils::statement_to_variable_binding_ident(context.statement) {
-            // Create the variable state
-            let var_span = var_ident.span();
-
-            if !block_state.var_states.contains_key(&var_span) {
-                block_state.var_states.insert(var_span.clone(), VarState {
-                    name: var_span.as_str().to_string(),
-                    ..Default::default()
-                });
-            }
-        }
-        // Check if we have encountered a variable reassignment
-        else if let Some(reassignment_idents) = utils::statement_to_reassignment_idents(context.statement) {
-            let var_span = reassignment_idents.first().unwrap().span();
-            let var_name = var_span.as_str().to_string();
-
+        // If expr is an assignment, check if expr being assigned to was already assigned to in available block scopes
+        if let Expr::Reassignment {
+            assignable,
+            reassignment_op: ReassignmentOp {
+                variant: ReassignmentOpVariant::Equals,
+                ..
+            },
+            expr: value_expr,
+        } = expr {
+            let assignable_span = assignable.span();
+            let mut assignable_state_exists = false;
+            
+            // Check if the assigned value has been used and create a report entry if not
             for block_span in context.blocks.iter().rev() {
+                // Get the block state
                 let block_state = fn_state.block_states.get_mut(block_span).unwrap();
 
-                if let Some((_, var_state)) = block_state.var_states.iter_mut().find(|(_, var_state)| var_state.name == var_name) {
-                    var_state.modified_span = Some(var_span);
-                    var_state.used = false;
+                // Check if the assignable state exists
+                if let Some(assignable_state) = block_state.assignable_states.iter_mut().find(|x| x.name == assignable_span.as_str()) {
+                    // If the assigned value has not been used, create a report entry
+                    if !assignable_state.used {
+                        project.report.borrow_mut().add_entry(
+                            context.path,
+                            project.span_to_line(context.path, &assignable_state.span)?,
+                            format!(
+                                "Assignment made to `{}` is discarded by the assignment made on L{}.",
+                                assignable_state.span.as_str(),
+                                project.span_to_line(context.path, &assignable_span)?.unwrap(),
+                            ),
+                        );
+                    }
 
-                    //
-                    // TODO: update state of specific fields/tuple members
-                    //
+                    // Since the assignable has been assigned a new value, update its span and mark it as unused
+                    assignable_state.span = assignable_span.clone();
+                    assignable_state.used = false;
 
+                    // Note that the assignable state exists and stop the lookup
+                    assignable_state_exists = true;
                     break;
                 }
             }
+
+            // If the assignable state does not exist, create a new assignable state in the current block state
+            if !assignable_state_exists {
+                // Get the current block state
+                let block_span = context.blocks.last().unwrap();
+                let block_state = fn_state.block_states.get_mut(block_span).unwrap();
+    
+                // Create a new assignable state
+                block_state.assignable_states.push(AssignableState {
+                    name: assignable_span.as_str().to_string(),
+                    span: assignable_span,
+                    used: false,
+                });
+            }
+
+            expr = value_expr.as_ref();
         }
 
-        Ok(())
-    }
+        // Collect all identifier spans in the expression
+        let ident_spans = utils::collect_ident_spans(expr);
 
-    fn visit_expr(&mut self, context: &ExprContext, _project: &mut Project) -> Result<(), Error> {
-        // Get the module state
-        let module_state = self.module_states.get_mut(context.path).unwrap();
+        // If an assignable state for any of the identifier spans exists in any of the current blocks, mark it as used
+        for ident_span in ident_spans.into_iter() {
+            for block_span in context.blocks.iter().rev() {
+                // Get the block state
+                let block_state = fn_state.block_states.get_mut(block_span).unwrap();
 
-        // Get the function state
-        let fn_signature = context.item_fn.fn_signature.span();
-        let fn_state = module_state.fn_states.get_mut(&fn_signature).unwrap();
-
-        let expr_idents = utils::fold_expr_idents(context.expr);
-
-        if expr_idents.is_empty() {
-            return Ok(())
-        }
-
-        for block_span in context.blocks.iter().rev() {
-            let block_state = fn_state.block_states.get_mut(block_span).unwrap();
-
-            for (_, var_state) in block_state.var_states.iter_mut() {
-                if var_state.name == expr_idents[0].as_str() {
-                    var_state.used = true;
-
-                    //
-                    // TODO: update state of specific fields/tuple members
-                    //
-
+                if let Some(assignable_state) = block_state.assignable_states.iter_mut().find(|x| x.name == ident_span.as_str()) {
+                    assignable_state.used = true;
                     break;
                 }
             }
