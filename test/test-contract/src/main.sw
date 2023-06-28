@@ -37,14 +37,13 @@ impl TestContract for Contract {
     #[storage(read, write)]
     fn increment_counter(amount: u64) -> u64 {
         let mut counter = storage.counter.read();
+        let mut amount = amount;
         counter.value += amount;
         {
             storage.counter.write(counter);
         }
-        counter.value = amount * 2;
-        counter.value += amount * 2;
-        counter.value = amount * 2;
-        counter.value
+        amount *= 2;
+        0
     }
 
     #[storage(read, write), payable]

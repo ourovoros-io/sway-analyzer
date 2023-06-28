@@ -1,11 +1,11 @@
-use super::{AstVisitor, BlockContext, ExprContext, FnContext, ModuleContext, WhileExprContext};
+use super::{AstVisitor, BlockContext, ExprContext, FnContext, ModuleContext, StatementContext, WhileExprContext};
 use crate::{error::Error, project::Project, utils};
 use std::{collections::HashMap, path::PathBuf};
-use sway_ast::{expr::ReassignmentOpVariant, Expr};
+use sway_ast::{expr::ReassignmentOpVariant, Expr, Statement, StatementLet, Pattern};
 use sway_types::{Span, Spanned};
 
 #[derive(Default)]
-pub struct WriteAfterWriteVisitor {
+pub struct DiscardedAssignmentsVisitor {
     module_states: HashMap<PathBuf, ModuleState>,
 }
 
@@ -31,7 +31,7 @@ struct AssignableState {
     op: ReassignmentOpVariant,
 }
 
-impl AstVisitor for WriteAfterWriteVisitor {
+impl AstVisitor for DiscardedAssignmentsVisitor {
     fn visit_module(&mut self, context: &ModuleContext,  _project: &mut Project) -> Result<(), Error> {
         // Create the module state
         if !self.module_states.contains_key(context.path) {
@@ -73,6 +73,32 @@ impl AstVisitor for WriteAfterWriteVisitor {
         Ok(())
     }
 
+    fn leave_block(&mut self, context: &BlockContext, project: &mut Project) -> Result<(), Error> {
+        // Get the module state
+        let module_state = self.module_states.get(context.path).unwrap();
+
+        // Get the function state
+        let fn_signature = context.item_fn.fn_signature.span();
+        let fn_state = module_state.fn_states.get(&fn_signature).unwrap();
+
+        // Get the block state
+        let block_span = context.block.span();
+        let block_state = fn_state.block_states.get(&block_span).unwrap();
+
+        // Check for discarded assignments
+        for assignable_state in block_state.assignable_states.iter() {
+            if !assignable_state.used {
+                project.report.borrow_mut().add_entry(
+                    context.path,
+                    project.span_to_line(context.path, &assignable_state.span)?,
+                    format!("Assignment made to `{}` is discarded.", assignable_state.span.as_str()),
+                );
+            }
+        }
+
+        Ok(())
+    }
+
     fn leave_while_expr(&mut self, context: &WhileExprContext, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let module_state = self.module_states.get_mut(context.path).unwrap();
@@ -86,16 +112,48 @@ impl AstVisitor for WriteAfterWriteVisitor {
 
         // Find the block state each variable state was declared in
         for var_span in var_spans {
+            println!("checking while condition var: {}", var_span.as_str());
+
             for block_span in context.blocks.iter().rev() {
                 // Get the block state
                 let block_state = fn_state.block_states.get_mut(&block_span).unwrap();
         
                 // Find the variable state and mark it as used
                 if let Some(assignable_state) = block_state.assignable_states.iter_mut().find(|x| x.name == var_span.as_str()) {
+                    println!("marking while condition var as used: {}", var_span.as_str());
                     assignable_state.used = true;
                     break;
                 }
             }
+        }
+
+        Ok(())
+    }
+
+    fn visit_statement(&mut self, context: &StatementContext, _project: &mut Project) -> Result<(), Error> {
+        // Get the module state
+        let module_state = self.module_states.get_mut(context.path).unwrap();
+
+        // Get the function state
+        let fn_signature = context.item_fn.fn_signature.span();
+        let fn_state = module_state.fn_states.get_mut(&fn_signature).unwrap();
+
+        // Get the block state
+        let block_span = context.blocks.last().unwrap();
+        let block_state = fn_state.block_states.get_mut(block_span).unwrap();
+
+        // Create an assignment state for variable declarations
+        if let Statement::Let(StatementLet {
+            // TODO: handle other patterns
+            pattern: Pattern::Var { name, .. },
+            ..
+        }) = context.statement {
+            block_state.assignable_states.push(AssignableState {
+                name: name.as_str().to_string(),
+                span: name.span(),
+                used: false,
+                op: ReassignmentOpVariant::Equals,
+            });
         }
 
         Ok(())
