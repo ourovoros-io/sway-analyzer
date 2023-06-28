@@ -139,7 +139,7 @@ impl AstVisitor for WriteAfterWriteVisitor {
                     };
 
                     // If the assigned value has not been used, create a report entry
-                    if !assignable_state.used || assignment_discarded {
+                    if !assignable_state.used && assignment_discarded {
                         project.report.borrow_mut().add_entry(
                             context.path,
                             project.span_to_line(context.path, &assignable_state.span)?,
