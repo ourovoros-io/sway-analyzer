@@ -210,7 +210,8 @@ pub fn collect_ident_spans(expr: &Expr) -> Vec<Span> {
             spans.extend(collect_ident_spans(rhs.as_ref()));
         }
         
-        Expr::Reassignment { expr, .. } => {
+        Expr::Reassignment { assignable, expr, .. } => {
+            spans.push(assignable.span());
             spans.extend(collect_ident_spans(expr.as_ref()));
         }
         
