@@ -1,7 +1,7 @@
 use super::{AstVisitor, BlockContext, ExprContext, FnContext, ModuleContext, WhileExprContext};
 use crate::{error::Error, project::Project, utils};
 use std::{collections::HashMap, path::PathBuf};
-use sway_ast::{expr::{ReassignmentOp, ReassignmentOpVariant}, Expr};
+use sway_ast::{expr::ReassignmentOpVariant, Expr};
 use sway_types::{Span, Spanned};
 
 #[derive(Default)]
@@ -28,6 +28,7 @@ struct AssignableState {
     name: String,
     span: Span,
     used: bool,
+    op: ReassignmentOpVariant,
 }
 
 impl AstVisitor for WriteAfterWriteVisitor {
@@ -113,10 +114,7 @@ impl AstVisitor for WriteAfterWriteVisitor {
         // If expr is an assignment, check if expr being assigned to was already assigned to in available block scopes
         if let Expr::Reassignment {
             assignable,
-            reassignment_op: ReassignmentOp {
-                variant: ReassignmentOpVariant::Equals,
-                ..
-            },
+            reassignment_op,
             expr: value_expr,
         } = expr {
             let assignable_span = assignable.span();
@@ -129,8 +127,19 @@ impl AstVisitor for WriteAfterWriteVisitor {
 
                 // Check if the assignable state exists
                 if let Some(assignable_state) = block_state.assignable_states.iter_mut().find(|x| x.name == assignable_span.as_str()) {
+                    // Check for assignment invariants
+                    let assignment_discarded = match (&reassignment_op.variant, &assignable_state.op) {
+                        (ReassignmentOpVariant::Equals, ReassignmentOpVariant::AddEquals) |
+                        (ReassignmentOpVariant::Equals, ReassignmentOpVariant::SubEquals) |
+                        (ReassignmentOpVariant::Equals, ReassignmentOpVariant::MulEquals) |
+                        (ReassignmentOpVariant::Equals, ReassignmentOpVariant::DivEquals) |
+                        (ReassignmentOpVariant::Equals, ReassignmentOpVariant::ShlEquals) |
+                        (ReassignmentOpVariant::Equals, ReassignmentOpVariant::ShrEquals) => !assignable_state.used,
+                        _ => false,
+                    };
+
                     // If the assigned value has not been used, create a report entry
-                    if !assignable_state.used {
+                    if !assignable_state.used || assignment_discarded {
                         project.report.borrow_mut().add_entry(
                             context.path,
                             project.span_to_line(context.path, &assignable_state.span)?,
@@ -145,6 +154,7 @@ impl AstVisitor for WriteAfterWriteVisitor {
                     // Since the assignable has been assigned a new value, update its span and mark it as unused
                     assignable_state.span = assignable_span.clone();
                     assignable_state.used = false;
+                    assignable_state.op = reassignment_op.variant.clone();
 
                     // Note that the assignable state exists and stop the lookup
                     assignable_state_exists = true;
@@ -163,6 +173,7 @@ impl AstVisitor for WriteAfterWriteVisitor {
                     name: assignable_span.as_str().to_string(),
                     span: assignable_span,
                     used: false,
+                    op: reassignment_op.variant.clone(),
                 });
             }
 
