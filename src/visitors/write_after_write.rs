@@ -189,9 +189,14 @@ impl AstVisitor for WriteAfterWriteVisitor {
                 // Get the block state
                 let block_state = fn_state.block_states.get_mut(block_span).unwrap();
 
+                // If the assignable state is a direct match, mark it as used
                 if let Some(assignable_state) = block_state.assignable_states.iter_mut().find(|x| x.name == ident_span.as_str()) {
                     assignable_state.used = true;
-                    break;
+                }
+
+                // If the identifier span is a higher level variable, but fields of it were updated, mark all of their assignable states as used
+                for assignable_state in block_state.assignable_states.iter_mut().filter(|x| x.name.starts_with(format!("{}.", ident_span.as_str()).as_str())) {
+                    assignable_state.used = true;
                 }
             }
         }
