@@ -2,6 +2,7 @@ contract;
 
 use std::call_frames::msg_asset_id;
 use std::context::msg_amount;
+use std::logging::log;
 use std::storage::storage_vec::*;
 
 abi TestContract {
@@ -41,6 +42,7 @@ impl TestContract for Contract {
         counter.value += amount;
         {
             storage.counter.write(counter);
+            log(counter);
         }
         amount *= 2;
         0
