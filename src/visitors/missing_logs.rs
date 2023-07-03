@@ -26,12 +26,6 @@ struct BlockState {
     logged: Vec<Span>,
 }
 
-//
-// TODO:
-//   keep track of storage writes in blocks
-//   when leaving a block, check to make sure the storage written is logged
-//
-
 impl AstVisitor for MissingLogsVisitor {
     fn visit_module(&mut self, context: &ModuleContext, _project: &mut Project) -> Result<(), Error> {
         // Create the module state

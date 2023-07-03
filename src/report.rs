@@ -34,13 +34,16 @@ impl Report {
         line: Option<usize>,
         text: S,
     ) {
-        self.entries
+        let file_entry = self.entries
             .entry(file.into())
-            .or_insert_with(|| vec![])
-            .push(Entry {
-                line,
-                text: text.into(),
-            });
+            .or_insert_with(|| vec![]);
+
+        file_entry.push(Entry {
+            line,
+            text: text.into(),
+        });
+
+        file_entry.sort_by(|a, b| a.line.cmp(&b.line));
     }
 
     pub fn sort_entries(&mut self) {

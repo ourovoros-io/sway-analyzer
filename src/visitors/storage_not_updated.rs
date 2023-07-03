@@ -1,6 +1,7 @@
-use super::{AstVisitor, BlockContext, FnContext, ModuleContext, StatementContext};
+use super::{AstVisitor, BlockContext, FnContext, ModuleContext, StatementContext, StorageFieldContext};
 use crate::{error::Error, project::Project, utils};
 use std::{collections::HashMap, path::PathBuf};
+use sway_ast::Ty;
 use sway_types::{BaseIdent, Spanned, Span};
 
 //
@@ -16,6 +17,7 @@ pub struct StorageNotUpdatedVisitor {
 #[derive(Default)]
 struct ModuleState {
     fn_states: HashMap<Span, FnState>,
+    storage_field_types: HashMap<String, Ty>,
 }
 
 #[derive(Default)]
@@ -25,19 +27,19 @@ struct FnState {
 
 #[derive(Default)]
 struct BlockState {
-    storage_bindings: Vec<StorageBinding>,
+    storage_value_bindings: Vec<StorageValueBinding>,
 }
 
 impl BlockState {
-    fn find_last_storage_binding<F>(&mut self, f: F) -> Option<&mut StorageBinding>
+    fn find_last_storage_binding<F>(&mut self, f: F) -> Option<&mut StorageValueBinding>
     where
-        F: FnMut(&&mut StorageBinding) -> bool,
+        F: FnMut(&&mut StorageValueBinding) -> bool,
     {
-        self.storage_bindings.iter_mut().rev().find(f)
+        self.storage_value_bindings.iter_mut().rev().find(f)
     }
 }
 
-struct StorageBinding {
+struct StorageValueBinding {
     storage_name: BaseIdent,
     variable_name: BaseIdent,
     post_write_name: Option<BaseIdent>,
@@ -52,6 +54,16 @@ impl AstVisitor for StorageNotUpdatedVisitor {
         if !self.module_states.contains_key(context.path) {
             self.module_states.insert(context.path.into(), ModuleState::default());
         }
+
+        Ok(())
+    }
+
+    fn visit_storage_field(&mut self, context: &StorageFieldContext, _project: &mut Project) -> Result<(), Error> {
+        // Get the module state
+        let module_state = self.module_states.get_mut(context.path).unwrap();
+
+        // Insert the storage field type
+        module_state.storage_field_types.insert(context.field.name.as_str().into(), context.field.ty.clone());
 
         Ok(())
     }
@@ -105,39 +117,39 @@ impl AstVisitor for StorageNotUpdatedVisitor {
         let block_span = context.block.span();
         let block_state = fn_state.block_states.get(&block_span).unwrap();
 
-        // Check all storage bindings to see if they are modified or shadowed without being written back to storage
-        for storage_binding in block_state.storage_bindings.iter() {
-            if !storage_binding.written {
+        // Check all storage value bindings to see if they are modified or shadowed without being written back to storage
+        for storage_value_binding in block_state.storage_value_bindings.iter() {
+            if !storage_value_binding.written {
                 project.report.borrow_mut().add_entry(
                     context.path,
-                    project.span_to_line(context.path, &storage_binding.variable_name.span())?,
-                    if let Some(shadowing_variable_name) = storage_binding.shadowing_variable_name.as_ref() {
+                    project.span_to_line(context.path, &storage_value_binding.variable_name.span())?,
+                    if let Some(shadowing_variable_name) = storage_value_binding.shadowing_variable_name.as_ref() {
                         format!(
                             "Storage bound to local variable `{}` is shadowed{} before being written back to `storage.{}`.",
-                            storage_binding.variable_name.as_str(),
+                            storage_value_binding.variable_name.as_str(),
                             if let Some(line) = project.span_to_line(context.path, &shadowing_variable_name.span())? {
                                 format!(" at L{}", line)
                             } else {
                                 String::new()
                             },
-                            storage_binding.storage_name.as_str(),
+                            storage_value_binding.storage_name.as_str(),
                         )
                     } else {
                         format!(
                             "Storage bound to local variable `{}` not written back to `storage.{}`.",
-                            storage_binding.variable_name.as_str(),
-                            storage_binding.storage_name.as_str(),
+                            storage_value_binding.variable_name.as_str(),
+                            storage_value_binding.storage_name.as_str(),
                         )
                     },
                 );
-            } else if let Some(post_write_name) = storage_binding.post_write_name.as_ref() {
+            } else if let Some(post_write_name) = storage_value_binding.post_write_name.as_ref() {
                 project.report.borrow_mut().add_entry(
                     context.path,
                     project.span_to_line(context.path, &post_write_name.span())?,
                     format!(
                         "Storage bound to local variable `{}` updated after writing back to `storage.{}` without writing updated value.",
-                        storage_binding.variable_name.as_str(),
-                        storage_binding.storage_name.as_str(),
+                        storage_value_binding.variable_name.as_str(),
+                        storage_value_binding.storage_name.as_str(),
                     ),
                 );
             }
@@ -158,16 +170,26 @@ impl AstVisitor for StorageNotUpdatedVisitor {
         let block_span = context.blocks.last().unwrap();
         let block_state = fn_state.block_states.get_mut(&block_span).unwrap();
 
-        // Check for storage binding variable shadowing
+        // Check for storage value binding shadowing
         if let Some(variable_name) = utils::statement_to_variable_binding_ident(context.statement) {
-            if let Some(storage_binding) = block_state.find_last_storage_binding(|x| x.variable_name == variable_name) {
-                storage_binding.shadowing_variable_name = Some(variable_name.clone());
+            if let Some(storage_value_binding) = block_state.find_last_storage_binding(|x| x.variable_name == variable_name) {
+                storage_value_binding.shadowing_variable_name = Some(variable_name.clone());
             }
         }
 
-        // Check for storage binding declaration, i.e: `let mut x = storage.x.read();`
+        //
+        // TODO: check for storage key bindings
+        //
+        // let _ = storage.balances;
+        // -> StorageKey<StorageMap<Address, StorageKey<StorageMap<ContractId, u64>>>>
+        //
+        // let _ = storage.balances.get(accounts.get(i).unwrap());
+        // -> StorageKey<StorageMap<ContractId, u64>>
+        //
+
+        // Check for storage value binding declaration, i.e: `let mut x = storage.x.read();`
         if let Some((storage_name, variable_name)) = utils::statement_to_storage_read_binding_idents(context.statement) {
-            block_state.storage_bindings.push(StorageBinding {
+            block_state.storage_value_bindings.push(StorageValueBinding {
                 storage_name,
                 variable_name,
                 post_write_name: None,
@@ -176,33 +198,33 @@ impl AstVisitor for StorageNotUpdatedVisitor {
                 written: false,
             });
         }
-        // Check for updates to storage binding, i.e: `x += 1;`
+        // Check for updates to storage value binding, i.e: `x += 1;`
         else if let Some(variable_names) = utils::statement_to_reassignment_idents(context.statement) {
             let variable_name = variable_names.first().unwrap();
             
             for block_span in context.blocks.iter().rev() {
                 let block_state = fn_state.block_states.get_mut(block_span).unwrap();
 
-                if let Some(storage_binding) = block_state.find_last_storage_binding(|x| x.variable_name == *variable_name) {
-                    storage_binding.modified = true;
+                if let Some(storage_value_binding) = block_state.find_last_storage_binding(|x| x.variable_name == *variable_name) {
+                    storage_value_binding.modified = true;
 
-                    // If the storage binding was previously written, storage is now out of date
-                    if storage_binding.written {
-                        storage_binding.post_write_name = Some(variable_name.clone());
+                    // If the storage value binding was previously written, storage is now out of date
+                    if storage_value_binding.written {
+                        storage_value_binding.post_write_name = Some(variable_name.clone());
                     }
 
                     break;
                 }
             }
         }
-        // Check for storage binding update, i.e: `storage.x.write(x);`
+        // Check for storage value binding update, i.e: `storage.x.write(x);`
         else if let Some((storage_name, variable_name)) = utils::statement_to_storage_write_idents(context.statement) {
             for block_span in context.blocks.iter().rev() {
                 let block_state = fn_state.block_states.get_mut(block_span).unwrap();
 
-                if let Some(storage_binding) = block_state.find_last_storage_binding(|x| x.storage_name == storage_name) {
-                    if variable_name == storage_binding.variable_name {
-                        storage_binding.written = true;
+                if let Some(storage_value_binding) = block_state.find_last_storage_binding(|x| x.storage_name == storage_name) {
+                    if variable_name == storage_value_binding.variable_name {
+                        storage_value_binding.written = true;
                         break;
                     }
                 }

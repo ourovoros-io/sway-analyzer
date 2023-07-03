@@ -112,15 +112,12 @@ impl AstVisitor for DiscardedAssignmentsVisitor {
 
         // Find the block state each variable state was declared in
         for var_span in var_spans {
-            println!("checking while condition var: {}", var_span.as_str());
-
             for block_span in context.blocks.iter().rev() {
                 // Get the block state
                 let block_state = fn_state.block_states.get_mut(&block_span).unwrap();
         
                 // Find the variable state and mark it as used
                 if let Some(assignable_state) = block_state.assignable_states.iter_mut().find(|x| x.name == var_span.as_str()) {
-                    println!("marking while condition var as used: {}", var_span.as_str());
                     assignable_state.used = true;
                     break;
                 }

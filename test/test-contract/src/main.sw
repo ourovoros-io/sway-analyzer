@@ -41,8 +41,8 @@ impl TestContract for Contract {
         let mut amount = amount;
         counter.value += amount;
         {
-            storage.counter.write(counter);
-            log(counter);
+            // storage.counter.write(counter);
+            // log(counter);
         }
         amount *= 2;
         0
