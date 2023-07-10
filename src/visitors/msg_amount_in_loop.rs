@@ -125,7 +125,19 @@ impl AstVisitor for MsgAmountInLoopVisitor {
                         context.path,
                         project.span_to_line(context.path, msg_amount_span)?,
                         format!(
-                            "Found `{}` call in a loop. Store the value in a variable outside the loop and decrement it over each iteration.",
+                            "The `{}` function makes a call to `{}` in a loop. Store the value in a variable outside the loop and decrement it over each iteration.",
+                            if let Some(item_impl) = context.item_impl.as_ref() {
+                                format!(
+                                    "{}::{}",
+                                    item_impl.ty.span().as_str(),
+                                    context.item_fn.fn_signature.name.as_str(),
+                                )
+                            } else {
+                                format!(
+                                    "{}",
+                                    context.item_fn.fn_signature.name.as_str(),
+                                )
+                            },
                             msg_amount_span.as_str(),
                         ),
                     );

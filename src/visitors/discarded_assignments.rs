@@ -91,7 +91,22 @@ impl AstVisitor for DiscardedAssignmentsVisitor {
                 project.report.borrow_mut().add_entry(
                     context.path,
                     project.span_to_line(context.path, &assignable_state.span)?,
-                    format!("Assignment made to `{}` is discarded.", assignable_state.span.as_str()),
+                    format!(
+                        "The `{}` function makes an assignment to `{}` which is discarded.",
+                        if let Some(item_impl) = context.item_impl.as_ref() {
+                            format!(
+                                "{}::{}",
+                                item_impl.ty.span().as_str(),
+                                context.item_fn.fn_signature.name.as_str(),
+                            )
+                        } else {
+                            format!(
+                                "{}",
+                                context.item_fn.fn_signature.name.as_str(),
+                            )
+                        },
+                        assignable_state.span.as_str(),
+                    ),
                 );
             }
         }
@@ -199,7 +214,19 @@ impl AstVisitor for DiscardedAssignmentsVisitor {
                             context.path,
                             project.span_to_line(context.path, &assignable_state.span)?,
                             format!(
-                                "Assignment made to `{}` is discarded by the assignment made on L{}.",
+                                "The `{}` functions makes an assignment to `{}` which is discarded by the assignment made on L{}.",
+                                if let Some(item_impl) = context.item_impl.as_ref() {
+                                    format!(
+                                        "{}::{}",
+                                        item_impl.ty.span().as_str(),
+                                        context.item_fn.fn_signature.name.as_str(),
+                                    )
+                                } else {
+                                    format!(
+                                        "{}",
+                                        context.item_fn.fn_signature.name.as_str(),
+                                    )
+                                },
                                 assignable_state.span.as_str(),
                                 project.span_to_line(context.path, &assignable_span)?.unwrap(),
                             ),

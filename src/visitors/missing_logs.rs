@@ -111,7 +111,22 @@ impl AstVisitor for MissingLogsVisitor {
                 project.report.borrow_mut().add_entry(
                     context.path,
                     project.span_to_line(context.path, storage_span)?,
-                    format!("The `storage.{}` value is written without being logged.", storage_span.as_str()),
+                    format!(
+                        "The `{}` function writes to `storage.{}` without being logged.",
+                        if let Some(item_impl) = context.item_impl.as_ref() {
+                            format!(
+                                "{}::{}",
+                                item_impl.ty.span().as_str(),
+                                context.item_fn.fn_signature.name.as_str(),
+                            )
+                        } else {
+                            format!(
+                                "{}",
+                                context.item_fn.fn_signature.name.as_str(),
+                            )
+                        },
+                        storage_span.as_str(),
+                    ),
                 );
             }
         }
