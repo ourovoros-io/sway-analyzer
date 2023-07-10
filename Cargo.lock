@@ -938,9 +938,9 @@ dependencies = [
 
 [[package]]
 name = "sway-ast"
-version = "0.40.1"
+version = "0.42.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28576dea2eac8ee06ec3ead8ec6a1a8b9fdc6a0f93cebaba0d4b18897671def4"
+checksum = "a1a7569b0ffb36d51e976c1777b3c7be587d76b31e7c4814a2d0461fe0421d88"
 dependencies = [
  "extension-trait",
  "num-bigint",
@@ -951,9 +951,9 @@ dependencies = [
 
 [[package]]
 name = "sway-error"
-version = "0.40.1"
+version = "0.42.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4572621cf65f357fae6cf8201092bb3de5e375a99ffa00ec6433962b0aeaafde"
+checksum = "8f3fc5c8977d0e56e0e71980a310f3c2a92a2e31da92714a2e0bac01d88e7e67"
 dependencies = [
  "extension-trait",
  "num-bigint",
@@ -965,9 +965,9 @@ dependencies = [
 
 [[package]]
 name = "sway-parse"
-version = "0.40.1"
+version = "0.42.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3e361c6b8801feba3479047cd8e0e3b563398e906a5f704bcff012e2dbdea7c8"
+checksum = "ee0a78f304be2f77f0c523ae292c83dcef710cc60cd2224fa68823674401668d"
 dependencies = [
  "extension-trait",
  "num-bigint",
@@ -982,9 +982,9 @@ dependencies = [
 
 [[package]]
 name = "sway-types"
-version = "0.40.1"
+version = "0.42.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb2acd72eada9d3b7d4d4485335540c9a3bff1b698823f520c6add4b64810036"
+checksum = "8094eff0b09473c955e788da903957dbd489367f35cd3c100d180cad58d56c6c"
 dependencies = [
  "fuel-asm",
  "fuel-crypto",

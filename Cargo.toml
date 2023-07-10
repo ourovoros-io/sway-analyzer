@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 serde = "1.0"
 structopt = { version = "0.3", default-features = false }
-sway-ast = "0.40.1"
-sway-error = "0.40.1"
-sway-parse = "0.40.1"
-sway-types = "0.40.1"
+sway-ast = "0.42.1"
+sway-error = "0.42.1"
+sway-parse = "0.42.1"
+sway-types = "0.42.1"
