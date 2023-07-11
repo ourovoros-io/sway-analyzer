@@ -25,7 +25,16 @@ struct Options {
 }
 
 fn main() -> Result<(), Error> {
-    let options = Options::from_args();
+    let mut options = Options::from_args();
+
+    // Make sure directory is a directory path
+    if let Some(directory) = options.directory.as_mut() {
+        let dir_string = directory.to_string_lossy();
+
+        if !dir_string.ends_with('/') || !dir_string.ends_with('\\') {
+            *directory = PathBuf::from(format!("{dir_string}/"));
+        }
+    }
 
     if options.directory.is_none() && options.files.is_empty() {
         // TODO: print help
