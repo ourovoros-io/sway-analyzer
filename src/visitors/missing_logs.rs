@@ -1,7 +1,7 @@
-use super::{AstVisitor, BlockContext, FnContext, ModuleContext, StatementContext, UseContext, ExprContext};
+use super::{AstVisitor, BlockContext, ExprContext, FnContext, ModuleContext, StatementContext, UseContext};
 use crate::{error::Error, project::Project, utils};
 use std::{collections::HashMap, path::PathBuf};
-use sway_ast::{UseTree, Expr};
+use sway_ast::{Expr, UseTree};
 use sway_types::{Span, Spanned};
 
 #[derive(Default)]

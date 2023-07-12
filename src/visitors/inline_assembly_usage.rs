@@ -1,7 +1,6 @@
-use sway_types::Spanned;
-
 use super::{AsmBlockContext, AstVisitor};
 use crate::{error::Error, project::Project};
+use sway_types::Spanned;
 
 #[derive(Default)]
 pub struct InlineAssemblyUsageVisitor;

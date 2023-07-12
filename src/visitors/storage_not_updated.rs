@@ -2,7 +2,7 @@ use super::{AstVisitor, BlockContext, FnContext, ModuleContext, StatementContext
 use crate::{error::Error, project::Project, utils};
 use std::{collections::HashMap, path::PathBuf};
 use sway_ast::Ty;
-use sway_types::{BaseIdent, Spanned, Span};
+use sway_types::{BaseIdent, Span, Spanned};
 
 //
 // If a storage value is bound to a mutable local variable, we need to

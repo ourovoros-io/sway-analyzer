@@ -36,36 +36,33 @@ impl TryFrom<&Options> for Project {
                 // TODO
             }
     
-            let forc_toml_path = PathBuf::from(format!("{}Forc.toml", path.to_string_lossy()));
-    
-            if !forc_toml_path.is_file() || !forc_toml_path.exists() {
-                // TODO
-            }
-    
-            let src_path = PathBuf::from(format!("{}src", path.to_string_lossy()));
-    
-            if !src_path.is_dir() || !src_path.exists() {
-                // TODO
-            }
-    
             fn parse_dir<P: AsRef<Path>>(project: &mut Project, path: P) -> Result<(), Error> {
                 for entry in path.as_ref().read_dir().map_err(|e| Error::Wrapped(Box::new(e)))? {
                     let Ok(entry) = entry else { continue };
                     let path = entry.path();
     
+                    let forc_toml_path = PathBuf::from(format!("{}Forc.toml", path.to_string_lossy()));
+    
+                    if forc_toml_path.is_file() && forc_toml_path.exists() {
+                        let src_path = PathBuf::from(format!("{}src", path.to_string_lossy()));
+                
+                        if src_path.is_dir() && src_path.exists() {
+                            parse_dir(project, src_path)?;
+                            continue;
+                        }    
+                    }
+            
                     if path.is_dir() {
                         parse_dir(project, path)?;
                     } else if path.is_file() && path.extension().map(|x| x == "sw").unwrap_or(false) {
                         project.parse_file(path)?;
-                    } else {
-                        // TODO
                     }
                 }
     
                 Ok(())
             }
     
-            parse_dir(&mut project, src_path)?;
+            parse_dir(&mut project, path)?;
         }
     
         for path in options.files.iter() {
