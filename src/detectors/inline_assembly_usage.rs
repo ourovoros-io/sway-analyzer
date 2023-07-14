@@ -1,5 +1,8 @@
-use super::{AsmBlockContext, AstVisitor};
-use crate::{error::Error, project::Project};
+use crate::{
+    error::Error,
+    project::Project,
+    visitor::{AsmBlockContext, AstVisitor},
+};
 use sway_types::Spanned;
 
 #[derive(Default)]

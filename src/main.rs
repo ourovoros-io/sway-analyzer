@@ -3,6 +3,7 @@ pub mod error;
 pub mod project;
 pub mod report;
 pub mod utils;
+pub mod visitor;
 
 use error::Error;
 use project::Project;

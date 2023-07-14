@@ -3,9 +3,8 @@ mod inline_assembly_usage;
 mod missing_logs;
 mod msg_amount_in_loop;
 mod storage_not_updated;
-mod visitor;
 
-pub use self::visitor::*;
+use crate::visitor::AstVisitor;
 
 use self::{
     discarded_assignments::*, inline_assembly_usage::*, missing_logs::*, msg_amount_in_loop::*,

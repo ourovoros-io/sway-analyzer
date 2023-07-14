@@ -1,5 +1,11 @@
-use super::{AstVisitor, BlockContext, ExprContext, FnContext, ModuleContext, UseContext, WhileExprContext};
-use crate::{error::Error, project::Project};
+use crate::{
+    error::Error,
+    project::Project,
+    visitor::{
+        AstVisitor, BlockContext, ExprContext, FnContext, ModuleContext, UseContext,
+        WhileExprContext,
+    },
+};
 use std::{collections::HashMap, path::PathBuf};
 use sway_ast::{Expr, UseTree};
 use sway_types::{Span, Spanned};

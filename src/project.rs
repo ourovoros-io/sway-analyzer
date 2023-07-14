@@ -2,6 +2,7 @@ use crate::{
     detectors::*,
     error::Error,
     report::Report,
+    visitor::*,
     Options
 };
 use std::{
