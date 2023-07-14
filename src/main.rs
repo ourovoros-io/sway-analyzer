@@ -1,8 +1,8 @@
+pub mod detectors;
 pub mod error;
 pub mod project;
 pub mod report;
 pub mod utils;
-pub mod visitors;
 
 use error::Error;
 use project::Project;

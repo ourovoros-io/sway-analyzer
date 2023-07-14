@@ -1,7 +1,7 @@
 use crate::{
     error::Error,
     report::Report,
-    visitors::*,
+    detectors::*,
     Options
 };
 use std::{
@@ -69,7 +69,7 @@ impl TryFrom<&Options> for Project {
             project.parse_file(path)?;
         }
     
-        for &(visitor_name, create_visitor) in VISITOR_TYPES {
+        for &(visitor_name, create_visitor) in DETECTOR_TYPES {
             if options.visitors.is_empty() || options.visitors.iter().any(|v| v == visitor_name) {
                 project.visitors.borrow_mut().visitors.push(create_visitor());
             }

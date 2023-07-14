@@ -12,10 +12,10 @@ use self::{
     storage_not_updated::*,
 };
 
-type VisitorConstructor = fn() -> Box<dyn AstVisitor>;
-type VisitorEntry = (&'static str, VisitorConstructor);
+type DetectorConstructor = fn() -> Box<dyn AstVisitor>;
+type DetectorEntry = (&'static str, DetectorConstructor);
 
-pub const VISITOR_TYPES: &[VisitorEntry] = &[
+pub const DETECTOR_TYPES: &[DetectorEntry] = &[
     ("discarded_assignments", || Box::new(DiscardedAssignmentsVisitor::default())),
     ("inline_assembly_usage", || Box::new(InlineAssemblyUsageVisitor::default())),
     ("missing_logs", || Box::new(MissingLogsVisitor::default())),
