@@ -1,5 +1,27 @@
 # sway-analyzer
-A static analyzer for Sway written in Rust.
+
+A static analyzer for Sway written in Rust. The tool makes use of the existing [`sway-ast`](https://github.com/FuelLabs/sway/tree/master/sway-ast) and [`sway-parse`](https://github.com/FuelLabs/sway/tree/master/sway-parse) crates in order to parse Sway source code into its abstract syntax tree (AST). A recursive AST visitor is implemented on top of this, which will walk the AST structures top-down in a context-sensitive manner. Detectors leverage the AST visitor in order to implement their logic by inspecting the values contained in certain parts of the AST structures.
+
+## Requirements
+
+The `sway-analyzer` binary requires the Rust compiler and its package manager, cargo.
+
+See the [Rust Install](https://www.rust-lang.org/tools/install) page for installation options.
+
+## Installation
+
+The `sway-analyzer` binary can be installed using the following commands:
+
+```bash
+cd /path/to/sway-analyzer/
+cargo install --path .
+```
+
+The `sway-analyzer` binary can be uninstalled using the following command:
+
+```bash
+cargo uninstall sway-analyzer
+```
 
 ## Usage
 
@@ -16,7 +38,7 @@ A static analyzer for Sway written in Rust.
 | `--files <files>...` | The paths to the Sway source files. (Optional) |
 | `--visitors <visitors>...` | The specific visitors to utilize. (Optional; Leave unused for all) |
 
-## Visitors
+## Detectors
 
 | Name | Description |
 |-|-|
