@@ -18,7 +18,7 @@ use sway_types::Span;
 pub struct Project {
     line_ranges: HashMap<PathBuf, Vec<(usize, usize)>>,
     modules: Rc<RefCell<HashMap<PathBuf, Module>>>,
-    visitors: Rc<RefCell<AstVisitorRecursive>>,
+    detectors: Rc<RefCell<AstVisitorRecursive>>,
     pub report: Rc<RefCell<Report>>,
 }
 
@@ -70,8 +70,8 @@ impl TryFrom<&Options> for Project {
         }
     
         for &(detector_name, create_detector) in DETECTOR_TYPES {
-            if options.visitors.is_empty() || options.visitors.iter().any(|v| v == detector_name) {
-                project.visitors.borrow_mut().visitors.push(create_detector());
+            if options.detectors.is_empty() || options.detectors.iter().any(|v| v == detector_name) {
+                project.detectors.borrow_mut().visitors.push(create_detector());
             }
         }
     
@@ -134,7 +134,7 @@ impl Project {
     /// Attempts to analyze all of the parsed files.
     pub fn analyze_modules(&mut self) -> Result<(), Error> {
         let modules = self.modules.clone();
-        let visitors = self.visitors.clone();
+        let detectors = self.detectors.clone();
 
         for (path, module) in modules.borrow().iter() {
             let context = ModuleContext {
@@ -142,8 +142,8 @@ impl Project {
                 module,
             };
 
-            visitors.borrow_mut().visit_module(&context, self)?;
-            visitors.borrow_mut().leave_module(&context, self)?;
+            detectors.borrow_mut().visit_module(&context, self)?;
+            detectors.borrow_mut().leave_module(&context, self)?;
         }
 
         Ok(())

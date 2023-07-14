@@ -19,9 +19,9 @@ struct Options {
     #[structopt(long)]
     files: Vec<PathBuf>,
 
-    /// The specific visitors to utilize. (Optional; Leave unused for all)
+    /// The specific detectors to utilize. (Optional; Leave unused for all)
     #[structopt(long)]
-    visitors: Vec<String>,
+    detectors: Vec<String>,
 }
 
 fn main() -> Result<(), Error> {
