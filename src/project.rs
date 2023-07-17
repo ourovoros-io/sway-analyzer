@@ -83,7 +83,7 @@ impl TryFrom<&Options> for Project {
 impl Project {
     /// Attempts to parse the file from the supplied `path`.
     pub fn parse_file<P: AsRef<Path>>(&mut self, path: P) -> Result<(), Error> {
-        let path = PathBuf::from(path.as_ref());
+        let path = PathBuf::from(path.as_ref().to_string_lossy().replace("\\\\", "\\").replace("//", "/"));
         let source = std::fs::read_to_string(path.clone()).map_err(|e| Error::Wrapped(Box::new(e)))?;
         
         self.load_line_ranges(path.clone(), source.as_str());
