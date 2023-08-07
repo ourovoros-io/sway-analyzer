@@ -894,7 +894,7 @@ impl AstVisitor for AstVisitorRecursive {
         }
 
         match context.expr {
-            Expr::Error(_) => {}
+            Expr::Error(_, _) => {}
             Expr::Path(_) => {}
             Expr::Literal(_) => {}
 
