@@ -3,8 +3,10 @@ use crate::{
     project::Project,
     visitor::{AstVisitor, BlockContext, FnContext, ModuleContext, StatementContext},
 };
-use std::{collections::HashMap, path::PathBuf, ops::ControlFlow};
-use sway_ast::{FnArg, FnArgs, IfExpr, IfCondition, expr::LoopControlFlow};
+use std::{collections::HashMap, path::PathBuf};
+use sway_ast::{
+    expr::LoopControlFlow, Expr, FnArg, FnArgs, IfCondition, IfExpr, Pattern, Statement,
+};
 use sway_types::{Span, Spanned};
 
 #[derive(Default)]
@@ -134,7 +136,7 @@ impl AstVisitor for InputIdentityValidationVisitor {
         Ok(())
     }
 
-    fn visit_statement(&mut self, context: &StatementContext, project: &mut Project) -> Result<(), Error> {
+    fn visit_statement(&mut self, context: &StatementContext, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let module_state = self.module_states.get_mut(context.path).unwrap();
 
@@ -146,30 +148,31 @@ impl AstVisitor for InputIdentityValidationVisitor {
         let block_span = context.blocks.last().unwrap();
         let block_state = fn_state.block_states.get_mut(&block_span).unwrap();
 
-        // Store variable bindings declared in the current block
-        if let sway_ast::Statement::Let(item_let) = context.statement {
+        // Store variable bindings declared in the current block in order to check if they shadow a parameter
+        if let Statement::Let(item_let) = context.statement {
             match &item_let.pattern {
                 //
                 // TODO: handle other patterns
                 //
 
-                sway_ast::Pattern::Var { name, .. } => {
+                Pattern::Var { name, .. } => {
                     block_state.variables.push(name.span());
                 }
 
                 _ => {}
             }
 
+            // Skip expression check since we know this is a variable binding
             return Ok(());
         }
 
         // Only check expression statements
-        let sway_ast::Statement::Expr { expr, .. } = context.statement else {
+        let Statement::Expr { expr, .. } = context.statement else {
             return Ok(())
         };
 
         match expr {
-            sway_ast::Expr::Match { value, branches, .. } => {
+            Expr::Match { value, branches, .. } => {
                 //
                 // TODO: check for the following pattern
                 //
@@ -184,20 +187,19 @@ impl AstVisitor for InputIdentityValidationVisitor {
                     let block_state = fn_state.block_states.get(block_span).unwrap();
 
                     if block_state.variables.iter().any(|v| v.as_str() == value.span().as_str()) {
-                        return Ok(())
+                        return Ok(());
                     }
                 }
 
-                //
-                // TODO: check if `value` is a parameter of type `Identity`
-                //
-
-                //
-                // TODO: check `branches` for `Identity::Address` and `Identity::ContractId` zero value checks
-                //
+                // Check if `value` is a parameter of type `Identity`
+                if let Some((_, identity_checked)) = fn_state.identity_checks.iter_mut().find(|(x, _)| x.as_str() == value.span().as_str()) {
+                    //
+                    // TODO: check `branches` for `Identity::Address` and `Identity::ContractId` zero value checks
+                    //
+                }
             }
             
-            sway_ast::Expr::If(if_expr) => {
+            Expr::If(if_expr) => {
                 //
                 // TODO: check for the following pattern
                 //
@@ -226,17 +228,16 @@ impl AstVisitor for InputIdentityValidationVisitor {
                     let block_state = fn_state.block_states.get(block_span).unwrap();
 
                     if block_state.variables.iter().any(|v| v.as_str() == if_let_condition_rhs.span().as_str()) {
-                        return Ok(())
+                        return Ok(());
                     }
                 }
 
-                //
-                // TODO: check if `if_let_condition_rhs` is a parameter of type `Identity`
-                //
-
-                //
-                // TODO: check `if_let_then_block` statements for `Identity::Address` and `Identity::ContractId` zero value checks
-                //
+                // Check if `if_let_condition_rhs` is a parameter of type `Identity`
+                if let Some((_, identity_checked)) = fn_state.identity_checks.iter_mut().find(|(x, _)| x.as_str() == if_let_condition_rhs.span().as_str()) {
+                    //
+                    // TODO: check `if_let_then_block` statements for `Identity::Address` and `Identity::ContractId` zero value checks
+                    //
+                }
                 
                 let IfExpr {
                     condition: IfCondition::Let {
@@ -255,23 +256,22 @@ impl AstVisitor for InputIdentityValidationVisitor {
                     let block_state = fn_state.block_states.get(block_span).unwrap();
 
                     if block_state.variables.iter().any(|v| v.as_str() == else_if_let_condition_rhs.span().as_str()) {
-                        return Ok(())
+                        return Ok(());
                     }
                 }
                 
-                //
-                // TODO: check if `else_if_let_condition_rhs` is a parameter of type `Identity`
-                //
-
-                //
-                // TODO: check `else_if_let_then_block` statements for `Identity::Address` and `Identity::ContractId` zero value checks
-                //
+                // Check if `else_if_let_condition_rhs` is a parameter of type `Identity`
+                if let Some((_, identity_checked)) = fn_state.identity_checks.iter_mut().find(|(x, _)| x.as_str() == else_if_let_condition_rhs.span().as_str()) {
+                    //
+                    // TODO: check `else_if_let_then_block` statements for `Identity::Address` and `Identity::ContractId` zero value checks
+                    //
+                }
             }
 
-            sway_ast::Expr::FuncApp { func, args } => {
+            Expr::FuncApp { func, args } => {
                 // Only check require calls
                 if func.span().as_str() != "require" {
-                    return Ok(())
+                    return Ok(());
                 }
 
                 //
