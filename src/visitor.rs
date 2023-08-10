@@ -15,6 +15,8 @@ pub struct ModuleItemContext<'a> {
     pub module: &'a Module,
     pub attributes: &'a [AttributeDecl],
     pub item: &'a ItemKind,
+    pub fn_attributes: Option<&'a [AttributeDecl]>,
+    pub item_fn: Option<&'a ItemFn>,
 }
 
 #[derive(Clone)]
@@ -274,6 +276,8 @@ pub struct ConstContext<'a> {
     pub item: &'a ItemKind,
     pub impl_attributes: Option<&'a [AttributeDecl]>,
     pub item_impl: Option<&'a ItemImpl>,
+    pub fn_attributes: Option<&'a [AttributeDecl]>,
+    pub item_fn: Option<&'a ItemFn>,
     pub const_attributes: &'a [AttributeDecl],
     pub item_const: &'a ItemConst,
 }
@@ -434,6 +438,8 @@ impl AstVisitor for AstVisitorRecursive {
                 module: context.module,
                 attributes: item.attribute_list.as_slice(),
                 item: &item.value,
+                fn_attributes: None,
+                item_fn: None,
             };
             
             self.visit_module_item(&context, project)?;
@@ -570,6 +576,8 @@ impl AstVisitor for AstVisitorRecursive {
                     item: context.item,
                     impl_attributes: None,
                     item_impl: None,
+                    fn_attributes: context.fn_attributes,
+                    item_fn: context.item_fn,
                     const_attributes: context.attributes,
                     item_const,
                 };
@@ -837,6 +845,8 @@ impl AstVisitor for AstVisitorRecursive {
                     module: context.module,
                     attributes: item.attribute_list.as_slice(),
                     item: &item.value,
+                    fn_attributes: Some(context.fn_attributes),
+                    item_fn: Some(context.item_fn),
                 };
 
                 self.visit_module_item(&context, project)?;
@@ -2538,6 +2548,8 @@ impl AstVisitor for AstVisitorRecursive {
                         item: context.item,
                         impl_attributes: Some(context.attributes),
                         item_impl: Some(context.item_impl),
+                        fn_attributes: None,
+                        item_fn: None,
                         const_attributes: item.attribute_list.as_slice(),
                         item_const,
                     };
