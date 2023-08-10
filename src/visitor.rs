@@ -10,11 +10,13 @@ pub struct ModuleContext<'a> {
 }
 
 #[derive(Clone)]
-pub struct ModuleItemContext<'a> {
+pub struct ItemContext<'a> {
     pub path: &'a Path,
     pub module: &'a Module,
     pub attributes: &'a [AttributeDecl],
     pub item: &'a ItemKind,
+    pub impl_attributes: Option<&'a [AttributeDecl]>,
+    pub item_impl: Option<&'a ItemImpl>,
     pub fn_attributes: Option<&'a [AttributeDecl]>,
     pub item_fn: Option<&'a ItemFn>,
 }
@@ -336,8 +338,8 @@ pub trait AstVisitor {
     fn visit_module(&mut self, context: &ModuleContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
     fn leave_module(&mut self, context: &ModuleContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
 
-    fn visit_module_item(&mut self, context: &ModuleItemContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
-    fn leave_module_item(&mut self, context: &ModuleItemContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
+    fn visit_module_item(&mut self, context: &ItemContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
+    fn leave_module_item(&mut self, context: &ItemContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
 
     fn visit_submodule(&mut self, context: &SubmoduleContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
     fn leave_submodule(&mut self, context: &SubmoduleContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
@@ -433,11 +435,13 @@ impl AstVisitor for AstVisitorRecursive {
         }
 
         for item in context.module.items.iter() {
-            let context = ModuleItemContext {
+            let context = ItemContext {
                 path: context.path,
                 module: context.module,
                 attributes: item.attribute_list.as_slice(),
                 item: &item.value,
+                impl_attributes: None,
+                item_impl: None,
                 fn_attributes: None,
                 item_fn: None,
             };
@@ -457,7 +461,7 @@ impl AstVisitor for AstVisitorRecursive {
         Ok(())
     }
 
-    fn visit_module_item(&mut self, context: &ModuleItemContext, project: &mut Project) -> Result<(), Error> {
+    fn visit_module_item(&mut self, context: &ItemContext, project: &mut Project) -> Result<(), Error> {
         for visitor in self.visitors.iter_mut() {
             visitor.visit_module_item(context, project)?;
         }
@@ -629,7 +633,7 @@ impl AstVisitor for AstVisitorRecursive {
         Ok(())
     }
 
-    fn leave_module_item(&mut self, context: &ModuleItemContext, project: &mut Project) -> Result<(), Error> {
+    fn leave_module_item(&mut self, context: &ItemContext, project: &mut Project) -> Result<(), Error> {
         for visitor in self.visitors.iter_mut() {
             visitor.leave_module_item(context, project)?;
         }
@@ -840,11 +844,13 @@ impl AstVisitor for AstVisitorRecursive {
             }
 
             Statement::Item(item) => {
-                let context = ModuleItemContext {
+                let context = ItemContext {
                     path: context.path,
                     module: context.module,
                     attributes: item.attribute_list.as_slice(),
                     item: &item.value,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
                     fn_attributes: Some(context.fn_attributes),
                     item_fn: Some(context.item_fn),
                 };
