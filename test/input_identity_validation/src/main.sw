@@ -24,7 +24,7 @@ impl MyContract for Contract {
     }
 
     // Report entry should be created:
-    // L26: The `Contract::test_address_not_checked` function does not check its `input` parameter for a zero value.
+    // L28: The `Contract::test_address_not_checked` function does not check its `input` parameter for a zero value.
     fn test_address_not_checked(input: Address) {
         log(input);
     }
@@ -36,7 +36,7 @@ impl MyContract for Contract {
     }
 
     // Report entry should be created:
-    // L38: The `Contract::test_contract_id_not_checked` function does not check its `input` parameter for a zero value.
+    // L40: The `Contract::test_contract_id_not_checked` function does not check its `input` parameter for a zero value.
     fn test_contract_id_not_checked(input: ContractId) {
         log(input);
     }
