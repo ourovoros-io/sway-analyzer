@@ -55,22 +55,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_project_from_directory() {
+    fn test_detectors() {
         let options = Options {
-            directory: Some(PathBuf::from("test/test-contract/")),
-            ..Default::default()
-        };
-
-        let mut project = Project::try_from(&options).unwrap();
-        project.analyze_modules().unwrap();
-
-        println!("{}", project.report.borrow());
-    }
-
-    #[test]
-    fn test_project_from_files() {
-        let options = Options {
-            files: vec![PathBuf::from("test/test-contract/src/main.sw")],
+            directory: Some(PathBuf::from("test/")),
             ..Default::default()
         };
 
