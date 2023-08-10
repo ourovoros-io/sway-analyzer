@@ -8,19 +8,58 @@ use crate::{
 use std::{
     cell::RefCell,
     collections::HashMap,
+    fmt::Display,
     path::{Path, PathBuf},
     rc::Rc,
+    str::FromStr,
     sync::Arc,
 };
 use sway_ast::Module;
 use sway_types::Span;
 
+#[derive(Clone, Copy, Default)]
+pub enum DisplayFormat {
+    #[default]
+    Text,
+    Json,
+}
+
+impl FromStr for DisplayFormat {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_ascii_lowercase().as_str() {
+            "text" => Ok(Self::Text),
+            "json" => Ok(Self::Json),
+            _ => Err(Error::InvalidDisplayFormat(s.to_string())),
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct Project {
+    display_format: DisplayFormat,
     line_ranges: HashMap<PathBuf, Vec<(usize, usize)>>,
     modules: Rc<RefCell<HashMap<PathBuf, Module>>>,
     detectors: Rc<RefCell<AstVisitorRecursive>>,
     pub report: Rc<RefCell<Report>>,
+}
+
+impl Display for Project {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.display_format {
+            DisplayFormat::Text => {
+                write!(f, "{}", self.report.borrow())?;
+            }
+
+            DisplayFormat::Json => {
+                let value = serde_json::to_value(self.report.borrow().clone()).unwrap();
+                write!(f, "{}", value.to_string())?;
+            }
+        }
+
+        Ok(())
+    }
 }
 
 impl TryFrom<&Options> for Project {
@@ -28,6 +67,7 @@ impl TryFrom<&Options> for Project {
 
     fn try_from(options: &Options) -> Result<Self, Self::Error> {
         let mut project = Project {
+            display_format: options.display_format,
             report: Rc::new(RefCell::new(Report::default())),
             ..Default::default()
         };

@@ -6,12 +6,16 @@ pub mod utils;
 pub mod visitor;
 
 use error::Error;
-use project::Project;
+use project::{Project, DisplayFormat};
 use std::path::PathBuf;
 use structopt::StructOpt;
 
 #[derive(Default, StructOpt)]
 struct Options {
+    /// The display format of the report. Can be "Text" or "Json". (Default = Text)
+    #[structopt(long)]
+    display_format: DisplayFormat,
+
     /// The path to the Forc project directory. (Optional)
     #[structopt(long)]
     directory: Option<PathBuf>,
@@ -45,7 +49,7 @@ fn main() -> Result<(), Error> {
     let mut project = Project::try_from(&options)?;
     project.analyze_modules()?;
 
-    println!("{}", project.report.borrow());
+    println!("{project}");
 
     Ok(())
 }
@@ -64,6 +68,6 @@ mod tests {
         let mut project = Project::try_from(&options).unwrap();
         project.analyze_modules().unwrap();
 
-        println!("{}", project.report.borrow());
+        println!("{project}");
     }
 }

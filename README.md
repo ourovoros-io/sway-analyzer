@@ -34,9 +34,10 @@ cargo uninstall sway-analyzer
 
 | Options | |
 |-|-|
-| `--directory <directory>` | The path to the Forc project directory. (Optional) |
-| `--files <files>...` | The paths to the Sway source files. (Optional) |
 | `--detectors <detectors>...` | The specific detectors to utilize. (Optional; Leave unused for all) |
+| `--directory <directory>` | The path to the Forc project directory. (Optional) |
+| `--display-format <display-format>` | The display format of the report. Can be "Text" or "Json". (Default = Text) |
+| `--files <files>...` | The paths to the Sway source files. (Optional) |
 
 ## Detectors
 
