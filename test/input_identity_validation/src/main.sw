@@ -2,7 +2,7 @@ contract;
 
 use std::constants::ZERO_B256;
 
-abi MyContract {
+abi TestInputIdentityValidation {
     fn test_address_validated(input: Address);
     fn test_address_not_validated(input: Address);
 
@@ -16,7 +16,7 @@ abi MyContract {
     fn test_identity_not_validated(input: Identity);
 }
 
-impl MyContract for Contract {
+impl TestInputIdentityValidation for Contract {
     // Report entry should not be created
     fn test_address_validated(input: Address) {
         require(input != Address::from(ZERO_B256), "Zero address");
