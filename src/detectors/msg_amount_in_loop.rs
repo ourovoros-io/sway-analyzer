@@ -178,7 +178,8 @@ impl AstVisitor for MsgAmountInLoopVisitor {
         let module_state = self.module_states.get_mut(context.path.into()).unwrap();
 
         // Get the function state
-        let fn_signature = context.item_fn.fn_signature.span();
+        let Some(item_fn) = context.item_fn.as_ref() else { return Ok(()) };
+        let fn_signature = item_fn.fn_signature.span();
         let fn_state = module_state.fn_states.get_mut(&fn_signature).unwrap();
 
         // Get the block state

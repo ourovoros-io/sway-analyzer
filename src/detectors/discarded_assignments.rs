@@ -183,7 +183,8 @@ impl AstVisitor for DiscardedAssignmentsVisitor {
         let module_state = self.module_states.get_mut(context.path).unwrap();
 
         // Get the function state
-        let fn_signature = context.item_fn.fn_signature.span();
+        let Some(item_fn) = context.item_fn.as_ref() else { return Ok(()) };
+        let fn_signature = item_fn.fn_signature.span();
         let fn_state = module_state.fn_states.get_mut(&fn_signature).unwrap();
 
         let mut expr = context.expr;
@@ -226,12 +227,12 @@ impl AstVisitor for DiscardedAssignmentsVisitor {
                                     format!(
                                         "{}::{}",
                                         item_impl.ty.span().as_str(),
-                                        context.item_fn.fn_signature.name.as_str(),
+                                        item_fn.fn_signature.name.as_str(),
                                     )
                                 } else {
                                     format!(
                                         "{}",
-                                        context.item_fn.fn_signature.name.as_str(),
+                                        item_fn.fn_signature.name.as_str(),
                                     )
                                 },
                                 assignable_state.span.as_str(),

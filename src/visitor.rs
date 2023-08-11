@@ -124,8 +124,8 @@ pub struct ExprContext<'a> {
     pub item: &'a ItemKind,
     pub impl_attributes: Option<&'a [AttributeDecl]>,
     pub item_impl: Option<&'a ItemImpl>,
-    pub fn_attributes: &'a [AttributeDecl],
-    pub item_fn: &'a ItemFn,
+    pub fn_attributes: Option<&'a [AttributeDecl]>,
+    pub item_fn: Option<&'a ItemFn>,
     pub blocks: Vec<Span>,
     pub expr: &'a Expr,
 }
@@ -866,8 +866,8 @@ impl AstVisitor for AstVisitorRecursive {
                     item: context.item,
                     impl_attributes: context.impl_attributes,
                     item_impl: context.item_impl,
-                    fn_attributes: context.fn_attributes,
-                    item_fn: context.item_fn,
+                    fn_attributes: Some(context.fn_attributes),
+                    item_fn: Some(context.item_fn),
                     blocks: context.blocks.clone(),
                     expr,
                 };
@@ -893,6 +893,21 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.visit_statement_let(context, project)?;
         }
         
+        let context = ExprContext {
+            path: context.path,
+            module: context.module,
+            item: context.item,
+            impl_attributes: context.impl_attributes,
+            item_impl: context.item_impl,
+            fn_attributes: Some(context.fn_attributes),
+            item_fn: Some(context.item_fn),
+            blocks: context.blocks.clone(),
+            expr: &context.statement_let.expr,
+        };
+
+        self.visit_expr(&context, project)?;
+        self.leave_expr(&context, project)?;
+
         Ok(())
     }
 
@@ -1032,8 +1047,8 @@ impl AstVisitor for AstVisitorRecursive {
                     item: context.item,
                     impl_attributes: context.impl_attributes,
                     item_impl: context.item_impl,
-                    fn_attributes: context.fn_attributes,
-                    item_fn: context.item_fn,
+                    fn_attributes: context.fn_attributes.unwrap(),
+                    item_fn: context.item_fn.unwrap(),
                     expr: Some(context.expr),
                     blocks: context.blocks.clone(),
                     block,
@@ -1122,8 +1137,8 @@ impl AstVisitor for AstVisitorRecursive {
                     item: context.item,
                     impl_attributes: context.impl_attributes,
                     item_impl: context.item_impl,
-                    fn_attributes: context.fn_attributes,
-                    item_fn: context.item_fn,
+                    fn_attributes: context.fn_attributes.unwrap(),
+                    item_fn: context.item_fn.unwrap(),
                     expr: context.expr,
                     asm,
                 };
@@ -1158,8 +1173,8 @@ impl AstVisitor for AstVisitorRecursive {
                     item: context.item,
                     impl_attributes: context.impl_attributes,
                     item_impl: context.item_impl,
-                    fn_attributes: context.fn_attributes,
-                    item_fn: context.item_fn,
+                    fn_attributes: context.fn_attributes.unwrap(),
+                    item_fn: context.item_fn.unwrap(),
                     blocks: context.blocks.clone(),
                     expr: context.expr,
                     if_expr,
@@ -1176,8 +1191,8 @@ impl AstVisitor for AstVisitorRecursive {
                     item: context.item,
                     impl_attributes: context.impl_attributes,
                     item_impl: context.item_impl,
-                    fn_attributes: context.fn_attributes,
-                    item_fn: context.item_fn,
+                    fn_attributes: context.fn_attributes.unwrap(),
+                    item_fn: context.item_fn.unwrap(),
                     blocks: context.blocks.clone(),
                     expr: context.expr,
                     value: value.as_ref(),
@@ -1195,8 +1210,8 @@ impl AstVisitor for AstVisitorRecursive {
                     item: context.item,
                     impl_attributes: context.impl_attributes,
                     item_impl: context.item_impl,
-                    fn_attributes: context.fn_attributes,
-                    item_fn: context.item_fn,
+                    fn_attributes: context.fn_attributes.unwrap(),
+                    item_fn: context.item_fn.unwrap(),
                     blocks: context.blocks.clone(),
                     expr: context.expr,
                     condition: condition.as_ref(),
@@ -2138,8 +2153,8 @@ impl AstVisitor for AstVisitorRecursive {
                 item: context.item,
                 impl_attributes: context.impl_attributes,
                 item_impl: context.item_impl,
-                fn_attributes: context.fn_attributes,
-                item_fn: context.item_fn,
+                fn_attributes: Some(context.fn_attributes),
+                item_fn: Some(context.item_fn),
                 blocks: blocks.clone(),
                 expr: expr.as_ref(),
             };
@@ -2256,8 +2271,8 @@ impl AstVisitor for AstVisitorRecursive {
                     item: context.item,
                     impl_attributes: context.impl_attributes,
                     item_impl: context.item_impl,
-                    fn_attributes: context.fn_attributes,
-                    item_fn: context.item_fn,
+                    fn_attributes: Some(context.fn_attributes),
+                    item_fn: Some(context.item_fn),
                     blocks: context.blocks.clone(),
                     expr: expr.as_ref(),
                 };
@@ -2277,8 +2292,8 @@ impl AstVisitor for AstVisitorRecursive {
                     item: context.item,
                     impl_attributes: context.impl_attributes,
                     item_impl: context.item_impl,
-                    fn_attributes: context.fn_attributes,
-                    item_fn: context.item_fn,
+                    fn_attributes: Some(context.fn_attributes),
+                    item_fn: Some(context.item_fn),
                     blocks: context.blocks.clone(),
                     expr: rhs.as_ref(),
                 };
@@ -2366,8 +2381,8 @@ impl AstVisitor for AstVisitorRecursive {
             item: context.item,
             impl_attributes: context.impl_attributes,
             item_impl: context.item_impl,
-            fn_attributes: context.fn_attributes,
-            item_fn: context.item_fn,
+            fn_attributes: Some(context.fn_attributes),
+            item_fn: Some(context.item_fn),
             blocks: context.blocks.clone(),
             expr: context.value,
         };
@@ -2440,8 +2455,8 @@ impl AstVisitor for AstVisitorRecursive {
                     item: context.item,
                     impl_attributes: context.impl_attributes,
                     item_impl: context.item_impl,
-                    fn_attributes: context.fn_attributes,
-                    item_fn: context.item_fn,
+                    fn_attributes: Some(context.fn_attributes),
+                    item_fn: Some(context.item_fn),
                     blocks: context.blocks.clone(),
                     expr,
                 };
@@ -2473,8 +2488,8 @@ impl AstVisitor for AstVisitorRecursive {
             item: context.item,
             impl_attributes: context.impl_attributes,
             item_impl: context.item_impl,
-            fn_attributes: context.fn_attributes,
-            item_fn: context.item_fn,
+            fn_attributes: Some(context.fn_attributes),
+            item_fn: Some(context.item_fn),
             blocks: context.blocks.clone(),
             expr: context.condition,
         };
@@ -2596,6 +2611,23 @@ impl AstVisitor for AstVisitorRecursive {
     fn visit_const(&mut self, context: &ConstContext, project: &mut Project) -> Result<(), Error> {
         for visitor in self.visitors.iter_mut() {
             visitor.visit_const(context, project)?;
+        }
+        
+        if let Some(expr) = context.item_const.expr_opt.as_ref() {
+            let context = ExprContext {
+                path: context.path,
+                module: context.module,
+                item: context.item,
+                impl_attributes: context.impl_attributes,
+                item_impl: context.item_impl,
+                fn_attributes: context.fn_attributes,
+                item_fn: context.item_fn,
+                blocks: vec![],
+                expr,
+            };
+
+            self.visit_expr(&context, project)?;
+            self.leave_expr(&context, project)?;
         }
         
         Ok(())
