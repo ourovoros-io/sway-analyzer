@@ -180,7 +180,7 @@ impl AstVisitor for InputIdentityValidationVisitor {
         let fn_state = module_state.fn_states.get_mut(&fn_signature).unwrap();
 
         // Get the block state
-        let block_span = context.blocks.last().unwrap();
+        let Some(block_span) = context.blocks.last() else { return Ok(()) };
         let block_state = fn_state.block_states.get_mut(&block_span).unwrap();
 
         // Store variable bindings declared in the current block in order to check if they shadow a parameter

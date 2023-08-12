@@ -158,7 +158,7 @@ impl AstVisitor for DiscardedAssignmentsVisitor {
         let fn_state = module_state.fn_states.get_mut(&fn_signature).unwrap();
 
         // Get the block state
-        let block_span = context.blocks.last().unwrap();
+        let Some(block_span) = context.blocks.last() else { return Ok(()) };
         let block_state = fn_state.block_states.get_mut(block_span).unwrap();
 
         // Create an assignment state for variable declarations
@@ -255,7 +255,7 @@ impl AstVisitor for DiscardedAssignmentsVisitor {
             // If the assignable state does not exist, create a new assignable state in the current block state
             if !assignable_state_exists {
                 // Get the current block state
-                let block_span = context.blocks.last().unwrap();
+                let Some(block_span) = context.blocks.last() else { return Ok(()) };
                 let block_state = fn_state.block_states.get_mut(block_span).unwrap();
     
                 // Create a new assignable state
