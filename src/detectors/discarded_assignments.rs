@@ -1,14 +1,16 @@
 use crate::{
     error::Error,
     project::Project,
-    utils::{self, fold_pattern_idents},
+    utils,
     visitor::{
-        AstVisitor, BlockContext, ExprContext, FnContext, ModuleContext, StatementContext,
-        WhileExprContext,
+        AsmBlockContext, AstVisitor, BlockContext, ExprContext, FnContext, ModuleContext,
+        StatementContext, WhileExprContext,
     },
 };
 use std::{collections::HashMap, path::PathBuf};
-use sway_ast::{expr::ReassignmentOpVariant, Expr, Statement, StatementLet};
+use sway_ast::{
+    expr::ReassignmentOpVariant, AsmRegisterDeclaration, Expr, Statement, StatementLet,
+};
 use sway_types::{Span, Spanned};
 
 #[derive(Default)]
@@ -163,7 +165,7 @@ impl AstVisitor for DiscardedAssignmentsVisitor {
 
         // Create an assignment state for variable declarations
         if let Statement::Let(StatementLet { pattern, .. }) = context.statement {
-            for ident in fold_pattern_idents(pattern) {
+            for ident in utils::fold_pattern_idents(pattern) {
                 block_state.assignable_states.push(AssignableState {
                     name: ident.as_str().to_string(),
                     span: ident.span(),
@@ -171,6 +173,58 @@ impl AstVisitor for DiscardedAssignmentsVisitor {
                     op: ReassignmentOpVariant::Equals,
                 });
             }
+        }
+
+        Ok(())
+    }
+
+    fn visit_asm_block(&mut self, context: &AsmBlockContext, _project: &mut Project) -> Result<(), Error> {
+        // Get the module state
+        let module_state = self.module_states.get_mut(context.path).unwrap();
+
+        // Get the function state
+        let fn_signature = context.item_fn.fn_signature.span();
+        let fn_state = module_state.fn_states.get_mut(&fn_signature).unwrap();
+
+        let mut check_register = |register: &AsmRegisterDeclaration| {
+            let mut check_for_assignable_span = |span: Span| {
+                // Check if `expr` has an assignable state and mark it as used if so
+                for block_span in context.blocks.iter().rev() {
+                    let mut found = false;
+
+                    // Get the block state
+                    let block_state = fn_state.block_states.get_mut(block_span).unwrap();
+
+                    // If the assignable state is a direct match, mark it as used
+                    if let Some(assignable_state) = block_state.assignable_states.iter_mut().find(|x| x.name == span.as_str()) {
+                        assignable_state.used = true;
+                        found = true;
+                    }
+
+                    // If the identifier span is a higher level variable, but fields of it were updated, mark all of their assignable states as used
+                    for assignable_state in block_state.assignable_states.iter_mut().filter(|x| x.name.starts_with(format!("{}.", span.as_str()).as_str())) {
+                        assignable_state.used = true;
+                        found = true;
+                    }
+
+                    if found {
+                        break;
+                    }
+                }
+            };
+
+            match register.value_opt.as_ref() {
+                Some((_, expr)) => check_for_assignable_span(expr.span()),
+                None => check_for_assignable_span(register.register.span()),
+            }
+        };
+
+        for (register, _) in context.asm.registers.inner.value_separator_pairs.iter() {
+            check_register(register);
+        }
+
+        if let Some(register) = context.asm.registers.inner.final_value_opt.as_ref() {
+            check_register(register);
         }
 
         Ok(())
@@ -202,52 +256,52 @@ impl AstVisitor for DiscardedAssignmentsVisitor {
                 let block_state = fn_state.block_states.get_mut(block_span).unwrap();
 
                 // Check if the assignable state exists
-                if let Some(assignable_state) = block_state.assignable_states.iter_mut().find(|x| x.name == assignable_span.as_str()) {
-                    // Check for assignment invariants
-                    let assignment_discarded = match (&reassignment_op.variant, &assignable_state.op) {
-                        (ReassignmentOpVariant::Equals, ReassignmentOpVariant::AddEquals) |
-                        (ReassignmentOpVariant::Equals, ReassignmentOpVariant::SubEquals) |
-                        (ReassignmentOpVariant::Equals, ReassignmentOpVariant::MulEquals) |
-                        (ReassignmentOpVariant::Equals, ReassignmentOpVariant::DivEquals) |
-                        (ReassignmentOpVariant::Equals, ReassignmentOpVariant::ShlEquals) |
-                        (ReassignmentOpVariant::Equals, ReassignmentOpVariant::ShrEquals) => !assignable_state.used,
-                        _ => false,
-                    };
+                let Some(assignable_state) = block_state.assignable_states.iter_mut().find(|x| x.name == assignable_span.as_str()) else { continue };
+            
+                // Check for assignment invariants
+                let assignment_discarded = match (&reassignment_op.variant, &assignable_state.op) {
+                    (ReassignmentOpVariant::Equals, ReassignmentOpVariant::AddEquals) |
+                    (ReassignmentOpVariant::Equals, ReassignmentOpVariant::SubEquals) |
+                    (ReassignmentOpVariant::Equals, ReassignmentOpVariant::MulEquals) |
+                    (ReassignmentOpVariant::Equals, ReassignmentOpVariant::DivEquals) |
+                    (ReassignmentOpVariant::Equals, ReassignmentOpVariant::ShlEquals) |
+                    (ReassignmentOpVariant::Equals, ReassignmentOpVariant::ShrEquals) => !assignable_state.used,
+                    _ => false,
+                };
 
-                    // If the assigned value has not been used, create a report entry
-                    if !assignable_state.used && assignment_discarded {
-                        project.report.borrow_mut().add_entry(
-                            context.path,
-                            project.span_to_line(context.path, &assignable_state.span)?,
-                            format!(
-                                "The `{}` functions makes an assignment to `{}` which is discarded by the assignment made on L{}.",
-                                if let Some(item_impl) = context.item_impl.as_ref() {
-                                    format!(
-                                        "{}::{}",
-                                        item_impl.ty.span().as_str(),
-                                        item_fn.fn_signature.name.as_str(),
-                                    )
-                                } else {
-                                    format!(
-                                        "{}",
-                                        item_fn.fn_signature.name.as_str(),
-                                    )
-                                },
-                                assignable_state.span.as_str(),
-                                project.span_to_line(context.path, &assignable_span)?.unwrap(),
-                            ),
-                        );
-                    }
-
-                    // Since the assignable has been assigned a new value, update its span and mark it as unused
-                    assignable_state.span = assignable_span.clone();
-                    assignable_state.used = false;
-                    assignable_state.op = reassignment_op.variant.clone();
-
-                    // Note that the assignable state exists and stop the lookup
-                    assignable_state_exists = true;
-                    break;
+                // If the assigned value has not been used, create a report entry
+                if !assignable_state.used && assignment_discarded {
+                    project.report.borrow_mut().add_entry(
+                        context.path,
+                        project.span_to_line(context.path, &assignable_state.span)?,
+                        format!(
+                            "The `{}` functions makes an assignment to `{}` which is discarded by the assignment made on L{}.",
+                            if let Some(item_impl) = context.item_impl.as_ref() {
+                                format!(
+                                    "{}::{}",
+                                    item_impl.ty.span().as_str(),
+                                    item_fn.fn_signature.name.as_str(),
+                                )
+                            } else {
+                                format!(
+                                    "{}",
+                                    item_fn.fn_signature.name.as_str(),
+                                )
+                            },
+                            assignable_state.span.as_str(),
+                            project.span_to_line(context.path, &assignable_span)?.unwrap(),
+                        ),
+                    );
                 }
+
+                // Since the assignable has been assigned a new value, update its span and mark it as unused
+                assignable_state.span = assignable_span.clone();
+                assignable_state.used = false;
+                assignable_state.op = reassignment_op.variant.clone();
+
+                // Note that the assignable state exists and stop the lookup
+                assignable_state_exists = true;
+                break;
             }
 
             // If the assignable state does not exist, create a new assignable state in the current block state
