@@ -74,21 +74,13 @@ impl AstVisitor for InputIdentityValidationVisitor {
 
         match &context.item_fn.fn_signature.arguments.inner {
             FnArgs::Static(args) => {
-                for arg in args.value_separator_pairs.iter() {
-                    check_for_identity_argument(&arg.0);
-                }
-
-                if let Some(arg) = args.final_value_opt.as_ref() {
+                for arg in utils::fold_punctuated(args) {
                     check_for_identity_argument(arg);
                 }
             }
             
             FnArgs::NonStatic { args_opt: Some(args), .. } => {
-                for arg in args.1.value_separator_pairs.iter() {
-                    check_for_identity_argument(&arg.0);
-                }
-
-                if let Some(arg) = args.1.final_value_opt.as_ref() {
+                for arg in utils::fold_punctuated(&args.1) {
                     check_for_identity_argument(arg);
                 }
             }
@@ -254,22 +246,14 @@ impl AstVisitor for InputIdentityValidationVisitor {
                         let Pattern::Constructor { path, args } = &branch.pattern else { continue };
                         let "Identity" = path.prefix.name.as_str() else { continue };
                         let Some(suffix) = path.suffix.last() else { continue };
+                        let args = utils::fold_punctuated(&args.inner);
                         
                         let mut ident = None;
 
-                        match args.inner.final_value_opt.as_ref() {
-                            Some(arg) => match arg.as_ref() {
+                        if let Some(arg) = args.first() {
+                            match arg {
                                 Pattern::AmbiguousSingleIdent(arg) => ident = Some(arg),
                                 _ => {}
-                            }
-
-                            None => match args.inner.value_separator_pairs.first() {
-                                Some(arg) => match &arg.0 {
-                                    Pattern::AmbiguousSingleIdent(arg) => ident = Some(arg),
-                                    _ => {}
-                                }
-
-                                None => {}
                             }
                         }
 
@@ -278,15 +262,9 @@ impl AstVisitor for InputIdentityValidationVisitor {
                         let mut check_expr = |expr: &Expr| {
                             let Expr::FuncApp { func, args } = expr else { return };
                             let "require" = func.span().as_str() else { return };
+                            let args = utils::fold_punctuated(&args.inner);
 
-                            let input = match args.inner.value_separator_pairs.first() {
-                                Some(arg) => &arg.0,
-                                None => match args.inner.final_value_opt.as_ref() {
-                                    Some(arg) => arg.as_ref(),
-                                    None => return,
-                                }
-                            };
-
+                            let Some(input) = args.first() else { return };
                             let Expr::NotEqual { lhs, rhs, .. } = input else { return };
 
                             let zero_value = if lhs.span().as_str() == ident.span().as_str() {
@@ -376,22 +354,14 @@ impl AstVisitor for InputIdentityValidationVisitor {
                         let Pattern::Constructor { path, args } = lhs.as_ref() else { continue };
                         let "Identity" = path.prefix.name.as_str() else { continue };
                         let Some(suffix) = path.suffix.last() else { continue };
+                        let args = utils::fold_punctuated(&args.inner);
                         
                         let mut ident = None;
 
-                        match args.inner.final_value_opt.as_ref() {
-                            Some(arg) => match arg.as_ref() {
+                        if let Some(arg) = args.first() {
+                            match arg {
                                 Pattern::AmbiguousSingleIdent(arg) => ident = Some(arg),
                                 _ => {}
-                            }
-
-                            None => match args.inner.value_separator_pairs.first() {
-                                Some(arg) => match &arg.0 {
-                                    Pattern::AmbiguousSingleIdent(arg) => ident = Some(arg),
-                                    _ => {}
-                                }
-
-                                None => {}
                             }
                         }
 
@@ -400,15 +370,9 @@ impl AstVisitor for InputIdentityValidationVisitor {
                         let mut check_expr = |expr: &Expr| {
                             let Expr::FuncApp { func, args } = expr else { return };
                             let "require" = func.span().as_str() else { return };
+                            let args = utils::fold_punctuated(&args.inner);
 
-                            let input = match args.inner.value_separator_pairs.first() {
-                                Some(arg) => &arg.0,
-                                None => match args.inner.final_value_opt.as_ref() {
-                                    Some(arg) => arg.as_ref(),
-                                    None => return,
-                                }
-                            };
-
+                            let Some(input) = args.first() else { return };
                             let Expr::NotEqual { lhs, rhs, .. } = input else { return };
 
                             let zero_value = if lhs.span().as_str() == ident.span().as_str() {
@@ -452,14 +416,9 @@ impl AstVisitor for InputIdentityValidationVisitor {
             Expr::FuncApp { func, args } => {
                 // Only check require calls
                 let "require" = func.span().as_str() else { return Ok(()) };
+                let args = utils::fold_punctuated(&args.inner);
 
-                let input = match args.inner.value_separator_pairs.first() {
-                    Some(arg) => &arg.0,
-                    None => match args.inner.final_value_opt.as_ref() {
-                        Some(arg) => arg.as_ref(),
-                        None => return Ok(()),
-                    }
-                };
+                let Some(input) = args.first() else { return Ok(()) };
 
                 match input {
                     Expr::NotEqual { lhs, rhs, .. } => {
@@ -524,22 +483,14 @@ impl AstVisitor for InputIdentityValidationVisitor {
                                 let Pattern::Constructor { path, args } = &branch.pattern else { continue };
                                 let "Identity" = path.prefix.name.as_str() else { continue };
                                 let Some(suffix) = path.suffix.last() else { continue };
+                                let args = utils::fold_punctuated(&args.inner);
                                 
                                 let mut ident = None;
 
-                                match args.inner.final_value_opt.as_ref() {
-                                    Some(arg) => match arg.as_ref() {
+                                if let Some(arg) = args.first() {
+                                    match arg {
                                         Pattern::AmbiguousSingleIdent(arg) => ident = Some(arg),
                                         _ => {}
-                                    }
-
-                                    None => match args.inner.value_separator_pairs.first() {
-                                        Some(arg) => match &arg.0 {
-                                            Pattern::AmbiguousSingleIdent(arg) => ident = Some(arg),
-                                            _ => {}
-                                        }
-
-                                        None => {}
                                     }
                                 }
 
@@ -635,22 +586,14 @@ impl AstVisitor for InputIdentityValidationVisitor {
                                 let Pattern::Constructor { path, args } = lhs.as_ref() else { continue };
                                 let "Identity" = path.prefix.name.as_str() else { continue };
                                 let Some(suffix) = path.suffix.last() else { continue };
+                                let args = utils::fold_punctuated(&args.inner);
                                 
                                 let mut ident = None;
 
-                                match args.inner.final_value_opt.as_ref() {
-                                    Some(arg) => match arg.as_ref() {
+                                if let Some(arg) = args.first() {
+                                    match arg {
                                         Pattern::AmbiguousSingleIdent(arg) => ident = Some(arg),
                                         _ => {}
-                                    }
-
-                                    None => match args.inner.value_separator_pairs.first() {
-                                        Some(arg) => match &arg.0 {
-                                            Pattern::AmbiguousSingleIdent(arg) => ident = Some(arg),
-                                            _ => {}
-                                        }
-
-                                        None => {}
                                     }
                                 }
 

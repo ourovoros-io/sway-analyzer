@@ -1,4 +1,4 @@
-use crate::{error::Error, project::Project};
+use crate::{error::Error, project::Project, utils};
 use std::path::Path;
 use sway_ast::{*, attribute::Annotated, expr::asm::AsmFinalExpr};
 use sway_types::{Span, Spanned};
@@ -702,7 +702,7 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.visit_struct(context, project)?;
         }
         
-        let mut visit_field = |field: &Annotated<TypeField>| -> Result<(), Error> {
+        for field in utils::fold_punctuated(&context.item_struct.fields.inner) {
             let context = StructFieldContext {
                 path: context.path,
                 module: context.module,
@@ -715,16 +715,6 @@ impl AstVisitor for AstVisitorRecursive {
 
             self.visit_struct_field(&context, project)?;
             self.leave_struct_field(&context, project)?;
-
-            Ok(())
-        };
-
-        for field in context.item_struct.fields.inner.value_separator_pairs.iter() {
-            visit_field(&field.0)?;
-        }
-
-        if let Some(field) = context.item_struct.fields.inner.final_value_opt.as_ref() {
-            visit_field(field)?;
         }
 
         Ok(())
@@ -759,7 +749,7 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.visit_enum(context, project)?;
         }
         
-        let mut visit_field = |field: &Annotated<TypeField>| -> Result<(), Error> {
+        for field in utils::fold_punctuated(&context.item_enum.fields.inner) {
             let context = EnumFieldContext {
                 path: context.path,
                 module: context.module,
@@ -772,16 +762,6 @@ impl AstVisitor for AstVisitorRecursive {
 
             self.visit_enum_field(&context, project)?;
             self.leave_enum_field(&context, project)?;
-
-            Ok(())
-        };
-
-        for field in context.item_enum.fields.inner.value_separator_pairs.iter() {
-            visit_field(&field.0)?;
-        }
-
-        if let Some(field) = context.item_enum.fields.inner.final_value_opt.as_ref() {
-            visit_field(field)?;
         }
 
         Ok(())
@@ -977,8 +957,8 @@ impl AstVisitor for AstVisitorRecursive {
             }
 
             Expr::Struct { fields, .. } => {
-                for field in fields.inner.value_separator_pairs.iter() {
-                    if let Some(field) = field.0.expr_opt.as_ref() {
+                for field in utils::fold_punctuated(&fields.inner) {
+                    if let Some(field) = field.expr_opt.as_ref() {
                         let context = ExprContext {
                             path: context.path,
                             module: context.module,
@@ -1019,7 +999,7 @@ impl AstVisitor for AstVisitorRecursive {
                         self.visit_expr(&context, project)?;
                         self.leave_expr(&context, project)?;
 
-                        for expr in tail.value_separator_pairs.iter() {
+                        for expr in utils::fold_punctuated(tail) {
                             let context = ExprContext {
                                 path: context.path,
                                 module: context.module,
@@ -1030,25 +1010,7 @@ impl AstVisitor for AstVisitorRecursive {
                                 item_fn: context.item_fn,
                                 blocks: context.blocks.clone(),
                                 statement: context.statement.clone(),
-                                expr: &expr.0,
-                            };
-            
-                            self.visit_expr(&context, project)?;
-                            self.leave_expr(&context, project)?;
-                        }
-
-                        if let Some(expr) = tail.final_value_opt.as_ref() {
-                            let context = ExprContext {
-                                path: context.path,
-                                module: context.module,
-                                item: context.item,
-                                impl_attributes: context.impl_attributes,
-                                item_impl: context.item_impl,
-                                fn_attributes: context.fn_attributes,
-                                item_fn: context.item_fn,
-                                blocks: context.blocks.clone(),
-                                statement: context.statement.clone(),
-                                expr: expr.as_ref(),
+                                expr,
                             };
             
                             self.visit_expr(&context, project)?;
@@ -1097,7 +1059,7 @@ impl AstVisitor for AstVisitorRecursive {
             Expr::Array(array) => {
                 match &array.inner {
                     ExprArrayDescriptor::Sequence(sequence) => {
-                        for expr in sequence.value_separator_pairs.iter() {
+                        for expr in utils::fold_punctuated(sequence) {
                             let context = ExprContext {
                                 path: context.path,
                                 module: context.module,
@@ -1108,25 +1070,7 @@ impl AstVisitor for AstVisitorRecursive {
                                 item_fn: context.item_fn,
                                 blocks: context.blocks.clone(),
                                 statement: context.statement.clone(),
-                                expr: &expr.0,
-                            };
-            
-                            self.visit_expr(&context, project)?;
-                            self.leave_expr(&context, project)?;
-                        }
-
-                        if let Some(expr) = sequence.final_value_opt.as_ref() {
-                            let context = ExprContext {
-                                path: context.path,
-                                module: context.module,
-                                item: context.item,
-                                impl_attributes: context.impl_attributes,
-                                item_impl: context.item_impl,
-                                fn_attributes: context.fn_attributes,
-                                item_fn: context.item_fn,
-                                blocks: context.blocks.clone(),
-                                statement: context.statement.clone(),
-                                expr: expr.as_ref(),
+                                expr,
                             };
             
                             self.visit_expr(&context, project)?;
@@ -1285,7 +1229,7 @@ impl AstVisitor for AstVisitorRecursive {
                 self.visit_expr(&context, project)?;
                 self.leave_expr(&context, project)?;
 
-                for arg in args.inner.value_separator_pairs.iter() {
+                for arg in utils::fold_punctuated(&args.inner) {
                     let context = ExprContext {
                         path: context.path,
                         module: context.module,
@@ -1296,29 +1240,11 @@ impl AstVisitor for AstVisitorRecursive {
                         item_fn: context.item_fn,
                         blocks: context.blocks.clone(),
                         statement: context.statement.clone(),
-                        expr: &arg.0,
+                        expr: arg,
                     };
     
                     self.visit_expr(&context, project)?;
                     self.leave_expr(&context, project)?;    
-                }
-
-                if let Some(arg) = args.inner.final_value_opt.as_ref() {
-                    let context = ExprContext {
-                        path: context.path,
-                        module: context.module,
-                        item: context.item,
-                        impl_attributes: context.impl_attributes,
-                        item_impl: context.item_impl,
-                        fn_attributes: context.fn_attributes,
-                        item_fn: context.item_fn,
-                        blocks: context.blocks.clone(),
-                        statement: context.statement.clone(),
-                        expr: arg.as_ref(),
-                    };
-    
-                    self.visit_expr(&context, project)?;
-                    self.leave_expr(&context, project)?;  
                 }
             }
 
@@ -1374,27 +1300,7 @@ impl AstVisitor for AstVisitorRecursive {
                 self.leave_expr(&context, project)?;
 
                 if let Some(opts) = contract_args_opt.as_ref() {
-                    for expr in opts.inner.value_separator_pairs.iter() {
-                        if let Some(expr) = expr.0.expr_opt.as_ref() {
-                            let context = ExprContext {
-                                path: context.path,
-                                module: context.module,
-                                item: context.item,
-                                impl_attributes: context.impl_attributes,
-                                item_impl: context.item_impl,
-                                fn_attributes: context.fn_attributes,
-                                item_fn: context.item_fn,
-                                blocks: context.blocks.clone(),
-                                statement: context.statement.clone(),
-                                expr: expr.1.as_ref(),
-                            };
-            
-                            self.visit_expr(&context, project)?;
-                            self.leave_expr(&context, project)?;
-                        }
-                    }
-
-                    if let Some(expr) = opts.inner.final_value_opt.as_ref() {
+                    for expr in utils::fold_punctuated(&opts.inner) {
                         if let Some(expr) = expr.expr_opt.as_ref() {
                             let context = ExprContext {
                                 path: context.path,
@@ -1415,7 +1321,7 @@ impl AstVisitor for AstVisitorRecursive {
                     }
                 }
             
-                for arg in args.inner.value_separator_pairs.iter() {
+                for arg in utils::fold_punctuated(&args.inner) {
                     let context = ExprContext {
                         path: context.path,
                         module: context.module,
@@ -1426,25 +1332,7 @@ impl AstVisitor for AstVisitorRecursive {
                         item_fn: context.item_fn,
                         blocks: context.blocks.clone(),
                         statement: context.statement.clone(),
-                        expr: &arg.0,
-                    };
-    
-                    self.visit_expr(&context, project)?;
-                    self.leave_expr(&context, project)?;
-                }
-
-                if let Some(arg) = args.inner.final_value_opt.as_ref() {
-                    let context = ExprContext {
-                        path: context.path,
-                        module: context.module,
-                        item: context.item,
-                        impl_attributes: context.impl_attributes,
-                        item_impl: context.item_impl,
-                        fn_attributes: context.fn_attributes,
-                        item_fn: context.item_fn,
-                        blocks: context.blocks.clone(),
-                        statement: context.statement.clone(),
-                        expr: arg.as_ref(),
+                        expr: arg,
                     };
     
                     self.visit_expr(&context, project)?;
@@ -2782,11 +2670,7 @@ impl AstVisitor for AstVisitorRecursive {
             Ok(())
         };
 
-        for field in context.item_storage.fields.inner.value_separator_pairs.iter() {
-            visit_field(&field.0)?;
-        }
-
-        if let Some(field) = context.item_storage.fields.inner.final_value_opt.as_ref() {
+        for field in utils::fold_punctuated(&context.item_storage.fields.inner) {
             visit_field(field)?;
         }
         
@@ -2839,11 +2723,7 @@ impl AstVisitor for AstVisitorRecursive {
             Ok(())
         };
 
-        for field in context.item_configurable.fields.inner.value_separator_pairs.iter() {
-            visit_field(&field.0)?;
-        }
-
-        if let Some(field) = context.item_configurable.fields.inner.final_value_opt.as_ref() {
+        for field in utils::fold_punctuated(&context.item_configurable.fields.inner) {
             visit_field(field)?;
         }
         

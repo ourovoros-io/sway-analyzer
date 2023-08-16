@@ -132,7 +132,7 @@ impl AstVisitor for DiscardedAssignmentsVisitor {
         let fn_state = module_state.fn_states.get_mut(&fn_signature).unwrap();
 
         // Collect all identifier spans in `context.condition`
-        let var_spans = utils::collect_ident_spans(context.condition);
+        let var_spans = utils::fold_expr_ident_spans(context.condition);
 
         // Find the block state each variable state was declared in
         for var_span in var_spans {
@@ -219,11 +219,7 @@ impl AstVisitor for DiscardedAssignmentsVisitor {
             }
         };
 
-        for (register, _) in context.asm.registers.inner.value_separator_pairs.iter() {
-            check_register(register);
-        }
-
-        if let Some(register) = context.asm.registers.inner.final_value_opt.as_ref() {
+        for register in utils::fold_punctuated(&context.asm.registers.inner) {
             check_register(register);
         }
 
@@ -323,7 +319,7 @@ impl AstVisitor for DiscardedAssignmentsVisitor {
         }
 
         // Collect all identifier spans in the expression
-        let ident_spans = utils::collect_ident_spans(expr);
+        let ident_spans = utils::fold_expr_ident_spans(expr);
 
         // If an assignable state for any of the identifier spans exists in any of the current blocks, mark it as used
         for ident_span in ident_spans.into_iter() {

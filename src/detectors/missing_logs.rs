@@ -178,15 +178,7 @@ impl AstVisitor for MissingLogsVisitor {
         let Expr::FuncApp { func, args } = context.expr else { return Ok(()) };
         let Expr::Path(path) = func.as_ref() else { return Ok(()) };
 
-        let mut log_args = vec![];
-
-        for arg in args.inner.value_separator_pairs.iter() {
-            log_args.push(&arg.0);
-        }
-
-        if let Some(arg) = args.inner.final_value_opt.as_ref() {
-            log_args.push(arg.as_ref());
-        }
+        let log_args = utils::fold_punctuated(&args.inner);
 
         if log_args.len() != 1 {
             return Ok(());
