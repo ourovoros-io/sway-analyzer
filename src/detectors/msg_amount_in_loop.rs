@@ -165,7 +165,7 @@ impl AstVisitor for MsgAmountInLoopVisitor {
 
         // Get or create the block state
         let block_span = context.body.span();
-        let block_state = fn_state.block_states.entry(block_span).or_insert_with(|| BlockState::default());
+        let block_state = fn_state.block_states.entry(block_span).or_insert_with(BlockState::default);
         
         // Mark the block as a loop
         block_state.is_loop = true;

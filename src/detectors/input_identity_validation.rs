@@ -51,7 +51,7 @@ impl AstVisitor for InputIdentityValidationVisitor {
 
         // Create the function state
         let fn_signature = context.item_fn.fn_signature.span();
-        let fn_state = module_state.fn_states.entry(fn_signature).or_insert(FnState::default());
+        let fn_state = module_state.fn_states.entry(fn_signature).or_insert_with(FnState::default);
 
         // Check function arguments for `Address`, `ContractId` or `Identity` types and queue them to be checked
         let mut check_for_identity_argument = |arg: &FnArg| {
