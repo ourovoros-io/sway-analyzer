@@ -1,7 +1,10 @@
 use crate::{
     error::Error,
     project::Project,
-    visitor::{AstVisitor, BlockContext, FnContext, ModuleContext, StatementContext}, utils::fold_pattern_idents,
+    utils,
+    visitor::{
+        AstVisitor, BlockContext, FnContext, IfExprContext, ModuleContext, StatementContext,
+    },
 };
 use std::{collections::HashMap, path::PathBuf};
 use sway_ast::{
@@ -171,6 +174,29 @@ impl AstVisitor for InputIdentityValidationVisitor {
         Ok(())
     }
 
+    fn visit_if_expr(&mut self, context: &IfExprContext, _project: &mut Project) -> Result<(), Error> {
+        // Get the module state
+        let module_state = self.module_states.get_mut(context.path).unwrap();
+
+        // Get the function state
+        let fn_signature = context.item_fn.fn_signature.span();
+        let fn_state = module_state.fn_states.get_mut(&fn_signature).unwrap();
+
+        // Check if the expression is an `if let`
+        let IfCondition::Let { lhs, .. } = &context.if_expr.condition else { return Ok(()) };
+
+        // Create the block state for the `if let` ahead of time
+        let block_span = context.if_expr.then_block.span();
+        let block_state = fn_state.block_states.entry(block_span).or_insert_with(BlockState::default);
+
+        // Declare variable bindings from `lhs` inside the body block state of the `if let`
+        for ident in utils::fold_pattern_idents(lhs.as_ref()) {
+            block_state.variables.push(ident.span());
+        }
+
+        Ok(())
+    }
+
     fn visit_statement(&mut self, context: &StatementContext, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let module_state = self.module_states.get_mut(context.path).unwrap();
@@ -185,7 +211,7 @@ impl AstVisitor for InputIdentityValidationVisitor {
 
         // Store variable bindings declared in the current block in order to check if they shadow a parameter
         if let Statement::Let(item_let) = context.statement {
-            for ident in fold_pattern_idents(&item_let.pattern) {
+            for ident in utils::fold_pattern_idents(&item_let.pattern) {
                 block_state.variables.push(ident.span());
             }
 
