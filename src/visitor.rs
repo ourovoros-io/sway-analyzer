@@ -2387,9 +2387,9 @@ impl AstVisitor for AstVisitorRecursive {
                 self.leave_expr(&context, project)?;
             }
             
-            IfCondition::Let { lhs, rhs, .. } => {
+            IfCondition::Let { rhs, .. } => {
                 //
-                // TODO: visit `lhs` pattern
+                // NOTE: `lhs` pattern can be handled by overriding `visit_if_expr`
                 //
 
                 let rhs_context = ExprContext {
@@ -2538,7 +2538,7 @@ impl AstVisitor for AstVisitorRecursive {
         }
 
         //
-        // TODO: visit `context.branch.pattern`
+        // NOTE: `context.branch.pattern` pattern can be handled by overriding `visit_match_branch`
         //
 
         match &context.branch.kind {

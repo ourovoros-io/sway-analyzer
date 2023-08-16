@@ -221,12 +221,24 @@ pub fn collect_ident_spans(expr: &Expr) -> Vec<Span> {
     spans
 }
 
+pub fn fold_path_idents(path: &PathExpr) -> Vec<BaseIdent> {
+    let mut result = vec![];
+
+    result.push(path.prefix.name.clone());
+
+    for (_, path) in path.suffix.iter() {
+        result.push(path.name.clone());
+    }
+
+    result
+}
+
 pub fn fold_expr_idents(expr: &Expr) -> Vec<BaseIdent> {
     let mut result = vec![];
 
     match expr {
-        Expr::Path(PathExpr { prefix, .. }) => {
-            result.push(prefix.name.clone());
+        Expr::Path(path) => {
+            result.extend(fold_path_idents(path));
         }
 
         Expr::Index { target, .. } => {
@@ -273,6 +285,93 @@ pub fn fold_assignable_idents(assignable: &Assignable) -> Vec<BaseIdent> {
         Assignable::TupleFieldProjection { target, .. } => {
             result.extend(fold_assignable_idents(target));
         }
+    }
+
+    result
+}
+
+pub fn fold_pattern_idents(pattern: &Pattern) -> Vec<BaseIdent> {
+    let mut result = vec![];
+
+    match pattern {
+        Pattern::Or { lhs, rhs, .. } => {
+            result.extend(fold_pattern_idents(lhs.as_ref()));
+            result.extend(fold_pattern_idents(rhs.as_ref()));
+        }
+
+        Pattern::Wildcard { .. } => {}
+
+        Pattern::AmbiguousSingleIdent(ident) => {
+            result.push(ident.clone());
+        }
+
+        Pattern::Var { name, .. } => {
+            result.push(name.clone());
+        }
+
+        Pattern::Literal(_) => {}
+
+        Pattern::Constant(path) => {
+            result.extend(fold_path_idents(path));
+        }
+
+        Pattern::Constructor { args, .. } => {
+            //
+            // NOTE: constructor path is ignored since it is a type name
+            //
+
+            for (pattern, _) in args.inner.value_separator_pairs.iter() {
+                result.extend(fold_pattern_idents(pattern));
+            }
+
+            if let Some(pattern) = args.inner.final_value_opt.as_ref() {
+                result.extend(fold_pattern_idents(pattern.as_ref()));
+            }
+        }
+
+        Pattern::Struct { fields, .. } => {
+            //
+            // NOTE: struct name is ignored since it is a type name
+            //
+
+            let mut fold_field_idents = |field: &PatternStructField| {
+                match field {
+                    PatternStructField::Rest { .. } => {}
+
+                    PatternStructField::Field { field_name, pattern_opt } => {
+                        match pattern_opt.as_ref() {
+                            Some((_, pattern)) => {
+                                result.extend(fold_pattern_idents(pattern));
+                            }
+
+                            None => {
+                                result.push(field_name.clone());
+                            }
+                        }
+                    }
+                }
+            };
+
+            for (field, _) in fields.inner.value_separator_pairs.iter() {
+                fold_field_idents(field);
+            }
+
+            if let Some(field) = fields.inner.final_value_opt.as_ref() {
+                fold_field_idents(field.as_ref());
+            }
+        }
+
+        Pattern::Tuple(patterns) => {
+            for (pattern, _) in patterns.inner.value_separator_pairs.iter() {
+                result.extend(fold_pattern_idents(pattern));
+            }
+
+            if let Some(pattern) = patterns.inner.final_value_opt.as_ref() {
+                result.extend(fold_pattern_idents(pattern.as_ref()));
+            }
+        }
+
+        Pattern::Error(_, _) => {}
     }
 
     result

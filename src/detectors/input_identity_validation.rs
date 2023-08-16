@@ -1,7 +1,7 @@
 use crate::{
     error::Error,
     project::Project,
-    visitor::{AstVisitor, BlockContext, FnContext, ModuleContext, StatementContext},
+    visitor::{AstVisitor, BlockContext, FnContext, ModuleContext, StatementContext}, utils::fold_pattern_idents,
 };
 use std::{collections::HashMap, path::PathBuf};
 use sway_ast::{
@@ -185,16 +185,8 @@ impl AstVisitor for InputIdentityValidationVisitor {
 
         // Store variable bindings declared in the current block in order to check if they shadow a parameter
         if let Statement::Let(item_let) = context.statement {
-            match &item_let.pattern {
-                //
-                // TODO: handle other patterns
-                //
-
-                Pattern::Var { name, .. } => {
-                    block_state.variables.push(name.span());
-                }
-
-                _ => {}
+            for ident in fold_pattern_idents(&item_let.pattern) {
+                block_state.variables.push(ident.span());
             }
 
             // Skip expression check since we know this is a variable binding

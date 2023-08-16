@@ -1,14 +1,14 @@
 use crate::{
     error::Error,
     project::Project,
-    utils,
+    utils::{self, fold_pattern_idents},
     visitor::{
         AstVisitor, BlockContext, ExprContext, FnContext, ModuleContext, StatementContext,
         WhileExprContext,
     },
 };
 use std::{collections::HashMap, path::PathBuf};
-use sway_ast::{expr::ReassignmentOpVariant, Expr, Pattern, Statement, StatementLet};
+use sway_ast::{expr::ReassignmentOpVariant, Expr, Statement, StatementLet};
 use sway_types::{Span, Spanned};
 
 #[derive(Default)]
@@ -162,17 +162,15 @@ impl AstVisitor for DiscardedAssignmentsVisitor {
         let block_state = fn_state.block_states.get_mut(block_span).unwrap();
 
         // Create an assignment state for variable declarations
-        if let Statement::Let(StatementLet {
-            // TODO: handle other patterns
-            pattern: Pattern::Var { name, .. },
-            ..
-        }) = context.statement {
-            block_state.assignable_states.push(AssignableState {
-                name: name.as_str().to_string(),
-                span: name.span(),
-                used: false,
-                op: ReassignmentOpVariant::Equals,
-            });
+        if let Statement::Let(StatementLet { pattern, .. }) = context.statement {
+            for ident in fold_pattern_idents(pattern) {
+                block_state.assignable_states.push(AssignableState {
+                    name: ident.as_str().to_string(),
+                    span: ident.span(),
+                    used: false,
+                    op: ReassignmentOpVariant::Equals,
+                });
+            }
         }
 
         Ok(())
