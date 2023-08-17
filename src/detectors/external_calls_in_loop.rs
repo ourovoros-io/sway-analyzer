@@ -137,47 +137,61 @@ impl AstVisitor for ExternalCallsInLoopVisitor {
 
         // Check to see if the expression is a method call
         let Expr::MethodCall { target, .. } = context.expr else { return Ok(()) };
-        
-        let target_idents = utils::fold_expr_idents(target.as_ref());
 
-        if target_idents.len() != 1 {
-            return Ok(());
-        }
-
-        let target_span = target_idents[0].span();
-
-        // Check to see if the method call's target is an abi variable
-        for block_span in context.blocks.iter().rev() {
-            let block_state = fn_state.block_states.get_mut(&block_span).unwrap();
-            
-            for (variable_span, is_abi) in block_state.variables.iter().rev() {
-                if variable_span.as_str() == target_span.as_str() && *is_abi {
-                    project.report.borrow_mut().add_entry(
-                        context.path,
-                        project.span_to_line(context.path, &context.expr.span())?,
+        let add_report_entry = || -> Result<(), Error> {
+            project.report.borrow_mut().add_entry(
+                context.path,
+                project.span_to_line(context.path, &context.expr.span())?,
+                format!(
+                    "The `{}` function performs an external call in a loop: `{}`",
+                    if let Some(item_impl) = context.item_impl.as_ref() {
                         format!(
-                            "The `{}` function performs an external call in a loop: `{}`",
-                            if let Some(item_impl) = context.item_impl.as_ref() {
-                                format!(
-                                    "{}::{}",
-                                    item_impl.ty.span().as_str(),
-                                    item_fn.fn_signature.name.as_str(),
-                                )
-                            } else {
-                                format!(
-                                    "{}",
-                                    item_fn.fn_signature.name.as_str(),
-                                )
-                            },
-                            context.expr.span().as_str(),
-                        ),
-                    );
+                            "{}::{}",
+                            item_impl.ty.span().as_str(),
+                            item_fn.fn_signature.name.as_str(),
+                        )
+                    } else {
+                        format!(
+                            "{}",
+                            item_fn.fn_signature.name.as_str(),
+                        )
+                    },
+                    context.expr.span().as_str(),
+                ),
+            );
 
+            Ok(())
+        };
+
+        match target.as_ref() {
+            Expr::Path(_) => {
+                let target_idents = utils::fold_expr_idents(target.as_ref());
+
+                if target_idents.len() != 1 {
                     return Ok(());
                 }
+
+                let target_span = target_idents[0].span();
+                
+                // Check to see if the method call's target is an abi variable
+                for block_span in context.blocks.iter().rev() {
+                    let block_state = fn_state.block_states.get_mut(&block_span).unwrap();
+                    
+                    for (variable_span, is_abi) in block_state.variables.iter().rev() {
+                        if variable_span.as_str() == target_span.as_str() && *is_abi {
+                            return add_report_entry();
+                        }
+                    }
+                }
             }
+            
+            Expr::AbiCast { .. } => {
+                add_report_entry()?;
+            }
+            
+            _ => {}
         }
-        
+
         Ok(())
     }
 }
