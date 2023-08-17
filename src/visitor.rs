@@ -1,6 +1,6 @@
 use crate::{error::Error, project::Project, utils};
 use std::path::Path;
-use sway_ast::{*, attribute::Annotated, expr::asm::AsmFinalExpr};
+use sway_ast::{attribute::Annotated, expr::asm::AsmFinalExpr, *};
 use sway_types::{Span, Spanned};
 
 #[derive(Clone)]
@@ -883,6 +883,8 @@ impl AstVisitor for AstVisitorRecursive {
                 self.visit_expr(&context, project)?;
                 self.leave_expr(&context, project)?;
             }
+
+            Statement::Error(_, _) => {}
         }
 
         Ok(())

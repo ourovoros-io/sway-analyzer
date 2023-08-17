@@ -318,11 +318,8 @@ impl AstVisitor for DiscardedAssignmentsVisitor {
             expr = value_expr.as_ref();
         }
 
-        // Collect all identifier spans in the expression
-        let ident_spans = utils::fold_expr_ident_spans(expr);
-
         // If an assignable state for any of the identifier spans exists in any of the current blocks, mark it as used
-        for ident_span in ident_spans.into_iter() {
+        for ident_span in utils::fold_expr_ident_spans(expr) {
             for block_span in context.blocks.iter().rev() {
                 // Get the block state
                 let block_state = fn_state.block_states.get_mut(block_span).unwrap();
