@@ -115,7 +115,7 @@ Checks for imported symbols which are not used.
 
 **Status:** Not Started
 
-Determines if any functions or modifiers contain any loops which performs calls to external functions
+Determines if any functions contain any loops which performs calls to external functions.
 
 ### Milestone 2.X: `secure_native_asset_transfer` Detector
 

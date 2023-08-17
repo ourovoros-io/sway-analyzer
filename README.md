@@ -44,6 +44,7 @@ cargo uninstall sway-analyzer
 | Name | Description |
 |-|-|
 | `discarded_assignments` | Checks for variables that are assigned to without being utilized. |
+| `external_calls_in_loop` | Checks if any functions contain any loops which performs calls to external functions. |
 | `inline_assembly_usage` | Checks functions for inline assembly usage. |
 | `input_identity_validation` | Checks to see if `Identity`, `Address` and `ContractId` parameters are checked for a zero value. |
 | `missing_logs` | Checks for publicly-accessible functions that make changes to storage variables without emitted logs. |

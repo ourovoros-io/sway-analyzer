@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fmt::Display, path::PathBuf};
+use std::{fmt::Display, path::PathBuf};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Entry {
@@ -24,7 +24,7 @@ impl Display for Entry {
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Report {
-    pub entries: HashMap<PathBuf, Vec<Entry>>,
+    pub entries: Vec<(PathBuf, Vec<Entry>)>,
 }
 
 impl Report {
@@ -34,26 +34,25 @@ impl Report {
         line: Option<usize>,
         text: S,
     ) {
-        let file_entry = self.entries
-            .entry(file.into())
-            .or_insert_with(|| vec![]);
+        let file: PathBuf = file.into();
 
-        file_entry.push(Entry {
+        if !self.entries.iter().any(|(path, _)| file.eq(path)) {
+            self.entries.push((file.clone(), vec![]));
+            self.entries.sort_by(|(a, _), (b, _)| a.cmp(b));
+        }
+
+        let file_entry = self
+            .entries
+            .iter_mut()
+            .find(|(path, _)| file.eq(path))
+            .unwrap();
+
+        file_entry.1.push(Entry {
             line,
             text: text.into(),
         });
 
-        file_entry.sort_by(|a, b| a.line.cmp(&b.line));
-    }
-
-    pub fn sort_entries(&mut self) {
-        self.entries.iter_mut().for_each(|(_, entries)| {
-            entries.sort_by(|a, b| {
-                a.line
-                    .unwrap_or_else(|| 0)
-                    .cmp(&b.line.unwrap_or_else(|| 0))
-            });
-        });
+        file_entry.1.sort_by(|a, b| a.line.cmp(&b.line));
     }
 }
 
