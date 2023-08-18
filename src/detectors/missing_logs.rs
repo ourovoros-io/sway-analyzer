@@ -6,6 +6,7 @@ use crate::{
         AstVisitor, BlockContext, ExprContext, FnContext, ModuleContext, StatementContext,
         UseContext,
     },
+    report::Severity,
 };
 use std::{collections::HashMap, path::PathBuf};
 use sway_ast::{Expr, UseTree};
@@ -118,6 +119,7 @@ impl AstVisitor for MissingLogsVisitor {
                 project.report.borrow_mut().add_entry(
                     context.path,
                     project.span_to_line(context.path, storage_span)?,
+                    Severity::Medium,
                     format!(
                         "The `{}` function writes to `storage.{}` without being logged.",
                         if let Some(item_impl) = context.item_impl.as_ref() {

@@ -1,6 +1,7 @@
 use crate::{
     error::Error,
     project::Project,
+    report::Severity,
     utils,
     visitor::{
         AstVisitor, BlockContext, FnContext, ModuleContext, StatementContext, StorageFieldContext,
@@ -129,6 +130,7 @@ impl AstVisitor for StorageNotUpdatedVisitor {
                 project.report.borrow_mut().add_entry(
                     context.path,
                     project.span_to_line(context.path, &storage_value_binding.variable_name.span())?,
+                    Severity::High,
                     if let Some(shadowing_variable_name) = storage_value_binding.shadowing_variable_name.as_ref() {
                         format!(
                             "The `{}` function has storage bound to local variable `{}` which is shadowed{} before being written back to `storage.{}`.",
@@ -176,6 +178,7 @@ impl AstVisitor for StorageNotUpdatedVisitor {
                 project.report.borrow_mut().add_entry(
                     context.path,
                     project.span_to_line(context.path, &post_write_name.span())?,
+                    Severity::High,
                     format!(
                         "The `{}` function has storage bound to local variable `{}` which is updated after writing back to `storage.{}` without writing updated value.",
                         if let Some(item_impl) = context.item_impl.as_ref() {

@@ -1,6 +1,7 @@
 use crate::{
     error::Error,
     project::Project,
+    report::Severity,
     visitor::{
         AstVisitor, BlockContext, ExprContext, FnContext, ModuleContext, UseContext,
         WhileExprContext,
@@ -130,6 +131,7 @@ impl AstVisitor for MsgAmountInLoopVisitor {
                     project.report.borrow_mut().add_entry(
                         context.path,
                         project.span_to_line(context.path, msg_amount_span)?,
+                        Severity::Medium,
                         format!(
                             "The `{}` function makes a call to `{}` in a loop. Store the value in a variable outside the loop and decrement it over each iteration.",
                             if let Some(item_impl) = context.item_impl.as_ref() {

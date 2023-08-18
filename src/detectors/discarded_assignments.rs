@@ -1,6 +1,7 @@
 use crate::{
     error::Error,
     project::Project,
+    report::Severity,
     utils,
     visitor::{
         AsmBlockContext, AstVisitor, BlockContext, ExprContext, FnContext, ModuleContext,
@@ -100,6 +101,7 @@ impl AstVisitor for DiscardedAssignmentsVisitor {
                 project.report.borrow_mut().add_entry(
                     context.path,
                     project.span_to_line(context.path, &assignable_state.span)?,
+                    Severity::High,
                     format!(
                         "The `{}` function makes an assignment to `{}` which is discarded.",
                         if let Some(item_impl) = context.item_impl.as_ref() {
@@ -270,6 +272,7 @@ impl AstVisitor for DiscardedAssignmentsVisitor {
                     project.report.borrow_mut().add_entry(
                         context.path,
                         project.span_to_line(context.path, &assignable_state.span)?,
+                        Severity::High,
                         format!(
                             "The `{}` functions makes an assignment to `{}` which is discarded by the assignment made on L{}.",
                             if let Some(item_impl) = context.item_impl.as_ref() {

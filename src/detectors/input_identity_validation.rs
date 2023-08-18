@@ -1,6 +1,7 @@
 use crate::{
     error::Error,
     project::Project,
+    report::Severity,
     utils,
     visitor::{
         AstVisitor, BlockContext, FnContext, IfExprContext, ModuleContext, StatementContext,
@@ -103,6 +104,7 @@ impl AstVisitor for InputIdentityValidationVisitor {
             project.report.borrow_mut().add_entry(
                 context.path,
                 project.span_to_line(context.path, parameter_span)?,
+                Severity::Low,
                 format!(
                     "The `{}` function does not check its `{}` parameter for a zero value.",
                     if let Some(item_impl) = context.item_impl.as_ref() {

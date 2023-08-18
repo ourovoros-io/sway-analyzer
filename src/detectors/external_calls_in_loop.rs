@@ -1,6 +1,7 @@
 use crate::{
     error::Error,
     project::Project,
+    report::Severity,
     utils,
     visitor::{AstVisitor, BlockContext, ExprContext, FnContext, ModuleContext, StatementContext, WhileExprContext},
 };
@@ -142,6 +143,7 @@ impl AstVisitor for ExternalCallsInLoopVisitor {
             project.report.borrow_mut().add_entry(
                 context.path,
                 project.span_to_line(context.path, &context.expr.span())?,
+                Severity::Medium,
                 format!(
                     "The `{}` function performs an external call in a loop: `{}`",
                     if let Some(item_impl) = context.item_impl.as_ref() {

@@ -1,6 +1,7 @@
 use crate::{
     error::Error,
     project::Project,
+    report::Severity,
     visitor::{AsmBlockContext, AstVisitor},
 };
 use sway_types::Spanned;
@@ -13,6 +14,7 @@ impl AstVisitor for InlineAssemblyUsageVisitor {
         project.report.borrow_mut().add_entry(
             context.path,
             project.span_to_line(context.path, &context.asm.span())?,
+            Severity::Medium,
             format!(
                 "The `{}` function contains inline assembly usage.",
                 if let Some(item_impl) = context.item_impl.as_ref() {

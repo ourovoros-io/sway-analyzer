@@ -1,24 +1,45 @@
+use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use std::{fmt::Display, path::PathBuf};
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, PartialOrd, Eq, Ord)]
+pub enum Severity {
+    High,
+    Medium,
+    Low,
+}
+
+impl Display for Severity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Entry {
     pub line: Option<usize>,
+    pub severity: Severity,
     pub text: String,
 }
 
 impl Display for Entry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}{}",
+        let line = format!("{}{}",
             if let Some(line) = self.line.as_ref() {
-                format!("L{}: ", line)
+                format!("L{}; {}: ", line, self.severity)
             } else {
-                String::new()
+                format!("{}: ", self.severity)
             },
             self.text,
-        )
+        );
+
+        let output = match self.severity {
+            Severity::High => line.red(),
+            Severity::Medium => line.yellow(),
+            Severity::Low => line.green(),
+        };
+        
+        write!(f, "{output}")
     }
 }
 
@@ -32,6 +53,7 @@ impl Report {
         &mut self,
         file: P,
         line: Option<usize>,
+        severity: Severity,
         text: S,
     ) {
         let file: PathBuf = file.into();
@@ -49,10 +71,11 @@ impl Report {
 
         file_entry.1.push(Entry {
             line,
+            severity,
             text: text.into(),
         });
 
-        file_entry.1.sort_by(|a, b| a.line.cmp(&b.line));
+        file_entry.1.sort_unstable_by_key(|x| (x.severity, x.line));
     }
 }
 
