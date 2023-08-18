@@ -4,6 +4,7 @@ use std::path::PathBuf;
 pub enum Error {
     Wrapped(Box<dyn std::error::Error>),
     InvalidDisplayFormat(String),
+    InvalidSorting(String),
     ParseFailed(PathBuf),
     FileNotFound(PathBuf),
     LineNotFound(PathBuf, usize),
@@ -14,6 +15,7 @@ impl std::fmt::Display for Error {
         match self {
             Error::Wrapped(e) => write!(f, "{e}"),
             Error::InvalidDisplayFormat(format) => write!(f, "Invalid display format: {format}"),
+            Error::InvalidSorting(sorting) => write!(f, "Invalid sorting: {sorting}"),
             Error::ParseFailed(path) => write!(f, "Failed to parse file: \"{}\"", path.to_string_lossy()),
             Error::FileNotFound(path) => write!(f, "File not found: \"{}\"", path.to_string_lossy()),
             Error::LineNotFound(path, offset) => write!(f, "Offset {offset} not found in file: \"{}\"", path.to_string_lossy()),

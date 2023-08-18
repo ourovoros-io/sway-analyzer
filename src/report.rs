@@ -1,6 +1,26 @@
+use crate::error::Error;
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
-use std::{fmt::Display, path::PathBuf};
+use std::{fmt::Display, path::PathBuf, str::FromStr};
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
+pub enum Sorting {
+    #[default]
+    Line,
+    Severity,
+}
+
+impl FromStr for Sorting {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_ascii_lowercase().as_str() {
+            "line" => Ok(Self::Line),
+            "severity" => Ok(Self::Severity),
+            _ => Err(Error::InvalidSorting(s.to_string())),
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, PartialOrd, Eq, Ord)]
 pub enum Severity {
@@ -24,7 +44,8 @@ pub struct Entry {
 
 impl Display for Entry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let line = format!("{}{}",
+        let line = format!(
+            "{}{}",
             if let Some(line) = self.line.as_ref() {
                 format!("L{}; {}: ", line, self.severity)
             } else {
@@ -38,13 +59,14 @@ impl Display for Entry {
             Severity::Medium => line.yellow(),
             Severity::Low => line.green(),
         };
-        
+
         write!(f, "{output}")
     }
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Report {
+    pub sorting: Sorting,
     pub entries: Vec<(PathBuf, Vec<Entry>)>,
 }
 
@@ -75,7 +97,10 @@ impl Report {
             text: text.into(),
         });
 
-        file_entry.1.sort_unstable_by_key(|x| (x.severity, x.line));
+        match self.sorting {
+            Sorting::Line => file_entry.1.sort_unstable_by_key(|x| (x.line, x.severity)),
+            Sorting::Severity => file_entry.1.sort_unstable_by_key(|x| (x.severity, x.line)),
+        }
     }
 }
 

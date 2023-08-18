@@ -7,6 +7,7 @@ pub mod visitor;
 
 use error::Error;
 use project::{Project, DisplayFormat};
+use report::Sorting;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -15,6 +16,10 @@ struct Options {
     /// The display format of the report. Can be "Text" or "Json". (Default = Text)
     #[structopt(long)]
     display_format: DisplayFormat,
+
+    /// The order to sort report entries by. Can be "Line" or "Severity". (Default = Line)
+    #[structopt(long)]
+    sorting: Sorting,
 
     /// The path to the Forc project directory. (Optional)
     #[structopt(long)]

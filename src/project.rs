@@ -1,10 +1,4 @@
-use crate::{
-    detectors::*,
-    error::Error,
-    report::Report,
-    visitor::*,
-    Options
-};
+use crate::{detectors::*, error::Error, report::Report, visitor::*, Options};
 use std::{
     cell::RefCell,
     collections::HashMap,
@@ -68,7 +62,10 @@ impl TryFrom<&Options> for Project {
     fn try_from(options: &Options) -> Result<Self, Self::Error> {
         let mut project = Project {
             display_format: options.display_format,
-            report: Rc::new(RefCell::new(Report::default())),
+            report: Rc::new(RefCell::new(Report {
+                sorting: options.sorting,
+                ..Default::default()
+            })),
             ..Default::default()
         };
     

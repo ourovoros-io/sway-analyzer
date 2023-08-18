@@ -38,6 +38,7 @@ cargo uninstall sway-analyzer
 | `--directory <directory>` | The path to the Forc project directory. (Optional) |
 | `--display-format <display-format>` | The display format of the report. Can be "Text" or "Json". (Default = Text) |
 | `--files <files>...` | The paths to the Sway source files. (Optional) |
+| `--sorting <sorting>` | The order to sort report entries by. Can be "Line" or "Severity". (Default = Line) |
 
 ## Detectors
 
