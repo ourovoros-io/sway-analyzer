@@ -47,9 +47,9 @@ impl Display for Entry {
         let line = format!(
             "{}{}",
             if let Some(line) = self.line.as_ref() {
-                format!("L{}; {}: ", line, self.severity)
+                format!("L{}: ", line)
             } else {
-                format!("{}: ", self.severity)
+                String::new()
             },
             self.text,
         );
