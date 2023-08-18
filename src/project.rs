@@ -61,9 +61,9 @@ impl TryFrom<&Options> for Project {
 
     fn try_from(options: &Options) -> Result<Self, Self::Error> {
         let mut project = Project {
-            display_format: options.display_format,
+            display_format: options.display_format.unwrap_or_default(),
             report: Rc::new(RefCell::new(Report {
-                sorting: options.sorting,
+                sorting: options.sorting.unwrap_or_default(),
                 ..Default::default()
             })),
             ..Default::default()

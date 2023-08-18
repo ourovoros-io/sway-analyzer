@@ -15,11 +15,11 @@ use structopt::StructOpt;
 struct Options {
     /// The display format of the report. Can be "Text" or "Json". (Default = Text)
     #[structopt(long)]
-    display_format: DisplayFormat,
+    display_format: Option<DisplayFormat>,
 
     /// The order to sort report entries by. Can be "Line" or "Severity". (Default = Line)
     #[structopt(long)]
-    sorting: Sorting,
+    sorting: Option<Sorting>,
 
     /// The path to the Forc project directory. (Optional)
     #[structopt(long)]
