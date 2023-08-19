@@ -652,3 +652,23 @@ impl AstVisitor for InputIdentityValidationVisitor {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Options;
+
+    #[test]
+    fn test_redundant_storage_access() {
+        let options = Options {
+            directory: Some(PathBuf::from("test/input_identity_validation")),
+            detectors: vec!["input_identity_validation".to_string()],
+            ..Default::default()
+        };
+
+        let mut project = Project::try_from(&options).unwrap();
+        project.analyze_modules().unwrap();
+
+        println!("{project}");
+    }
+}

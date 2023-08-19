@@ -15,6 +15,20 @@ pub fn fold_punctuated<T, P>(punctuated: &Punctuated<T, P>) -> Vec<&T> {
     result
 }
 
+pub fn fold_tuple(tuple: &ExprTupleDescriptor) -> Vec<&Expr> {
+    let mut result = vec![];
+    
+    match tuple {
+        ExprTupleDescriptor::Nil => {},
+        ExprTupleDescriptor::Cons { head, tail, .. } => {
+            result.push(head.as_ref());
+            result.extend(fold_punctuated(tail));
+        },
+    }
+
+    result
+}
+
 pub fn fold_expr_ident_spans(expr: &Expr) -> Vec<Span> {
     let mut spans = vec![];
 
@@ -425,6 +439,386 @@ pub fn statement_to_variable_binding_ident(statement: &Statement) -> Option<Base
     } = pattern else { return None };
     
     Some(variable_name.clone())
+}
+
+pub fn find_storage_access_in_expr(expr: &Expr) -> Option<&Expr> {
+    fn find_storage_access_in_block(block: &Braces<CodeBlockContents>) -> Option<&Expr> {
+        for statement in block.inner.statements.iter() {
+            match statement {
+                Statement::Let(stmt_let) => {
+                    let result = find_storage_access_in_expr(&stmt_let.expr);
+                    if result.is_some() {
+                        return result;
+                    }
+                }
+                
+                Statement::Item(_) => {},
+                
+                Statement::Expr { expr, .. } => {
+                    let result = find_storage_access_in_expr(expr);
+                    if result.is_some() {
+                        return result;
+                    }
+                }
+
+                Statement::Error(_, _) => {}
+            }
+        }
+
+        if let Some(expr) = block.inner.final_expr_opt.as_ref() {
+            let result = find_storage_access_in_expr(expr.as_ref());
+            if result.is_some() {
+                return result;
+            }
+        }
+
+        None
+    }
+
+    fn find_storage_access_in_if_expr(if_expr: &IfExpr) -> Option<&Expr> {
+        match &if_expr.condition {
+            sway_ast::IfCondition::Expr(expr) => {
+                let result = find_storage_access_in_expr(expr.as_ref());
+                if result.is_some() {
+                    return result;
+                }
+            }
+
+            sway_ast::IfCondition::Let { rhs, .. } => {
+                let result = find_storage_access_in_expr(rhs.as_ref());
+                if result.is_some() {
+                    return result;
+                }
+            }
+        }
+
+        let result = find_storage_access_in_block(&if_expr.then_block);
+        if result.is_some() {
+            return result;
+        }
+
+        match if_expr.else_opt.as_ref() {
+            Some(else_if_expr) => match &else_if_expr.1 {
+                sway_ast::expr::LoopControlFlow::Continue(else_if_expr) => find_storage_access_in_if_expr(else_if_expr.as_ref()),
+                sway_ast::expr::LoopControlFlow::Break(else_block) => find_storage_access_in_block(else_block),
+            }
+
+            None => None,
+        }
+    }
+
+    match expr {
+        Expr::Error(_, _) => None,
+        Expr::Path(_) => None,
+        Expr::Literal(_) => None,
+        Expr::AbiCast { args, .. } => find_storage_access_in_expr(args.inner.address.as_ref()),
+        Expr::Struct { fields, .. } => {
+            for field in fold_punctuated(&fields.inner) {
+                if let Some(expr) = field.expr_opt.as_ref() {
+                    let result = find_storage_access_in_expr(expr.1.as_ref());
+                    if result.is_some() {
+                        return result;
+                    }
+                }
+            }
+            None
+        }
+        Expr::Tuple(tuple) => {
+            for expr in fold_tuple(&tuple.inner) {
+                let result = find_storage_access_in_expr(expr);
+                if result.is_some() {
+                    return result;
+                }
+            }
+            None
+        }
+        Expr::Parens(parens) => find_storage_access_in_expr(parens.inner.as_ref()),
+        Expr::Block(block) => find_storage_access_in_block(block),
+        Expr::Array(array) => {
+            match &array.inner {
+                sway_ast::ExprArrayDescriptor::Sequence(sequence) => {
+                    for expr in fold_punctuated(sequence) {
+                        let result = find_storage_access_in_expr(expr);
+                        if result.is_some() {
+                            return result;
+                        }
+                    }
+                }
+                sway_ast::ExprArrayDescriptor::Repeat { value, length, .. } => {
+                    let result = find_storage_access_in_expr(value.as_ref());
+                    if result.is_some() {
+                        return result;
+                    }
+                    let result = find_storage_access_in_expr(length.as_ref());
+                    if result.is_some() {
+                        return result;
+                    }
+                }
+            }
+            None
+        }
+        Expr::Asm(_) => None,
+        Expr::Return { expr_opt, .. } => {
+            if let Some(expr) = expr_opt.as_ref() {
+                let result = find_storage_access_in_expr(expr);
+                if result.is_some() {
+                    return result;
+                }
+            }
+            None
+        }
+        Expr::If(if_expr) => find_storage_access_in_if_expr(if_expr),
+        Expr::Match { value, branches, .. } => {
+            let result = find_storage_access_in_expr(value.as_ref());
+            if result.is_some() {
+                return result;
+            }
+
+            for branch in branches.inner.iter() {
+                match &branch.kind {
+                    sway_ast::MatchBranchKind::Block { block, .. } => {
+                        let result = find_storage_access_in_block(block);
+                        if result.is_some() {
+                            return result;
+                        }
+                    }
+
+                    sway_ast::MatchBranchKind::Expr { expr, .. } => {
+                        let result = find_storage_access_in_expr(expr);
+                        if result.is_some() {
+                            return result;
+                        }
+                    }
+                }
+            }
+
+            None
+        }
+        Expr::While { condition, block, .. } => {
+            let result = find_storage_access_in_expr(condition.as_ref());
+            if result.is_some() {
+                return result;
+            }
+
+            find_storage_access_in_block(block)
+        }
+        Expr::FuncApp { func, args } => {
+            let result = find_storage_access_in_expr(func.as_ref());
+            if result.is_some() {
+                return result;
+            }
+
+            for arg in fold_punctuated(&args.inner) {
+                let result = find_storage_access_in_expr(arg);
+                if result.is_some() {
+                    return result;
+                }
+            }
+
+            None
+        }
+        Expr::Index { target, arg } => {
+            let result = find_storage_access_in_expr(target.as_ref());
+            if result.is_some() {
+                return result;
+            }
+
+            find_storage_access_in_expr(arg.inner.as_ref())
+        }
+        Expr::MethodCall { target, contract_args_opt, args, .. } => {
+            let idents = fold_expr_idents(expr);
+            if idents.len() >= 3 {
+                if idents.first().unwrap().as_str() == "storage" {
+                    return Some(expr);
+                }
+            }
+
+            let result = find_storage_access_in_expr(target.as_ref());
+            if result.is_some() {
+                return result;
+            }
+
+            if let Some(contract_args) = contract_args_opt.as_ref() {
+                for contract_arg in fold_punctuated(&contract_args.inner) {
+                    if let Some(expr) = contract_arg.expr_opt.as_ref() {
+                        let result = find_storage_access_in_expr(expr.1.as_ref());
+                        if result.is_some() {
+                            return result;
+                        }
+                    }
+                }
+            }
+            
+            for arg in fold_punctuated(&args.inner) {
+                let result = find_storage_access_in_expr(arg);
+                if result.is_some() {
+                    return result;
+                }
+            }
+
+            None
+        }
+        Expr::FieldProjection { target, .. } => find_storage_access_in_expr(target.as_ref()),
+        Expr::TupleFieldProjection { target, .. } => find_storage_access_in_expr(target.as_ref()),
+        Expr::Ref { expr, .. } => find_storage_access_in_expr(expr.as_ref()),
+        Expr::Deref { expr, .. } => find_storage_access_in_expr(expr.as_ref()),
+        Expr::Not { expr, .. } => find_storage_access_in_expr(expr.as_ref()),
+        Expr::Mul { lhs, rhs, .. } => {
+            let result = find_storage_access_in_expr(lhs.as_ref());
+            if result.is_some() {
+                return result;
+            }
+
+            find_storage_access_in_expr(rhs.as_ref())
+        }
+        Expr::Div { lhs, rhs, .. } => {
+            let result = find_storage_access_in_expr(lhs.as_ref());
+            if result.is_some() {
+                return result;
+            }
+
+            find_storage_access_in_expr(rhs.as_ref())
+        }
+        Expr::Pow { lhs, rhs, .. } => {
+            let result = find_storage_access_in_expr(lhs.as_ref());
+            if result.is_some() {
+                return result;
+            }
+
+            find_storage_access_in_expr(rhs.as_ref())
+        }
+        Expr::Modulo { lhs, rhs, .. } => {
+            let result = find_storage_access_in_expr(lhs.as_ref());
+            if result.is_some() {
+                return result;
+            }
+
+            find_storage_access_in_expr(rhs.as_ref())
+        }
+        Expr::Add { lhs, rhs, .. } => {
+            let result = find_storage_access_in_expr(lhs.as_ref());
+            if result.is_some() {
+                return result;
+            }
+
+            find_storage_access_in_expr(rhs.as_ref())
+        }
+        Expr::Sub { lhs, rhs, .. } => {
+            let result = find_storage_access_in_expr(lhs.as_ref());
+            if result.is_some() {
+                return result;
+            }
+
+            find_storage_access_in_expr(rhs.as_ref())
+        }
+        Expr::Shl { lhs, rhs, .. } => {
+            let result = find_storage_access_in_expr(lhs.as_ref());
+            if result.is_some() {
+                return result;
+            }
+
+            find_storage_access_in_expr(rhs.as_ref())
+        }
+        Expr::Shr { lhs, rhs, .. } => {
+            let result = find_storage_access_in_expr(lhs.as_ref());
+            if result.is_some() {
+                return result;
+            }
+
+            find_storage_access_in_expr(rhs.as_ref())
+        }
+        Expr::BitAnd { lhs, rhs, .. } => {
+            let result = find_storage_access_in_expr(lhs.as_ref());
+            if result.is_some() {
+                return result;
+            }
+
+            find_storage_access_in_expr(rhs.as_ref())
+        }
+        Expr::BitXor { lhs, rhs, .. } => {
+            let result = find_storage_access_in_expr(lhs.as_ref());
+            if result.is_some() {
+                return result;
+            }
+
+            find_storage_access_in_expr(rhs.as_ref())
+        }
+        Expr::BitOr { lhs, rhs, .. } => {
+            let result = find_storage_access_in_expr(lhs.as_ref());
+            if result.is_some() {
+                return result;
+            }
+
+            find_storage_access_in_expr(rhs.as_ref())
+        }
+        Expr::Equal { lhs, rhs, .. } => {
+            let result = find_storage_access_in_expr(lhs.as_ref());
+            if result.is_some() {
+                return result;
+            }
+
+            find_storage_access_in_expr(rhs.as_ref())
+        }
+        Expr::NotEqual { lhs, rhs, .. } => {
+            let result = find_storage_access_in_expr(lhs.as_ref());
+            if result.is_some() {
+                return result;
+            }
+
+            find_storage_access_in_expr(rhs.as_ref())
+        }
+        Expr::LessThan { lhs, rhs, .. } => {
+            let result = find_storage_access_in_expr(lhs.as_ref());
+            if result.is_some() {
+                return result;
+            }
+
+            find_storage_access_in_expr(rhs.as_ref())
+        }
+        Expr::GreaterThan { lhs, rhs, .. } => {
+            let result = find_storage_access_in_expr(lhs.as_ref());
+            if result.is_some() {
+                return result;
+            }
+
+            find_storage_access_in_expr(rhs.as_ref())
+        }
+        Expr::LessThanEq { lhs, rhs, .. } => {
+            let result = find_storage_access_in_expr(lhs.as_ref());
+            if result.is_some() {
+                return result;
+            }
+
+            find_storage_access_in_expr(rhs.as_ref())
+        }
+        Expr::GreaterThanEq { lhs, rhs, .. } => {
+            let result = find_storage_access_in_expr(lhs.as_ref());
+            if result.is_some() {
+                return result;
+            }
+
+            find_storage_access_in_expr(rhs.as_ref())
+        }
+        Expr::LogicalAnd { lhs, rhs, .. } => {
+            let result = find_storage_access_in_expr(lhs.as_ref());
+            if result.is_some() {
+                return result;
+            }
+
+            find_storage_access_in_expr(rhs.as_ref())
+        }
+        Expr::LogicalOr { lhs, rhs, .. } => {
+            let result = find_storage_access_in_expr(lhs.as_ref());
+            if result.is_some() {
+                return result;
+            }
+
+            find_storage_access_in_expr(rhs.as_ref())
+        }
+        Expr::Reassignment { expr, .. } => find_storage_access_in_expr(expr.as_ref()),
+        Expr::Break { .. } => None,
+        Expr::Continue { .. } => None,
+    }
 }
 
 pub fn statement_to_storage_read_binding_idents(statement: &Statement) -> Option<(BaseIdent, BaseIdent)> {
