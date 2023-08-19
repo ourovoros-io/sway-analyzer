@@ -170,7 +170,7 @@ impl AstVisitor for RedundantStorageAccessVisitor {
                             project.span_to_line(context.path, &expr.span())?,
                             Severity::Low,
                             format!(
-                                "The `{}` function contains a redundant storage access: `{}`. Consider storing the value in a local variable in order to lower gas costs.",
+                                "The `{}` function contains a redundant storage update: `{}`. Consider limiting to a single storage write in order to lower gas costs.",
                                 if let Some(item_impl) = context.item_impl.as_ref() {
                                     format!(
                                         "{}::{}",

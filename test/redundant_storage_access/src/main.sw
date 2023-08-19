@@ -71,7 +71,7 @@ impl TestRedundantStorageAccess for Contract {
     }
 
     // Report entry should be created:
-    // L78: The `Contract::test_redundant_storage_write_1` function contains a redundant storage access: `storage.counter.write(0)`. Consider storing the value in a local variable in order to lower gas costs.
+    // L78: The `Contract::test_redundant_storage_write_1` function contains a redundant storage update: `storage.counter.write(0)`. Consider limiting to a single storage write in order to lower gas costs.
     #[storage(write)]
     fn test_redundant_storage_write_1() {
         storage.counter.write(0);
@@ -79,7 +79,7 @@ impl TestRedundantStorageAccess for Contract {
     }
 
     // Report entry should be created:
-    // L87: The `Contract::test_redundant_storage_write_2` function contains a redundant storage access: `storage.counter.write(0)`. Consider storing the value in a local variable in order to lower gas costs.
+    // L87: The `Contract::test_redundant_storage_write_2` function contains a redundant storage update: `storage.counter.write(0)`. Consider limiting to a single storage write in order to lower gas costs.
     #[storage(write)]
     fn test_redundant_storage_write_2() {
         storage.counter.write(0);
