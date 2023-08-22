@@ -44,6 +44,7 @@ cargo uninstall sway-analyzer
 
 | Name | Description |
 |-|-|
+| `boolean_literal_comparisons` | Determines if an expression contains a comparison with a boolean literal, which is unnecessary. |
 | `discarded_assignments` | Checks for variables that are assigned to without being utilized. |
 | `external_calls_in_loop` | Checks if any functions contain any loops which performs calls to external functions. |
 | `inline_assembly_usage` | Checks functions for inline assembly usage. |

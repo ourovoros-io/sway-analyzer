@@ -2691,6 +2691,22 @@ impl AstVisitor for AstVisitorRecursive {
         for visitor in self.visitors.iter_mut() {
             visitor.visit_storage_field(context, project)?;
         }
+
+        let context = ExprContext {
+            path: context.path,
+            module: context.module,
+            item: context.item,
+            impl_attributes: None,
+            item_impl: None,
+            fn_attributes: None,
+            item_fn: None,
+            blocks: vec![],
+            statement: None,
+            expr: &context.field.initializer,
+        };
+
+        self.visit_expr(&context, project)?;
+        self.leave_expr(&context, project)?;
         
         Ok(())
     }
@@ -2744,6 +2760,22 @@ impl AstVisitor for AstVisitorRecursive {
         for visitor in self.visitors.iter_mut() {
             visitor.visit_configurable_field(context, project)?;
         }
+
+        let context = ExprContext {
+            path: context.path,
+            module: context.module,
+            item: context.item,
+            impl_attributes: None,
+            item_impl: None,
+            fn_attributes: None,
+            item_fn: None,
+            blocks: vec![],
+            statement: None,
+            expr: &context.field.initializer,
+        };
+
+        self.visit_expr(&context, project)?;
+        self.leave_expr(&context, project)?;
         
         Ok(())
     }
