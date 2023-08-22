@@ -5,6 +5,7 @@ mod input_identity_validation;
 mod missing_logs;
 mod msg_amount_in_loop;
 mod redundant_storage_access;
+mod storage_field_mutability;
 mod storage_not_updated;
 
 use crate::visitor::AstVisitor;
@@ -12,7 +13,7 @@ use crate::visitor::AstVisitor;
 use self::{
     discarded_assignments::*, external_calls_in_loop::*, inline_assembly_usage::*,
     input_identity_validation::*, missing_logs::*, msg_amount_in_loop::*,
-    redundant_storage_access::*, storage_not_updated::*,
+    redundant_storage_access::*, storage_field_mutability::*, storage_not_updated::*,
 };
 
 type DetectorConstructor = fn() -> Box<dyn AstVisitor>;
@@ -26,5 +27,6 @@ pub const DETECTOR_TYPES: &[DetectorEntry] = &[
     ("missing_logs", || Box::new(MissingLogsVisitor::default())),
     ("msg_amount_in_loop", || Box::new(MsgAmountInLoopVisitor::default())),
     ("redundant_storage_access", || Box::new(RedundantStorageAccessVisitor::default())),
+    ("storage_field_mutability", || Box::new(StorageFieldMutabilityVisitor::default())),
     ("storage_not_updated", || Box::new(StorageNotUpdatedVisitor::default())),
 ];
