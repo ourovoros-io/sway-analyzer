@@ -23,6 +23,7 @@ struct ModuleState {
     fn_states: HashMap<Span, FnState>,
 }
 
+#[derive(Default)]
 struct StorageFieldState {
     mutated: bool,
 }
@@ -79,12 +80,7 @@ impl AstVisitor for StorageFieldMutabilityVisitor {
         let module_state = self.module_states.get_mut(context.path).unwrap();
 
         // Create the storage field state
-        module_state.storage_field_states.insert(
-            context.field.name.span(),
-            StorageFieldState {
-                mutated: false,
-            }
-        );
+        module_state.storage_field_states.insert(context.field.name.span(), StorageFieldState::default());
 
         Ok(())
     }
@@ -133,6 +129,7 @@ impl AstVisitor for StorageFieldMutabilityVisitor {
         let block_span = context.blocks.last().unwrap();
         let block_state = fn_state.block_states.get_mut(&block_span).unwrap();
 
+        // Check for storage binding variable declarations
         let Statement::Let(StatementLet {
             pattern: Pattern::AmbiguousSingleIdent(variable_name),
             expr,
