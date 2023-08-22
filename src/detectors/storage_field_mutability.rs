@@ -186,6 +186,7 @@ impl AstVisitor for StorageFieldMutabilityVisitor {
                 if let Some(storage_binding) = block_state.storage_bindings.iter().rev().find(|x| x.variable_name.as_str() == idents[0].as_str()) {
                     if let Some((_, storage_field_state)) = module_state.storage_field_states.iter_mut().find(|(k, _)| k.as_str() == storage_binding.storage_name.as_str()) {
                         storage_field_state.mutated = true;
+                        return Ok(());
                     }
                 }
             }
