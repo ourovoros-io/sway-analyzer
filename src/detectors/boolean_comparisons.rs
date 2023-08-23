@@ -8,17 +8,26 @@ use sway_ast::Expr;
 use sway_types::Spanned;
 
 #[derive(Default)]
-pub struct BooleanLiteralComparisonsVisitor;
+pub struct BooleanComparisonsVisitor;
 
-impl AstVisitor for BooleanLiteralComparisonsVisitor {
+impl AstVisitor for BooleanComparisonsVisitor {
     fn visit_expr(&mut self, context: &ExprContext, project: &mut Project) -> Result<(), Error> {
+        fn is_boolean_literal_or_negation(expr: &Expr) -> bool {
+            match expr {
+                Expr::Literal(x) => {
+                    let x = x.span();
+                    x.as_str() == "true" || x.as_str() == "false"
+                }
+
+                Expr::Not { expr, .. } => is_boolean_literal_or_negation(expr),
+
+                _ => false,
+            }
+        }
+        
         match context.expr {
             Expr::Equal { lhs, rhs, .. } | Expr::NotEqual { lhs, rhs, .. } => {
-                if let Expr::Literal(lhs) = lhs.as_ref() {
-                    let ("true" | "false") = lhs.span().as_str() else { return Ok(()) };
-                } else if let Expr::Literal(rhs) = rhs.as_ref() {
-                    let ("true" | "false") = rhs.span().as_str() else { return Ok(()) };
-                } else {
+                if !is_boolean_literal_or_negation(lhs.as_ref()) && !is_boolean_literal_or_negation(rhs.as_ref()) {
                     return Ok(());
                 }
             }

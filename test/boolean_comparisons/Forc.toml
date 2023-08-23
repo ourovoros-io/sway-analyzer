@@ -2,6 +2,6 @@
 authors = ["Camden Smallwood"]
 entry = "main.sw"
 license = "Apache-2.0"
-name = "boolean_literal_comparisons"
+name = "boolean_comparisons"
 
 [dependencies]
