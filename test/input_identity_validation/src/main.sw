@@ -38,7 +38,7 @@ impl TestInputIdentityValidation for Contract {
     }
 
     // Report entry should be created:
-    // L38: The `Contract::test_address_not_validated` function does not check its `input` parameter for a zero value.
+    // L42: The `Contract::test_address_not_validated` function does not check its `input` parameter for a zero value.
     fn test_address_not_validated(input: Address) {
         log(input);
     }
@@ -58,7 +58,7 @@ impl TestInputIdentityValidation for Contract {
     }
 
     // Report entry should be created:
-    // L58: The `Contract::test_contract_id_not_validated` function does not check its `input` parameter for a zero value.
+    // L62: The `Contract::test_contract_id_not_validated` function does not check its `input` parameter for a zero value.
     fn test_contract_id_not_validated(input: ContractId) {
         log(input);
     }
