@@ -1,4 +1,4 @@
-use crate::{error::Error, project::Project, utils};
+use crate::{error::Error, project::Project};
 use std::path::Path;
 use sway_ast::{attribute::Annotated, expr::asm::AsmFinalExpr, *};
 use sway_types::{Span, Spanned};
