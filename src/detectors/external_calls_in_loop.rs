@@ -100,7 +100,7 @@ impl AstVisitor for ExternalCallsInLoopVisitor {
 
         // Get the block state
         let block_span = context.blocks.last().unwrap();
-        let block_state = fn_state.block_states.get_mut(&block_span).unwrap();
+        let block_state = fn_state.block_states.get_mut(block_span).unwrap();
 
         // Store variable bindings in the block state
         if let Statement::Let(StatementLet { pattern, expr, .. }) = context.statement {
@@ -177,7 +177,7 @@ impl AstVisitor for ExternalCallsInLoopVisitor {
                 
                 // Check to see if the method call's target is an abi variable
                 for block_span in context.blocks.iter().rev() {
-                    let block_state = fn_state.block_states.get_mut(&block_span).unwrap();
+                    let block_state = fn_state.block_states.get_mut(block_span).unwrap();
                     
                     for (variable_span, is_abi) in block_state.variables.iter().rev() {
                         if variable_span.as_str() == target_span.as_str() && *is_abi {

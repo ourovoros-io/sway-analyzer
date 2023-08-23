@@ -46,11 +46,15 @@ cargo uninstall sway-analyzer
 |-|-|
 | `boolean_comparisons` | Determines if an expression contains a comparison with a boolean literal, which is unnecessary. |
 | `discarded_assignments` | Checks for variables that are assigned to without being utilized. |
+| `division_before_multiplication` | Checks for division operations before multiplications, which can result in value truncation. |
 | `external_calls_in_loop` | Checks if any functions contain any loops which performs calls to external functions. |
 | `inline_assembly_usage` | Checks functions for inline assembly usage. |
 | `input_identity_validation` | Checks to see if `Identity`, `Address` and `ContractId` parameters are checked for a zero value. |
+| `large_literals` | Checks for expressions that contain large literal values, which may be difficult to read or interpreted incorrectly. |
 | `missing_logs` | Checks for publicly-accessible functions that make changes to storage variables without emitted logs. |
 | `msg_amount_in_loop` | Checks for calls to `std::context::msg_amount()` or `std::registers::balance()` inside a while loop. In most cases, the result of the call should be stored in a local variable and decremented over each loop iteration. |
+| `potential_infinite_loops` | Checks for potentially infinite loops. |
 | `redundant_storage_access` | Checks for redundant calls to `storage.x.read()` and `storage.x.write(x)`. |
 | `storage_field_mutability` | Checks for any storage fields that can be refactored into constants or configurable fields. |
 | `storage_not_updated` | Checks for local variables that are read from storage, then modified without being written back to storage. |
+| `unused_imports` | Checks for imported symbols that are not used. |

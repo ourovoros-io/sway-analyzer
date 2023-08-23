@@ -127,7 +127,7 @@ impl AstVisitor for StorageFieldMutabilityVisitor {
 
         // Get the block state
         let block_span = context.blocks.last().unwrap();
-        let block_state = fn_state.block_states.get_mut(&block_span).unwrap();
+        let block_state = fn_state.block_states.get_mut(block_span).unwrap();
 
         // Check for storage binding variable declarations
         let Statement::Let(StatementLet {

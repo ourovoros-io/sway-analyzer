@@ -2,6 +2,6 @@
 authors = ["Camden Smallwood"]
 entry = "main.sw"
 license = "Apache-2.0"
-name = "test-contract"
+name = "large_literals"
 
 [dependencies]

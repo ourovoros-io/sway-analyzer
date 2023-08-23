@@ -213,7 +213,7 @@ impl AstVisitor for StorageNotUpdatedVisitor {
 
         // Get the block state
         let Some(block_span) = context.blocks.last() else { return Ok(()) };
-        let block_state = fn_state.block_states.get_mut(&block_span).unwrap();
+        let block_state = fn_state.block_states.get_mut(block_span).unwrap();
 
         // Check for storage value binding shadowing
         if let Some(variable_name) = utils::statement_to_variable_binding_ident(context.statement) {

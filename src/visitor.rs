@@ -702,7 +702,7 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.visit_struct(context, project)?;
         }
         
-        for field in utils::fold_punctuated(&context.item_struct.fields.inner) {
+        for field in &context.item_struct.fields.inner {
             let context = StructFieldContext {
                 path: context.path,
                 module: context.module,
@@ -749,7 +749,7 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.visit_enum(context, project)?;
         }
         
-        for field in utils::fold_punctuated(&context.item_enum.fields.inner) {
+        for field in &context.item_enum.fields.inner {
             let context = EnumFieldContext {
                 path: context.path,
                 module: context.module,
@@ -959,7 +959,7 @@ impl AstVisitor for AstVisitorRecursive {
             }
 
             Expr::Struct { fields, .. } => {
-                for field in utils::fold_punctuated(&fields.inner) {
+                for field in &fields.inner {
                     if let Some(field) = field.expr_opt.as_ref() {
                         let context = ExprContext {
                             path: context.path,
@@ -1001,7 +1001,7 @@ impl AstVisitor for AstVisitorRecursive {
                         self.visit_expr(&context, project)?;
                         self.leave_expr(&context, project)?;
 
-                        for expr in utils::fold_punctuated(tail) {
+                        for expr in tail {
                             let context = ExprContext {
                                 path: context.path,
                                 module: context.module,
@@ -1061,7 +1061,7 @@ impl AstVisitor for AstVisitorRecursive {
             Expr::Array(array) => {
                 match &array.inner {
                     ExprArrayDescriptor::Sequence(sequence) => {
-                        for expr in utils::fold_punctuated(sequence) {
+                        for expr in sequence {
                             let context = ExprContext {
                                 path: context.path,
                                 module: context.module,
@@ -1231,7 +1231,7 @@ impl AstVisitor for AstVisitorRecursive {
                 self.visit_expr(&context, project)?;
                 self.leave_expr(&context, project)?;
 
-                for arg in utils::fold_punctuated(&args.inner) {
+                for arg in &args.inner {
                     let context = ExprContext {
                         path: context.path,
                         module: context.module,
@@ -1302,7 +1302,7 @@ impl AstVisitor for AstVisitorRecursive {
                 self.leave_expr(&context, project)?;
 
                 if let Some(opts) = contract_args_opt.as_ref() {
-                    for expr in utils::fold_punctuated(&opts.inner) {
+                    for expr in &opts.inner {
                         if let Some(expr) = expr.expr_opt.as_ref() {
                             let context = ExprContext {
                                 path: context.path,
@@ -1323,7 +1323,7 @@ impl AstVisitor for AstVisitorRecursive {
                     }
                 }
             
-                for arg in utils::fold_punctuated(&args.inner) {
+                for arg in &args.inner {
                     let context = ExprContext {
                         path: context.path,
                         module: context.module,
@@ -2672,7 +2672,7 @@ impl AstVisitor for AstVisitorRecursive {
             Ok(())
         };
 
-        for field in utils::fold_punctuated(&context.item_storage.fields.inner) {
+        for field in &context.item_storage.fields.inner {
             visit_field(field)?;
         }
         
@@ -2741,7 +2741,7 @@ impl AstVisitor for AstVisitorRecursive {
             Ok(())
         };
 
-        for field in utils::fold_punctuated(&context.item_configurable.fields.inner) {
+        for field in &context.item_configurable.fields.inner {
             visit_field(field)?;
         }
         

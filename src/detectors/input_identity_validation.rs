@@ -75,13 +75,13 @@ impl AstVisitor for InputIdentityValidationVisitor {
 
         match &context.item_fn.fn_signature.arguments.inner {
             FnArgs::Static(args) => {
-                for arg in utils::fold_punctuated(args) {
+                for arg in args {
                     check_for_identity_argument(arg);
                 }
             }
             
             FnArgs::NonStatic { args_opt: Some(args), .. } => {
-                for arg in utils::fold_punctuated(&args.1) {
+                for arg in &args.1 {
                     check_for_identity_argument(arg);
                 }
             }
@@ -201,7 +201,7 @@ impl AstVisitor for InputIdentityValidationVisitor {
 
         // Get the block state
         let Some(block_span) = context.blocks.last() else { return Ok(()) };
-        let block_state = fn_state.block_states.get_mut(&block_span).unwrap();
+        let block_state = fn_state.block_states.get_mut(block_span).unwrap();
 
         // Store variable bindings declared in the current block in order to check if they shadow a parameter
         if let Statement::Let(item_let) = context.statement {

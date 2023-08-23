@@ -140,7 +140,7 @@ impl AstVisitor for DiscardedAssignmentsVisitor {
         for var_span in var_spans {
             for block_span in context.blocks.iter().rev() {
                 // Get the block state
-                let block_state = fn_state.block_states.get_mut(&block_span).unwrap();
+                let block_state = fn_state.block_states.get_mut(block_span).unwrap();
         
                 // Find the variable state and mark it as used
                 if let Some(assignable_state) = block_state.assignable_states.iter_mut().find(|x| x.name == var_span.as_str()) {
@@ -221,7 +221,7 @@ impl AstVisitor for DiscardedAssignmentsVisitor {
             }
         };
 
-        for register in utils::fold_punctuated(&context.asm.registers.inner) {
+        for register in &context.asm.registers.inner {
             check_register(register);
         }
 
