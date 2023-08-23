@@ -330,27 +330,7 @@ impl AstVisitor for InputIdentityValidationVisitor {
                             if func.span().as_str() != format!("{}::from", suffix.1.name.as_str()) { return; }
                             if args.span().as_str() != "(ZERO_B256)" { return; }
 
-                            let mut has_revert = false;
-
-                            for statement in then_block.inner.statements.iter() {
-                                let Statement::Expr { expr, .. } = statement else { continue };
-                                let Expr::FuncApp { func, .. } = expr else { continue };
-                                
-                                if let "revert" = func.span().as_str() {
-                                    has_revert = true;
-                                    break;
-                                }
-                            }
-
-                            if let Some(expr) = then_block.inner.final_expr_opt.as_ref() {
-                                if let Expr::FuncApp { func, .. } = expr.as_ref() {
-                                    if let "revert" = func.span().as_str() {
-                                        has_revert = true;
-                                    }
-                                }
-                            }
-
-                            if !has_revert {
+                            if !utils::block_has_revert(then_block) {
                                 return;
                             }
 
@@ -723,27 +703,7 @@ impl AstVisitor for InputIdentityValidationVisitor {
                                 if func.span().as_str() != format!("{}::from", suffix.1.name.as_str()) { return; }
                                 if args.span().as_str() != "(ZERO_B256)" { return; }
 
-                                let mut has_revert = false;
-
-                                for statement in then_block.inner.statements.iter() {
-                                    let Statement::Expr { expr, .. } = statement else { continue };
-                                    let Expr::FuncApp { func, .. } = expr else { continue };
-                                    
-                                    if let "revert" = func.span().as_str() {
-                                        has_revert = true;
-                                        break;
-                                    }
-                                }
-
-                                if let Some(expr) = then_block.inner.final_expr_opt.as_ref() {
-                                    if let Expr::FuncApp { func, .. } = expr.as_ref() {
-                                        if let "revert" = func.span().as_str() {
-                                            has_revert = true;
-                                        }
-                                    }
-                                }
-
-                                if !has_revert {
+                                if !utils::block_has_revert(then_block) {
                                     return;
                                 }
 
