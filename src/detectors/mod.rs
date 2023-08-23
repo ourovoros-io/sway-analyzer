@@ -27,7 +27,7 @@ type DetectorConstructor = fn() -> Box<dyn AstVisitor>;
 type DetectorEntry = (&'static str, DetectorConstructor);
 
 pub const DETECTOR_TYPES: &[DetectorEntry] = &[
-    ("boolean_literal_comparisons", || Box::new(BooleanComparisonsVisitor::default())),
+    ("boolean_comparisons", || Box::new(BooleanComparisonsVisitor::default())),
     ("discarded_assignments", || Box::new(DiscardedAssignmentsVisitor::default())),
     ("division_before_multiplication", || Box::new(DivisionBeforeMultiplicationVisitor::default())),
     ("external_calls_in_loop", || Box::new(ExternalCallsInLoopVisitor::default())),

@@ -79,7 +79,7 @@ mod tests {
     use std::path::PathBuf;
 
     #[test]
-    fn test_boolean_literal_comparisons() {
+    fn test_boolean_comparisons() {
         let options = Options {
             directory: Some(PathBuf::from("test/boolean_comparisons")),
             detectors: vec!["boolean_comparisons".to_string()],
