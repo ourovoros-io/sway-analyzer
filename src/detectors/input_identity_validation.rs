@@ -218,6 +218,18 @@ impl AstVisitor for InputIdentityValidationVisitor {
             return Ok(());
         };
 
+        let expr_is_variable = |expr: &Expr| -> bool {
+            for block_span in context.blocks.iter().rev() {
+                let block_state = fn_state.block_states.get(block_span).unwrap();
+
+                if block_state.variables.iter().any(|v| v.as_str() == expr.span().as_str()) {
+                    return true;
+                }
+            }
+
+            false
+        };
+
         match expr {
             Expr::Match { value, branches, .. } => {
                 //
@@ -243,12 +255,8 @@ impl AstVisitor for InputIdentityValidationVisitor {
                 //
 
                 // Check if `value` is a variable declaration, skip if so
-                for block_span in context.blocks.iter().rev() {
-                    let block_state = fn_state.block_states.get(block_span).unwrap();
-
-                    if block_state.variables.iter().any(|v| v.as_str() == value.span().as_str()) {
-                        return Ok(());
-                    }
+                if expr_is_variable(value.as_ref()) {
+                    return Ok(());
                 }
 
                 // Check if `value` is a parameter of type `Identity`
@@ -392,36 +400,12 @@ impl AstVisitor for InputIdentityValidationVisitor {
                         //
 
                         // Check if `lhs` is a variable declaration, skip if so
-                        for block_span in context.blocks.iter().rev() {
-                            let block_state = fn_state.block_states.get(block_span).unwrap();
-        
-                            if block_state.variables.iter().any(|v| v.as_str() == lhs.span().as_str()) {
-                                return Ok(());
-                            }
+                        if expr_is_variable(lhs.as_ref()) {
+                            return Ok(());
                         }
 
                         // Check if `if_expr.then_block` contains a revert
-                        let mut has_revert = false;
-
-                        for statement in if_expr.then_block.inner.statements.iter() {
-                            let Statement::Expr { expr, .. } = statement else { continue };
-                            let Expr::FuncApp { func, .. } = expr else { continue };
-                            
-                            if let "revert" = func.span().as_str() {
-                                has_revert = true;
-                                break;
-                            }
-                        }
-
-                        if let Some(expr) = if_expr.then_block.inner.final_expr_opt.as_ref() {
-                            if let Expr::FuncApp { func, .. } = expr.as_ref() {
-                                if let "revert" = func.span().as_str() {
-                                    has_revert = true;
-                                }
-                            }
-                        }
-
-                        if !has_revert {
+                        if !utils::block_has_revert(&if_expr.then_block) {
                             return Ok(());
                         }
 
@@ -454,36 +438,12 @@ impl AstVisitor for InputIdentityValidationVisitor {
                         //
 
                         // Check if `value` is a variable declaration, skip if so
-                        for block_span in context.blocks.iter().rev() {
-                            let block_state = fn_state.block_states.get(block_span).unwrap();
-
-                            if block_state.variables.iter().any(|v| v.as_str() == value.span().as_str()) {
-                                return Ok(());
-                            }
+                        if expr_is_variable(value.as_ref()) {
+                            return Ok(());
                         }
 
                         // Check if `if_expr.then_block` contains a revert
-                        let mut has_revert = false;
-
-                        for statement in if_expr.then_block.inner.statements.iter() {
-                            let Statement::Expr { expr, .. } = statement else { continue };
-                            let Expr::FuncApp { func, .. } = expr else { continue };
-                            
-                            if let "revert" = func.span().as_str() {
-                                has_revert = true;
-                                break;
-                            }
-                        }
-
-                        if let Some(expr) = if_expr.then_block.inner.final_expr_opt.as_ref() {
-                            if let Expr::FuncApp { func, .. } = expr.as_ref() {
-                                if let "revert" = func.span().as_str() {
-                                    has_revert = true;
-                                }
-                            }
-                        }
-
-                        if !has_revert {
+                        if !utils::block_has_revert(&if_expr.then_block) {
                             return Ok(());
                         }
 
@@ -568,33 +528,13 @@ impl AstVisitor for InputIdentityValidationVisitor {
                         //
 
                         // Check if `if_expr.then_block` contains a revert
-                        let mut has_revert = false;
-
-                        for statement in if_expr.then_block.inner.statements.iter() {
-                            let Statement::Expr { expr, .. } = statement else { continue };
-                            let Expr::FuncApp { func, .. } = expr else { continue };
-                            
-                            if let "revert" = func.span().as_str() {
-                                has_revert = true;
-                                break;
-                            }
-                        }
-
-                        if let Some(expr) = if_expr.then_block.inner.final_expr_opt.as_ref() {
-                            if let Expr::FuncApp { func, .. } = expr.as_ref() {
-                                if let "revert" = func.span().as_str() {
-                                    has_revert = true;
-                                }
-                            }
-                        }
-
-                        if !has_revert {
+                        if !utils::block_has_revert(&if_expr.then_block) {
                             return Ok(());
                         }
 
                         let mut next_if_expr = Some(first_if_expr);
 
-                        'if_expr_check: while let Some(if_expr) = next_if_expr {
+                        while let Some(if_expr) = next_if_expr {
                             let IfExpr {
                                 condition: IfCondition::Let { lhs, rhs, .. },
                                 then_block,
@@ -605,19 +545,8 @@ impl AstVisitor for InputIdentityValidationVisitor {
                             };
     
                             // Check if `rhs` is a variable declaration, skip if so
-                            for block_span in context.blocks.iter().rev() {
-                                let block_state = fn_state.block_states.get(block_span).unwrap();
-            
-                                if block_state.variables.iter().any(|v| v.as_str() == rhs.span().as_str()) {
-                                    // Jump to the next if expression if available
-                                    if let Some((_, LoopControlFlow::Continue(else_if_expr))) = else_opt {
-                                        next_if_expr = Some(else_if_expr.as_ref());
-                                    } else {
-                                        next_if_expr = None;
-                                    }
-    
-                                    continue 'if_expr_check;
-                                }
+                            if expr_is_variable(rhs.as_ref()) {
+                                continue;
                             }
             
                             // Check if `rhs` is a parameter of type `Identity`
@@ -709,7 +638,7 @@ impl AstVisitor for InputIdentityValidationVisitor {
 
                     let mut next_if_expr = Some(if_expr);
 
-                    'if_expr_check: while let Some(if_expr) = next_if_expr {
+                    while let Some(if_expr) = next_if_expr {
                         let IfExpr {
                             condition: IfCondition::Let { lhs, rhs, .. },
                             then_block,
@@ -720,19 +649,8 @@ impl AstVisitor for InputIdentityValidationVisitor {
                         };
 
                         // Check if `rhs` is a variable declaration, skip if so
-                        for block_span in context.blocks.iter().rev() {
-                            let block_state = fn_state.block_states.get(block_span).unwrap();
-        
-                            if block_state.variables.iter().any(|v| v.as_str() == rhs.span().as_str()) {
-                                // Jump to the next if expression if available
-                                if let Some((_, LoopControlFlow::Continue(else_if_expr))) = else_opt {
-                                    next_if_expr = Some(else_if_expr.as_ref());
-                                } else {
-                                    next_if_expr = None;
-                                }
-
-                                continue 'if_expr_check;
-                            }
+                        if expr_is_variable(rhs.as_ref()) {
+                            continue;
                         }
         
                         // Check if `rhs` is a parameter of type `Identity`
@@ -875,12 +793,8 @@ impl AstVisitor for InputIdentityValidationVisitor {
                         //
 
                         // Check if `lhs` is a variable declaration, skip if so
-                        for block_span in context.blocks.iter().rev() {
-                            let block_state = fn_state.block_states.get(block_span).unwrap();
-        
-                            if block_state.variables.iter().any(|v| v.as_str() == lhs.span().as_str()) {
-                                return Ok(());
-                            }
+                        if expr_is_variable(lhs.as_ref()) {
+                            return Ok(());
                         }
                         
                         // Check if `lhs` is a parameter of type `Address`
@@ -910,12 +824,8 @@ impl AstVisitor for InputIdentityValidationVisitor {
                         //
 
                         // Check if `value` is a variable declaration, skip if so
-                        for block_span in context.blocks.iter().rev() {
-                            let block_state = fn_state.block_states.get(block_span).unwrap();
-
-                            if block_state.variables.iter().any(|v| v.as_str() == value.span().as_str()) {
-                                return Ok(());
-                            }
+                        if expr_is_variable(value.as_ref()) {
+                            return Ok(());
                         }
 
                         // Check if `value` is a parameter of type `Identity`
@@ -996,7 +906,7 @@ impl AstVisitor for InputIdentityValidationVisitor {
 
                         let mut next_if_expr = Some(if_expr);
 
-                        'if_expr_check: while let Some(if_expr) = next_if_expr {
+                        while let Some(if_expr) = next_if_expr {
                             let IfExpr {
                                 condition: IfCondition::Let { lhs, rhs, .. },
                                 then_block,
@@ -1007,19 +917,8 @@ impl AstVisitor for InputIdentityValidationVisitor {
                             };
 
                             // Check if `rhs` is a variable declaration, skip if so
-                            for block_span in context.blocks.iter().rev() {
-                                let block_state = fn_state.block_states.get(block_span).unwrap();
-            
-                                if block_state.variables.iter().any(|v| v.as_str() == rhs.span().as_str()) {
-                                    // Jump to the next if expression if available
-                                    if let Some((_, LoopControlFlow::Continue(else_if_expr))) = else_opt {
-                                        next_if_expr = Some(else_if_expr.as_ref());
-                                    } else {
-                                        next_if_expr = None;
-                                    }
-
-                                    continue 'if_expr_check;
-                                }
+                            if expr_is_variable(rhs.as_ref()) {
+                                continue;
                             }
             
                             // Check if `rhs` is a parameter of type `Identity`

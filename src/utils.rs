@@ -901,3 +901,28 @@ pub fn statement_to_storage_write_idents(statement: &Statement) -> Option<(BaseI
 
     Some((storage_idents[1].clone(), variable_idents[0].clone()))
 }
+
+pub fn block_has_revert(block: &Braces<CodeBlockContents>) -> bool {
+    // Check if `if_expr.then_block` contains a revert
+    let mut has_revert = false;
+
+    for statement in block.inner.statements.iter() {
+        let Statement::Expr { expr, .. } = statement else { continue };
+        let Expr::FuncApp { func, .. } = expr else { continue };
+        
+        if let "revert" = func.span().as_str() {
+            has_revert = true;
+            break;
+        }
+    }
+
+    if let Some(expr) = block.inner.final_expr_opt.as_ref() {
+        if let Expr::FuncApp { func, .. } = expr.as_ref() {
+            if let "revert" = func.span().as_str() {
+                has_revert = true;
+            }
+        }
+    }
+
+    has_revert
+}
