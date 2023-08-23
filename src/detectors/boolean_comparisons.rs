@@ -81,8 +81,8 @@ mod tests {
     #[test]
     fn test_boolean_literal_comparisons() {
         let options = Options {
-            directory: Some(PathBuf::from("test/boolean_literal_comparisons")),
-            detectors: vec!["boolean_literal_comparisons".to_string()],
+            directory: Some(PathBuf::from("test/boolean_comparisons")),
+            detectors: vec!["boolean_comparisons".to_string()],
             ..Default::default()
         };
 
