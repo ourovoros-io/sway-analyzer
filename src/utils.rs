@@ -926,3 +926,34 @@ pub fn block_has_revert(block: &Braces<CodeBlockContents>) -> bool {
 
     has_revert
 }
+
+pub fn is_zero_value_comparison(type_name: &str, var_name: &str, lhs: &Expr, rhs: &Expr) -> bool {
+    let zero_value = if lhs.span().as_str() == var_name {
+        rhs
+    } else if rhs.span().as_str() == var_name {
+        lhs
+    } else {
+        return false;
+    };
+
+    let Expr::FuncApp { func, args } = zero_value else { return false };
+    if func.span().as_str() != format!("{type_name}::from") { return false; }
+    if args.span().as_str() != "(ZERO_B256)" { return false; }
+
+    true
+}
+
+pub fn get_require_args(expr: &Expr) -> Option<Vec<&Expr>> {
+    let Expr::FuncApp { func, args } = expr else { return None };
+    let "require" = func.span().as_str() else { return None };
+    Some(fold_punctuated(&args.inner))
+}
+
+pub fn pattern_to_constructor_suffix_and_value(name: &str, pattern: &Pattern) -> Option<(BaseIdent, BaseIdent)> {
+    let Pattern::Constructor { path, args } = pattern else { return None };
+    if path.prefix.name.as_str() != name { return None; }
+    let Some(suffix) = path.suffix.last() else { return None };
+    let args = fold_punctuated(&args.inner);
+    let Some(Pattern::AmbiguousSingleIdent(ident)) = args.first() else { return None };
+    Some((suffix.1.name.clone(), ident.clone()))
+}

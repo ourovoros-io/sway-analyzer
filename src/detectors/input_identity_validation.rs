@@ -9,9 +9,9 @@ use crate::{
 };
 use std::{cell::RefCell, collections::HashMap, path::PathBuf, rc::Rc};
 use sway_ast::{
-    expr::LoopControlFlow, Expr, FnArg, FnArgs, IfCondition, IfExpr, Pattern, Statement,
+    expr::LoopControlFlow, Expr, FnArg, FnArgs, IfCondition, IfExpr, Pattern, Statement, PathExprSegment, DoubleColonToken,
 };
-use sway_types::{Span, Spanned};
+use sway_types::{Span, Spanned, BaseIdent};
 
 #[derive(Default)]
 pub struct InputIdentityValidationVisitor {
@@ -29,6 +29,62 @@ struct FnState {
     address_checks: HashMap<Span, bool>,
     contract_id_checks: HashMap<Span, bool>,
     identity_checks: HashMap<Span, (Rc<RefCell<bool>>, Rc<RefCell<bool>>)>,
+}
+
+impl FnState {
+    fn expr_is_variable(&self, expr: &Expr, blocks: &[Span]) -> bool {
+        for block_span in blocks.iter().rev() {
+            let block_state = self.block_states.get(block_span).unwrap();
+
+            if block_state.variables.iter().any(|v| v.as_str() == expr.span().as_str()) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    fn find_address_check(&mut self, expr: &Expr) -> Option<&mut bool> {
+        let span = expr.span();
+        self.address_checks.iter_mut().find(|(x, _)| x.as_str() == span.as_str()).map(|x| x.1)
+    }
+
+    fn find_contract_id_check(&mut self, expr: &Expr) -> Option<&mut bool> {
+        let span = expr.span();
+        self.contract_id_checks.iter_mut().find(|(x, _)| x.as_str() == span.as_str()).map(|x| x.1)
+    }
+
+    fn find_identity_check(&mut self, expr: &Expr) -> Option<&mut (Rc<RefCell<bool>>, Rc<RefCell<bool>>)> {
+        let span = expr.span();
+        self.identity_checks.iter_mut().find(|(x, _)| x.as_str() == span.as_str()).map(|x| x.1)
+    }
+
+    fn apply_address_or_contract_id_check(&mut self, lhs: &Expr, rhs: &Expr) {
+        // Check if `lhs` is a parameter of type `Address`
+        if let Some(address_checked) = self.find_address_check(lhs) {
+            if utils::is_zero_value_comparison("Address", lhs.span().as_str(), lhs, rhs) {
+                *address_checked = true;
+            }
+        }
+        // Check if `rhs` is a parameter of type `Address`
+        else if let Some(address_checked) = self.find_address_check(rhs) {
+            if utils::is_zero_value_comparison("Address", rhs.span().as_str(), lhs, rhs) {
+                *address_checked = true;
+            }
+        }
+        // Check if `lhs` is a parameter of type `ContractId`
+        else if let Some(contract_id_checked) = self.find_contract_id_check(lhs) {
+            if utils::is_zero_value_comparison("ContractId", lhs.span().as_str(), lhs, rhs) {
+                *contract_id_checked = true;
+            }
+        }
+        // Check if `rhs` is a parameter of type `ContractId`
+        else if let Some(contract_id_checked) = self.find_contract_id_check(rhs) {
+            if utils::is_zero_value_comparison("ContractId", rhs.span().as_str(), lhs, rhs) {
+                *contract_id_checked = true;
+            }
+        }
+    }
 }
 
 #[derive(Default)]
@@ -218,18 +274,6 @@ impl AstVisitor for InputIdentityValidationVisitor {
             return Ok(());
         };
 
-        let expr_is_variable = |expr: &Expr| -> bool {
-            for block_span in context.blocks.iter().rev() {
-                let block_state = fn_state.block_states.get(block_span).unwrap();
-
-                if block_state.variables.iter().any(|v| v.as_str() == expr.span().as_str()) {
-                    return true;
-                }
-            }
-
-            false
-        };
-
         match expr {
             Expr::Match { value, branches, .. } => {
                 //
@@ -255,110 +299,70 @@ impl AstVisitor for InputIdentityValidationVisitor {
                 //
 
                 // Check if `value` is a variable declaration, skip if so
-                if expr_is_variable(value.as_ref()) {
+                if fn_state.expr_is_variable(value.as_ref(), context.blocks.as_slice()) {
                     return Ok(());
                 }
 
                 // Check if `value` is a parameter of type `Identity`
-                if let Some((_, (address_checked, contract_id_checked))) = fn_state.identity_checks.iter_mut().find(|(x, _)| x.as_str() == value.span().as_str()) {
-                    //
-                    // Check `branches` for `Identity::Address` and `Identity::ContractId` zero value checks
-                    //
+                let Some((address_checked, contract_id_checked)) = fn_state.find_identity_check(value) else { return Ok(()) };
 
-                    for branch in branches.inner.iter() {
-                        let Pattern::Constructor { path, args } = &branch.pattern else { continue };
-                        let "Identity" = path.prefix.name.as_str() else { continue };
-                        let Some(suffix) = path.suffix.last() else { continue };
-                        let args = utils::fold_punctuated(&args.inner);
-                        
-                        let mut ident = None;
+                // Check `branches` for `Identity::Address` and `Identity::ContractId` zero value checks
+                for branch in branches.inner.iter() {
+                    let Some((identity_kind, identity_value)) = utils::pattern_to_constructor_suffix_and_value("Identity", &branch.pattern) else { continue };
 
-                        if let Some(arg) = args.first() {
-                            match arg {
-                                Pattern::AmbiguousSingleIdent(arg) => ident = Some(arg),
+                    let check_for_require = |expr: &Expr| {
+                        let Some(require_args) = utils::get_require_args(expr) else { return };
+                        let Some(require_condition) = require_args.first() else { return };
+                        let Expr::NotEqual { lhs, rhs, .. } = require_condition else { return };
+
+                        if utils::is_zero_value_comparison(identity_kind.as_str(), identity_value.span().as_str(), lhs.as_ref(), rhs.as_ref()) {
+                            match identity_kind.as_str() {
+                                "Address" => *address_checked.borrow_mut() = true,
+                                "ContractId" => *contract_id_checked.borrow_mut() = true,
                                 _ => {}
                             }
                         }
+                    };
 
-                        let Some(ident) = ident else { continue };
+                    let check_for_if_revert = |expr: &Expr| {
+                        let Expr::If(IfExpr {
+                            condition: IfCondition::Expr(input),
+                            then_block,
+                            ..
+                        }) = expr else { return };
 
-                        let check_for_require = |expr: &Expr| {
-                            let Expr::FuncApp { func, args } = expr else { return };
-                            let "require" = func.span().as_str() else { return };
-                            let args = utils::fold_punctuated(&args.inner);
+                        let Expr::Equal { lhs, rhs, .. } = input.as_ref() else { return };
 
-                            let Some(input) = args.first() else { return };
-                            let Expr::NotEqual { lhs, rhs, .. } = input else { return };
+                        if !utils::block_has_revert(then_block) {
+                            return;
+                        }
 
-                            let zero_value = if lhs.span().as_str() == ident.span().as_str() {
-                                rhs.as_ref()
-                            } else if rhs.span().as_str() == ident.span().as_str() {
-                                lhs.as_ref()
-                            } else {
-                                return;
-                            };
-
-                            let Expr::FuncApp { func, args } = zero_value else { return };
-                            if func.span().as_str() != format!("{}::from", suffix.1.name.as_str()) { return; }
-                            if args.span().as_str() != "(ZERO_B256)" { return; }
-
-                            match suffix.1.name.as_str() {
+                        if utils::is_zero_value_comparison(identity_kind.as_str(), identity_value.span().as_str(), lhs.as_ref(), rhs.as_ref()) {
+                            match identity_kind.as_str() {
                                 "Address" => *address_checked.borrow_mut() = true,
                                 "ContractId" => *contract_id_checked.borrow_mut() = true,
                                 _ => {}
                             }
-                        };
+                        }
+                    };
 
-                        let check_for_if_revert = |expr: &Expr| {
-                            let Expr::If(IfExpr {
-                                condition: IfCondition::Expr(input),
-                                then_block,
-                                ..
-                            }) = expr else { return };
-
-                            let Expr::Equal { lhs, rhs, .. } = input.as_ref() else { return };
-
-                            let zero_value = if lhs.span().as_str() == ident.span().as_str() {
-                                rhs.as_ref()
-                            } else if rhs.span().as_str() == ident.span().as_str() {
-                                lhs.as_ref()
-                            } else {
-                                return;
-                            };
-
-                            let Expr::FuncApp { func, args } = zero_value else { return };
-                            if func.span().as_str() != format!("{}::from", suffix.1.name.as_str()) { return; }
-                            if args.span().as_str() != "(ZERO_B256)" { return; }
-
-                            if !utils::block_has_revert(then_block) {
-                                return;
-                            }
-
-                            match suffix.1.name.as_str() {
-                                "Address" => *address_checked.borrow_mut() = true,
-                                "ContractId" => *contract_id_checked.borrow_mut() = true,
-                                _ => {}
-                            }
-                        };
-
-                        match &branch.kind {
-                            sway_ast::MatchBranchKind::Block { block, .. } => {
-                                for statement in block.inner.statements.iter() {
-                                    let Statement::Expr { expr, .. } = statement else { continue };
-                                    check_for_require(expr);
-                                    check_for_if_revert(expr);
-                                }
-
-                                if let Some(expr) = block.inner.final_expr_opt.as_ref() {
-                                    check_for_require(expr);
-                                    check_for_if_revert(expr);
-                                }
-                            }
-
-                            sway_ast::MatchBranchKind::Expr { expr, .. } => {
+                    match &branch.kind {
+                        sway_ast::MatchBranchKind::Block { block, .. } => {
+                            for statement in block.inner.statements.iter() {
+                                let Statement::Expr { expr, .. } = statement else { continue };
                                 check_for_require(expr);
                                 check_for_if_revert(expr);
                             }
+
+                            if let Some(expr) = block.inner.final_expr_opt.as_ref() {
+                                check_for_require(expr);
+                                check_for_if_revert(expr);
+                            }
+                        }
+
+                        sway_ast::MatchBranchKind::Expr { expr, .. } => {
+                            check_for_require(expr);
+                            check_for_if_revert(expr);
                         }
                     }
                 }
@@ -380,7 +384,7 @@ impl AstVisitor for InputIdentityValidationVisitor {
                         //
 
                         // Check if `lhs` is a variable declaration, skip if so
-                        if expr_is_variable(lhs.as_ref()) {
+                        if fn_state.expr_is_variable(lhs.as_ref(), context.blocks.as_slice()) {
                             return Ok(());
                         }
 
@@ -389,20 +393,8 @@ impl AstVisitor for InputIdentityValidationVisitor {
                             return Ok(());
                         }
 
-                        // Check if `lhs` is a parameter of type `Address`
-                        if let Some((_, address_checked)) = fn_state.address_checks.iter_mut().find(|(x, _)| x.as_str() == lhs.span().as_str()) {
-                            let Expr::FuncApp { func, args } = rhs.as_ref() else { return Ok(()) };
-                            let "Address::from" = func.span().as_str() else { return Ok(()) };
-                            let "(ZERO_B256)" = args.span().as_str() else { return Ok(()) };
-                            *address_checked = true;
-                        }
-                        // Check if `lhs` is a parameter of type `ContractId`
-                        else if let Some((_, contract_id_checked)) = fn_state.contract_id_checks.iter_mut().find(|(x, _)| x.as_str() == lhs.span().as_str()) {
-                            let Expr::FuncApp { func, args } = rhs.as_ref() else { return Ok(()) };
-                            let "ContractId::from" = func.span().as_str() else { return Ok(()) };
-                            let "(ZERO_B256)" = args.span().as_str() else { return Ok(()) };
-                            *contract_id_checked = true;
-                        }
+                        // Check if `lhs` or `rhs` is a parameter of type `Address` or `ContractId`
+                        fn_state.apply_address_or_contract_id_check(lhs.as_ref(), rhs.as_ref());
                     }
 
                     Expr::Match { value, branches, .. } => {
@@ -418,7 +410,7 @@ impl AstVisitor for InputIdentityValidationVisitor {
                         //
 
                         // Check if `value` is a variable declaration, skip if so
-                        if expr_is_variable(value.as_ref()) {
+                        if fn_state.expr_is_variable(value.as_ref(), context.blocks.as_slice()) {
                             return Ok(());
                         }
 
@@ -428,65 +420,38 @@ impl AstVisitor for InputIdentityValidationVisitor {
                         }
 
                         // Check if `value` is a parameter of type `Identity`
-                        if let Some((_, (address_checked, contract_id_checked))) = fn_state.identity_checks.iter_mut().find(|(x, _)| x.as_str() == value.span().as_str()) {
-                            //
-                            // Check `branches` for `Identity::Address` and `Identity::ContractId` zero value checks
-                            //
+                        let Some((address_checked, contract_id_checked)) = fn_state.find_identity_check(value) else { return Ok(()) };
+                    
+                        // Check `branches` for `Identity::Address` and `Identity::ContractId` zero value checks
+                        for branch in branches.inner.iter() {
+                            let Some((identity_kind, identity_value)) = utils::pattern_to_constructor_suffix_and_value("Identity", &branch.pattern) else { continue };
 
-                            for branch in branches.inner.iter() {
-                                let Pattern::Constructor { path, args } = &branch.pattern else { continue };
-                                let "Identity" = path.prefix.name.as_str() else { continue };
-                                let Some(suffix) = path.suffix.last() else { continue };
-                                let args = utils::fold_punctuated(&args.inner);
-                                
-                                let mut ident = None;
+                            let check_expr = |expr: &Expr| {
+                                let Expr::Equal { lhs, rhs, .. } = expr else { return };
 
-                                if let Some(arg) = args.first() {
-                                    match arg {
-                                        Pattern::AmbiguousSingleIdent(arg) => ident = Some(arg),
-                                        _ => {}
-                                    }
-                                }
-
-                                let Some(ident) = ident else { continue };
-
-                                let check_expr = |expr: &Expr| {
-                                    let Expr::Equal { lhs, rhs, .. } = expr else { return };
-
-                                    let zero_value = if lhs.span().as_str() == ident.span().as_str() {
-                                        rhs.as_ref()
-                                    } else if rhs.span().as_str() == ident.span().as_str() {
-                                        lhs.as_ref()
-                                    } else {
-                                        return;
-                                    };
-
-                                    let Expr::FuncApp { func, args } = zero_value else { return };
-                                    if func.span().as_str() != format!("{}::from", suffix.1.name.as_str()) { return; }
-                                    if args.span().as_str() != "(ZERO_B256)" { return; }
-
-                                    match suffix.1.name.as_str() {
+                                if utils::is_zero_value_comparison(identity_kind.as_str(), identity_value.span().as_str(), lhs.as_ref(), rhs.as_ref()) {
+                                    match identity_kind.as_str() {
                                         "Address" => *address_checked.borrow_mut() = true,
                                         "ContractId" => *contract_id_checked.borrow_mut() = true,
                                         _ => {}
                                     }
-                                };
+                                }
+                            };
 
-                                match &branch.kind {
-                                    sway_ast::MatchBranchKind::Block { block, .. } => {
-                                        for statement in block.inner.statements.iter() {
-                                            let Statement::Expr { expr, .. } = statement else { continue };
-                                            check_expr(expr);
-                                        }
-
-                                        if let Some(expr) = block.inner.final_expr_opt.as_ref() {
-                                            check_expr(expr);
-                                        }
-                                    }
-
-                                    sway_ast::MatchBranchKind::Expr { expr, .. } => {
+                            match &branch.kind {
+                                sway_ast::MatchBranchKind::Block { block, .. } => {
+                                    for statement in block.inner.statements.iter() {
+                                        let Statement::Expr { expr, .. } = statement else { continue };
                                         check_expr(expr);
                                     }
+
+                                    if let Some(expr) = block.inner.final_expr_opt.as_ref() {
+                                        check_expr(expr);
+                                    }
+                                }
+
+                                sway_ast::MatchBranchKind::Expr { expr, .. } => {
+                                    check_expr(expr);
                                 }
                             }
                         }
@@ -523,53 +488,28 @@ impl AstVisitor for InputIdentityValidationVisitor {
                             } = if_expr else {
                                 break;
                             };
-    
-                            // Check if `rhs` is a variable declaration, skip if so
-                            if expr_is_variable(rhs.as_ref()) {
-                                continue;
-                            }
-            
-                            // Check if `rhs` is a parameter of type `Identity`
-                            if let Some((_, (address_checked, contract_id_checked))) = fn_state.identity_checks.iter_mut().find(|(x, _)| x.as_str() == rhs.span().as_str()) {
-                                //
-                                // Check `then_block` statements for `Identity::Address` and `Identity::ContractId` zero value checks
-                                //
-    
-                                let Pattern::Constructor { path, args } = lhs.as_ref() else { continue };
-                                let "Identity" = path.prefix.name.as_str() else { continue };
-                                let Some(suffix) = path.suffix.last() else { continue };
-                                let args = utils::fold_punctuated(&args.inner);
-                                
-                                let mut ident = None;
-    
-                                if let Some(arg) = args.first() {
-                                    match arg {
-                                        Pattern::AmbiguousSingleIdent(arg) => ident = Some(arg),
-                                        _ => {}
-                                    }
+
+                            let mut check_if_expr = || {
+                                // Check if `rhs` is a variable declaration, skip if so
+                                if fn_state.expr_is_variable(rhs.as_ref(), context.blocks.as_slice()) {
+                                    return;
                                 }
+                
+                                // Check if `rhs` is a parameter of type `Identity`
+                                let Some((address_checked, contract_id_checked)) = fn_state.find_identity_check(rhs.as_ref()) else { return };
     
-                                let Some(ident) = ident else { continue };
+                                // Check `then_block` statements for `Identity::Address` and `Identity::ContractId` zero value checks
+                                let Some((identity_kind, identity_value)) = utils::pattern_to_constructor_suffix_and_value("Identity", lhs.as_ref()) else { return };
     
                                 let check_expr = |expr: &Expr| {
                                     let Expr::Equal { lhs, rhs, .. } = expr else { return };
     
-                                    let zero_value = if lhs.span().as_str() == ident.span().as_str() {
-                                        rhs.as_ref()
-                                    } else if rhs.span().as_str() == ident.span().as_str() {
-                                        lhs.as_ref()
-                                    } else {
-                                        return;
-                                    };
-    
-                                    let Expr::FuncApp { func, args } = zero_value else { return };
-                                    if func.span().as_str() != format!("{}::from", suffix.1.name.as_str()) { return; }
-                                    if args.span().as_str() != "(ZERO_B256)" { return; }
-    
-                                    match suffix.1.name.as_str() {
-                                        "Address" => *address_checked.borrow_mut() = true,
-                                        "ContractId" => *contract_id_checked.borrow_mut() = true,
-                                        _ => {}
+                                    if utils::is_zero_value_comparison(identity_kind.as_str(), identity_value.span().as_str(), lhs.as_ref(), rhs.as_ref()) {
+                                        match identity_kind.as_str() {
+                                            "Address" => *address_checked.borrow_mut() = true,
+                                            "ContractId" => *contract_id_checked.borrow_mut() = true,
+                                            _ => {}
+                                        }
                                     }
                                 };
     
@@ -581,7 +521,9 @@ impl AstVisitor for InputIdentityValidationVisitor {
                                 if let Some(expr) = then_block.inner.final_expr_opt.as_ref() {
                                     check_expr(expr);
                                 }
-                            }
+                            };
+
+                            check_if_expr();
     
                             // Jump to the next if expression if available
                             if let Some((_, LoopControlFlow::Continue(else_if_expr))) = else_opt {
@@ -628,57 +570,29 @@ impl AstVisitor for InputIdentityValidationVisitor {
                             break;
                         };
 
-                        // Check if `rhs` is a variable declaration, skip if so
-                        if expr_is_variable(rhs.as_ref()) {
-                            continue;
-                        }
-        
-                        // Check if `rhs` is a parameter of type `Identity`
-                        if let Some((_, (address_checked, contract_id_checked))) = fn_state.identity_checks.iter_mut().find(|(x, _)| x.as_str() == rhs.span().as_str()) {
-                            //
-                            // Check `then_block` statements for `Identity::Address` and `Identity::ContractId` zero value checks
-                            //
-
-                            let Pattern::Constructor { path, args } = lhs.as_ref() else { continue };
-                            let "Identity" = path.prefix.name.as_str() else { continue };
-                            let Some(suffix) = path.suffix.last() else { continue };
-                            let args = utils::fold_punctuated(&args.inner);
-                            
-                            let mut ident = None;
-
-                            if let Some(arg) = args.first() {
-                                match arg {
-                                    Pattern::AmbiguousSingleIdent(arg) => ident = Some(arg),
-                                    _ => {}
-                                }
+                        let mut check_if_expr = || {
+                            // Check if `rhs` is a variable declaration, skip if so
+                            if fn_state.expr_is_variable(rhs.as_ref(), context.blocks.as_slice()) {
+                                return;
                             }
-
-                            let Some(ident) = ident else { continue };
+            
+                            // Check if `rhs` is a parameter of type `Identity`
+                            let Some((address_checked, contract_id_checked)) = fn_state.find_identity_check(rhs.as_ref()) else { return };
+                            
+                            // Check `then_block` statements for `Identity::Address` and `Identity::ContractId` zero value checks
+                            let Some((identity_kind, identity_value)) = utils::pattern_to_constructor_suffix_and_value("Identity", lhs.as_ref()) else { return };
 
                             let check_for_require = |expr: &Expr| {
-                                let Expr::FuncApp { func, args } = expr else { return };
-                                let "require" = func.span().as_str() else { return };
-                                let args = utils::fold_punctuated(&args.inner);
+                                let Some(require_args) = utils::get_require_args(expr) else { return };
+                                let Some(require_condition) = require_args.first() else { return };
+                                let Expr::NotEqual { lhs, rhs, .. } = require_condition else { return };
 
-                                let Some(input) = args.first() else { return };
-                                let Expr::NotEqual { lhs, rhs, .. } = input else { return };
-
-                                let zero_value = if lhs.span().as_str() == ident.span().as_str() {
-                                    rhs.as_ref()
-                                } else if rhs.span().as_str() == ident.span().as_str() {
-                                    lhs.as_ref()
-                                } else {
-                                    return;
-                                };
-
-                                let Expr::FuncApp { func, args } = zero_value else { return };
-                                if func.span().as_str() != format!("{}::from", suffix.1.name.as_str()) { return; }
-                                if args.span().as_str() != "(ZERO_B256)" { return; }
-
-                                match suffix.1.name.as_str() {
-                                    "Address" => *address_checked.borrow_mut() = true,
-                                    "ContractId" => *contract_id_checked.borrow_mut() = true,
-                                    _ => {}
+                                if utils::is_zero_value_comparison(identity_kind.as_str(), identity_value.span().as_str(), lhs.as_ref(), rhs.as_ref()) {
+                                    match identity_kind.as_str() {
+                                        "Address" => *address_checked.borrow_mut() = true,
+                                        "ContractId" => *contract_id_checked.borrow_mut() = true,
+                                        _ => {}
+                                    }
                                 }
                             };
 
@@ -691,26 +605,16 @@ impl AstVisitor for InputIdentityValidationVisitor {
 
                                 let Expr::Equal { lhs, rhs, .. } = input.as_ref() else { return };
 
-                                let zero_value = if lhs.span().as_str() == ident.span().as_str() {
-                                    rhs.as_ref()
-                                } else if rhs.span().as_str() == ident.span().as_str() {
-                                    lhs.as_ref()
-                                } else {
-                                    return;
-                                };
-
-                                let Expr::FuncApp { func, args } = zero_value else { return };
-                                if func.span().as_str() != format!("{}::from", suffix.1.name.as_str()) { return; }
-                                if args.span().as_str() != "(ZERO_B256)" { return; }
-
                                 if !utils::block_has_revert(then_block) {
                                     return;
                                 }
 
-                                match suffix.1.name.as_str() {
-                                    "Address" => *address_checked.borrow_mut() = true,
-                                    "ContractId" => *contract_id_checked.borrow_mut() = true,
-                                    _ => {}
+                                if utils::is_zero_value_comparison(identity_kind.as_str(), identity_value.span().as_str(), lhs.as_ref(), rhs.as_ref()) {
+                                    match identity_kind.as_str() {
+                                        "Address" => *address_checked.borrow_mut() = true,
+                                        "ContractId" => *contract_id_checked.borrow_mut() = true,
+                                        _ => {}
+                                    }
                                 }
                             };
 
@@ -724,7 +628,9 @@ impl AstVisitor for InputIdentityValidationVisitor {
                                 check_for_require(expr);
                                 check_for_if_revert(expr);
                             }
-                        }
+                        };
+
+                        check_if_expr();
 
                         // Jump to the next if expression if available
                         if let Some((_, LoopControlFlow::Continue(else_if_expr))) = else_opt {
@@ -736,14 +642,12 @@ impl AstVisitor for InputIdentityValidationVisitor {
                 }
             }
             
-            Expr::FuncApp { func, args } => {
+            Expr::FuncApp { .. } => {
                 // Only check require calls
-                let "require" = func.span().as_str() else { return Ok(()) };
-                let args = utils::fold_punctuated(&args.inner);
+                let Some(require_args) = utils::get_require_args(expr) else { return Ok(()) };
+                let Some(require_condition) = require_args.first() else { return Ok(()) };
 
-                let Some(input) = args.first() else { return Ok(()) };
-
-                match input {
+                match require_condition {
                     Expr::NotEqual { lhs, rhs, .. } => {
                         //
                         // Check for the following patterns:
@@ -753,24 +657,12 @@ impl AstVisitor for InputIdentityValidationVisitor {
                         //
 
                         // Check if `lhs` is a variable declaration, skip if so
-                        if expr_is_variable(lhs.as_ref()) {
+                        if fn_state.expr_is_variable(lhs.as_ref(), context.blocks.as_slice()) {
                             return Ok(());
                         }
                         
-                        // Check if `lhs` is a parameter of type `Address`
-                        if let Some((_, address_checked)) = fn_state.address_checks.iter_mut().find(|(x, _)| x.as_str() == lhs.span().as_str()) {
-                            let Expr::FuncApp { func, args } = rhs.as_ref() else { return Ok(()) };
-                            let "Address::from" = func.span().as_str() else { return Ok(()) };
-                            let "(ZERO_B256)" = args.span().as_str() else { return Ok(()) };
-                            *address_checked = true;
-                        }
-                        // Check if `lhs` is a parameter of type `ContractId`
-                        else if let Some((_, contract_id_checked)) = fn_state.contract_id_checks.iter_mut().find(|(x, _)| x.as_str() == lhs.span().as_str()) {
-                            let Expr::FuncApp { func, args } = rhs.as_ref() else { return Ok(()) };
-                            let "ContractId::from" = func.span().as_str() else { return Ok(()) };
-                            let "(ZERO_B256)" = args.span().as_str() else { return Ok(()) };
-                            *contract_id_checked = true;
-                        }
+                        // Check if `lhs` or `rhs` is a parameter of type `Address` or `ContractId`
+                        fn_state.apply_address_or_contract_id_check(lhs.as_ref(), rhs.as_ref());
                     }
 
                     Expr::Match { value, branches, .. } => {
@@ -784,70 +676,43 @@ impl AstVisitor for InputIdentityValidationVisitor {
                         //
 
                         // Check if `value` is a variable declaration, skip if so
-                        if expr_is_variable(value.as_ref()) {
+                        if fn_state.expr_is_variable(value.as_ref(), context.blocks.as_slice()) {
                             return Ok(());
                         }
 
                         // Check if `value` is a parameter of type `Identity`
-                        if let Some((_, (address_checked, contract_id_checked))) = fn_state.identity_checks.iter_mut().find(|(x, _)| x.as_str() == value.span().as_str()) {
-                            //
-                            // Check `branches` for `Identity::Address` and `Identity::ContractId` zero value checks
-                            //
+                        let Some((address_checked, contract_id_checked)) = fn_state.find_identity_check(value.as_ref()) else { return Ok(()) };
+                            
+                        // Check `branches` for `Identity::Address` and `Identity::ContractId` zero value checks
+                        for branch in branches.inner.iter() {
+                            let Some((identity_kind, identity_value)) = utils::pattern_to_constructor_suffix_and_value("Identity", &branch.pattern) else { continue };
 
-                            for branch in branches.inner.iter() {
-                                let Pattern::Constructor { path, args } = &branch.pattern else { continue };
-                                let "Identity" = path.prefix.name.as_str() else { continue };
-                                let Some(suffix) = path.suffix.last() else { continue };
-                                let args = utils::fold_punctuated(&args.inner);
-                                
-                                let mut ident = None;
+                            let check_expr = |expr: &Expr| {
+                                let Expr::NotEqual { lhs, rhs, .. } = expr else { return };
 
-                                if let Some(arg) = args.first() {
-                                    match arg {
-                                        Pattern::AmbiguousSingleIdent(arg) => ident = Some(arg),
-                                        _ => {}
-                                    }
-                                }
-
-                                let Some(ident) = ident else { continue };
-
-                                let check_expr = |expr: &Expr| {
-                                    let Expr::NotEqual { lhs, rhs, .. } = expr else { return };
-
-                                    let zero_value = if lhs.span().as_str() == ident.span().as_str() {
-                                        rhs.as_ref()
-                                    } else if rhs.span().as_str() == ident.span().as_str() {
-                                        lhs.as_ref()
-                                    } else {
-                                        return;
-                                    };
-
-                                    let Expr::FuncApp { func, args } = zero_value else { return };
-                                    if func.span().as_str() != format!("{}::from", suffix.1.name.as_str()) { return; }
-                                    if args.span().as_str() != "(ZERO_B256)" { return; }
-
-                                    match suffix.1.name.as_str() {
+                                if utils::is_zero_value_comparison(identity_kind.as_str(), identity_value.span().as_str(), lhs.as_ref(), rhs.as_ref()) {
+                                    match identity_kind.as_str() {
                                         "Address" => *address_checked.borrow_mut() = true,
                                         "ContractId" => *contract_id_checked.borrow_mut() = true,
                                         _ => {}
                                     }
-                                };
+                                }
+                            };
 
-                                match &branch.kind {
-                                    sway_ast::MatchBranchKind::Block { block, .. } => {
-                                        for statement in block.inner.statements.iter() {
-                                            let Statement::Expr { expr, .. } = statement else { continue };
-                                            check_expr(expr);
-                                        }
-
-                                        if let Some(expr) = block.inner.final_expr_opt.as_ref() {
-                                            check_expr(expr);
-                                        }
-                                    }
-
-                                    sway_ast::MatchBranchKind::Expr { expr, .. } => {
+                            match &branch.kind {
+                                sway_ast::MatchBranchKind::Block { block, .. } => {
+                                    for statement in block.inner.statements.iter() {
+                                        let Statement::Expr { expr, .. } = statement else { continue };
                                         check_expr(expr);
                                     }
+
+                                    if let Some(expr) = block.inner.final_expr_opt.as_ref() {
+                                        check_expr(expr);
+                                    }
+                                }
+
+                                sway_ast::MatchBranchKind::Expr { expr, .. } => {
+                                    check_expr(expr);
                                 }
                             }
                         }
@@ -876,64 +741,41 @@ impl AstVisitor for InputIdentityValidationVisitor {
                                 break;
                             };
 
-                            // Check if `rhs` is a variable declaration, skip if so
-                            if expr_is_variable(rhs.as_ref()) {
-                                continue;
-                            }
-            
-                            // Check if `rhs` is a parameter of type `Identity`
-                            if let Some((_, (address_checked, contract_id_checked))) = fn_state.identity_checks.iter_mut().find(|(x, _)| x.as_str() == rhs.span().as_str()) {
-                                //
-                                // Check `then_block` statements for `Identity::Address` and `Identity::ContractId` zero value checks
-                                //
-
-                                let Pattern::Constructor { path, args } = lhs.as_ref() else { continue };
-                                let "Identity" = path.prefix.name.as_str() else { continue };
-                                let Some(suffix) = path.suffix.last() else { continue };
-                                let args = utils::fold_punctuated(&args.inner);
-                                
-                                let mut ident = None;
-
-                                if let Some(arg) = args.first() {
-                                    match arg {
-                                        Pattern::AmbiguousSingleIdent(arg) => ident = Some(arg),
-                                        _ => {}
-                                    }
+                            let mut check_if_expr = || {
+                                // Check if `rhs` is a variable declaration, skip if so
+                                if fn_state.expr_is_variable(rhs.as_ref(), context.blocks.as_slice()) {
+                                    return;
                                 }
-
-                                let Some(ident) = ident else { continue };
-
+                
+                                // Check if `rhs` is a parameter of type `Identity`
+                                let Some((address_checked, contract_id_checked)) = fn_state.find_identity_check(rhs.as_ref()) else { return };
+                                
+                                // Check `then_block` statements for `Identity::Address` and `Identity::ContractId` zero value checks
+                                let Some((identity_kind, identity_value)) = utils::pattern_to_constructor_suffix_and_value("Identity", lhs.as_ref()) else { return };
+    
                                 let check_expr = |expr: &Expr| {
                                     let Expr::NotEqual { lhs, rhs, .. } = expr else { return };
-
-                                    let zero_value = if lhs.span().as_str() == ident.span().as_str() {
-                                        rhs.as_ref()
-                                    } else if rhs.span().as_str() == ident.span().as_str() {
-                                        lhs.as_ref()
-                                    } else {
-                                        return;
-                                    };
-
-                                    let Expr::FuncApp { func, args } = zero_value else { return };
-                                    if func.span().as_str() != format!("{}::from", suffix.1.name.as_str()) { return; }
-                                    if args.span().as_str() != "(ZERO_B256)" { return; }
-
-                                    match suffix.1.name.as_str() {
-                                        "Address" => *address_checked.borrow_mut() = true,
-                                        "ContractId" => *contract_id_checked.borrow_mut() = true,
-                                        _ => {}
+    
+                                    if utils::is_zero_value_comparison(identity_kind.as_str(), identity_value.span().as_str(), lhs.as_ref(), rhs.as_ref()) {
+                                        match identity_kind.as_str() {
+                                            "Address" => *address_checked.borrow_mut() = true,
+                                            "ContractId" => *contract_id_checked.borrow_mut() = true,
+                                            _ => {}
+                                        }
                                     }
                                 };
-
+    
                                 for statement in then_block.inner.statements.iter() {
                                     let Statement::Expr { expr, .. } = statement else { continue };
                                     check_expr(expr);
                                 }
-
+    
                                 if let Some(expr) = then_block.inner.final_expr_opt.as_ref() {
                                     check_expr(expr);
                                 }
-                            }
+                            };
+
+                            check_if_expr();
 
                             // Jump to the next if expression if available
                             if let Some((_, LoopControlFlow::Continue(else_if_expr))) = else_opt {
