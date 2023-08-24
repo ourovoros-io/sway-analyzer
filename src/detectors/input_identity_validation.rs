@@ -9,9 +9,9 @@ use crate::{
 };
 use std::{cell::RefCell, collections::HashMap, path::PathBuf, rc::Rc};
 use sway_ast::{
-    expr::LoopControlFlow, Expr, FnArg, FnArgs, IfCondition, IfExpr, Pattern, Statement, PathExprSegment, DoubleColonToken,
+    expr::LoopControlFlow, Expr, FnArg, FnArgs, IfCondition, IfExpr, MatchBranchKind, Statement,
 };
-use sway_types::{Span, Spanned, BaseIdent};
+use sway_types::{Span, Spanned};
 
 #[derive(Default)]
 pub struct InputIdentityValidationVisitor {
@@ -347,7 +347,7 @@ impl AstVisitor for InputIdentityValidationVisitor {
                     };
 
                     match &branch.kind {
-                        sway_ast::MatchBranchKind::Block { block, .. } => {
+                        MatchBranchKind::Block { block, .. } => {
                             for statement in block.inner.statements.iter() {
                                 let Statement::Expr { expr, .. } = statement else { continue };
                                 check_for_require(expr);
@@ -360,7 +360,7 @@ impl AstVisitor for InputIdentityValidationVisitor {
                             }
                         }
 
-                        sway_ast::MatchBranchKind::Expr { expr, .. } => {
+                        MatchBranchKind::Expr { expr, .. } => {
                             check_for_require(expr);
                             check_for_if_revert(expr);
                         }
@@ -439,7 +439,7 @@ impl AstVisitor for InputIdentityValidationVisitor {
                             };
 
                             match &branch.kind {
-                                sway_ast::MatchBranchKind::Block { block, .. } => {
+                                MatchBranchKind::Block { block, .. } => {
                                     for statement in block.inner.statements.iter() {
                                         let Statement::Expr { expr, .. } = statement else { continue };
                                         check_expr(expr);
@@ -450,7 +450,7 @@ impl AstVisitor for InputIdentityValidationVisitor {
                                     }
                                 }
 
-                                sway_ast::MatchBranchKind::Expr { expr, .. } => {
+                                MatchBranchKind::Expr { expr, .. } => {
                                     check_expr(expr);
                                 }
                             }
@@ -700,7 +700,7 @@ impl AstVisitor for InputIdentityValidationVisitor {
                             };
 
                             match &branch.kind {
-                                sway_ast::MatchBranchKind::Block { block, .. } => {
+                                MatchBranchKind::Block { block, .. } => {
                                     for statement in block.inner.statements.iter() {
                                         let Statement::Expr { expr, .. } = statement else { continue };
                                         check_expr(expr);
@@ -711,7 +711,7 @@ impl AstVisitor for InputIdentityValidationVisitor {
                                     }
                                 }
 
-                                sway_ast::MatchBranchKind::Expr { expr, .. } => {
+                                MatchBranchKind::Expr { expr, .. } => {
                                     check_expr(expr);
                                 }
                             }
