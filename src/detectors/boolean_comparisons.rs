@@ -2,32 +2,31 @@ use crate::{
     error::Error,
     project::Project,
     report::Severity,
-    visitor::{AstVisitor, ExprContext},
+    utils,
+    visitor::{AstVisitor, ExprContext, IfExprContext},
 };
-use sway_ast::Expr;
+use std::path::Path;
+use sway_ast::{Expr, ItemFn, ItemImpl, IfCondition};
 use sway_types::Spanned;
 
 #[derive(Default)]
 pub struct BooleanComparisonsVisitor;
 
 impl AstVisitor for BooleanComparisonsVisitor {
-    fn visit_expr(&mut self, context: &ExprContext, project: &mut Project) -> Result<(), Error> {
-        fn is_boolean_literal_or_negation(expr: &Expr) -> bool {
-            match expr {
-                Expr::Literal(x) => {
-                    let x = x.span();
-                    x.as_str() == "true" || x.as_str() == "false"
-                }
+    fn visit_if_expr(&mut self, context: &IfExprContext, project: &mut Project) -> Result<(), Error> {
+        let IfCondition::Expr(expr) = &context.if_expr.condition else { return Ok(()) };
 
-                Expr::Not { expr, .. } => is_boolean_literal_or_negation(expr),
-
-                _ => false,
-            }
+        if utils::is_boolean_literal_or_negation(expr.as_ref()) {
+            add_report_entry(project, context.path, expr, &context.item_impl, &Some(context.item_fn))?;
         }
-        
+
+        Ok(())
+    }
+
+    fn visit_expr(&mut self, context: &ExprContext, project: &mut Project) -> Result<(), Error> {
         match context.expr {
             Expr::Equal { lhs, rhs, .. } | Expr::NotEqual { lhs, rhs, .. } => {
-                if !is_boolean_literal_or_negation(lhs.as_ref()) && !is_boolean_literal_or_negation(rhs.as_ref()) {
+                if !utils::is_boolean_literal_or_negation(lhs.as_ref()) && !utils::is_boolean_literal_or_negation(rhs.as_ref()) {
                     return Ok(());
                 }
             }
@@ -35,41 +34,45 @@ impl AstVisitor for BooleanComparisonsVisitor {
             _ => return Ok(())
         }
 
-        project.report.borrow_mut().add_entry(
-            context.path,
-            project.span_to_line(context.path, &context.expr.span())?,
-            Severity::Low,
-            match context.item_fn.as_ref() {
-                Some(item_fn) => {
-                    format!(
-                        "The `{}` function contains a comparison with a boolean literal, which is unnecessary: `{}`",
-                        if let Some(item_impl) = context.item_impl.as_ref() {
-                            format!(
-                                "{}::{}",
-                                item_impl.ty.span().as_str(),
-                                item_fn.fn_signature.name.as_str(),
-                            )
-                        } else {
-                            format!(
-                                "{}",
-                                item_fn.fn_signature.name.as_str(),
-                            )
-                        },
-                        context.expr.span().as_str(),
-                    )
-                }
-
-                None => {
-                    format!(
-                        "Found a comparison with a boolean literal, which is unnecessary: `{}`",
-                        context.expr.span().as_str(),
-                    )
-                }
-            },
-        );
-
-        Ok(())
+        add_report_entry(project, context.path, context.expr, &context.item_impl, &context.item_fn)
     }
+}
+
+fn add_report_entry(project: &mut Project, path: &Path, expr: &Expr, item_impl: &Option<&ItemImpl>, item_fn: &Option<&ItemFn>) -> Result<(), Error> {
+    project.report.borrow_mut().add_entry(
+        path,
+        project.span_to_line(path, &expr.span())?,
+        Severity::Low,
+        match item_fn.as_ref() {
+            Some(item_fn) => {
+                format!(
+                    "The `{}` function contains a comparison with a boolean literal, which is unnecessary: `{}`",
+                    if let Some(item_impl) = item_impl.as_ref() {
+                        format!(
+                            "{}::{}",
+                            item_impl.ty.span().as_str(),
+                            item_fn.fn_signature.name.as_str(),
+                        )
+                    } else {
+                        format!(
+                            "{}",
+                            item_fn.fn_signature.name.as_str(),
+                        )
+                    },
+                    expr.span().as_str(),
+                )
+            }
+
+            None => {
+                format!(
+                    "Found a comparison with a boolean literal, which is unnecessary: `{}`",
+                    expr.span().as_str(),
+                )
+            }
+        },
+    );
+
+    Ok(())
 }
 
 #[cfg(test)]

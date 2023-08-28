@@ -2,188 +2,92 @@ use crate::{
     error::Error,
     project::Project,
     report::Severity,
-    visitor::{AstVisitor, ConfigurableContext, ExprContext},
+    visitor::{AstVisitor, ExprContext},
 };
-use std::path::Path;
-use sway_ast::{Expr, ItemConst, ItemImpl, ItemImplItem, ItemKind, Literal, Statement};
-use sway_types::{Span, Spanned};
+use sway_ast::{Expr, ItemKind, Literal};
+use sway_types::Spanned;
 
 #[derive(Default)]
 pub struct LargeLiteralsVisitor;
 
 impl AstVisitor for LargeLiteralsVisitor {
-    fn visit_configurable(&mut self, context: &ConfigurableContext, project: &mut Project) -> Result<(), Error> {
-        // Case 1: Large Literal in Configurable
-        for (a, _) in &context.item_configurable.fields.inner.value_separator_pairs {
-            let Expr::Literal(Literal::Int(value)) = &a.value.initializer  else { return Ok(()) };
-
-            if value.span().as_str().len() > 6 {
-                add_report_entry(
-                    project,
-                    context.path,
-                    value.span(),
-                    "configurable",
-                    None,
-                    a.value.span().as_str(),
-                    &a.value.span().as_str().replace(
-                        value.span().as_str(),
-                        format_large_number(value.span().as_str().parse::<u64>().unwrap()).as_str(),
-                    ),
-                )?;
-            }
-        }
-
-        Ok(())
-    }
-
     fn visit_expr(&mut self, context: &ExprContext, project: &mut Project) -> Result<(), Error> {
-        match context.expr {
-            // Case 1: Function call with large literal
-            Expr::FuncApp { args, .. } => {
-                for arg in args.inner.clone().into_iter() {
-                    let Expr::Literal(i) = arg  else { continue };
-                    let Ok(n) = i.span().as_str().parse::<u64>() else { return Ok(()) };
-                    
-                    if i.span().as_str().len() > 6 {
-                        add_report_entry(
-                            project,
-                            context.path,
-                            context.expr.span(),
-                            "function",
-                            Some(context.item_fn.unwrap().fn_signature.span().as_str()),
-                            context.expr.span().as_str(),
-                            &context
-                                .expr
-                                .span()
-                                .as_str()
-                                .replace(&n.to_string(), format_large_number(n).as_str()),
-                        )?;
-                    }
-                }
-            }
+        let Expr::Literal(Literal::Int(i)) = context.expr else { return Ok(()) };
 
-            // Case 2: Statement with large literal
-            Expr::Literal(l) => {
-                let Literal::Int(i) = l else { return Ok(()) };
-                let Ok(n) = i.span().as_str().parse::<u64>() else { return Ok(()) };
+        let value = i.span.as_str();
 
-                if n.to_string().len() > 6 {
-                    // Case 2.1: Large literal statement in function
-                    if context.item_fn.is_some() {
-                        if let ItemKind::Const(ItemConst { .. }) = context.item {
-                            add_report_entry(
-                                project,
-                                context.path,
-                                context.expr.span(),
-                                "function",
-                                Some(context.item_fn.unwrap().fn_signature.span().as_str()),
-                                context.item.span().as_str(),
-                                &context
-                                    .item
-                                    .span()
-                                    .as_str()
-                                    .replace(&n.to_string(), format_large_number(n).as_str()),
-                            )?;
-                        } else if context.statement.is_some() {
-                            let Statement::Let(statement) = context.statement.unwrap() else { return Ok(()) };
-
-                            add_report_entry(
-                                project,
-                                context.path,
-                                context.expr.span(),
-                                "function",
-                                Some(context.item_fn.unwrap().fn_signature.span().as_str()),
-                                statement.span().as_str(),
-                                &statement
-                                    .span()
-                                    .as_str()
-                                    .replace(&n.to_string(), format_large_number(n).as_str()),
-                            )?;
-                        }
-                    }
-                    // Case 2.2: Large Literal statement in contract
-                    else if let ItemKind::Impl(ItemImpl { contents, .. }) = context.item {
-                        for c in &contents.inner {
-                            let ItemImplItem::Const(ItemConst { ref expr_opt, .. }) = c.value else { return Ok(()) };
-
-                            if expr_opt.as_ref().unwrap().span().as_str().len() > 6 {
-                                add_report_entry(
-                                    project,
-                                    context.path,
-                                    context.expr.span(),
-                                    "contract",
-                                    None,
-                                    c.value.span().as_str(),
-                                    &c.value
-                                        .span()
-                                        .as_str()
-                                        .replace(&n.to_string(), format_large_number(n).as_str()),
-                                )?;
-                            }
-                        }
-                    } else {
-                        add_report_entry(
-                            project,
-                            context.path,
-                            context.expr.span(),
-                            "contract",
-                            None,
-                            context.item.span().as_str(),
-                            &context
-                                .item
-                                .span()
-                                .as_str()
-                                .replace(&n.to_string(), format_large_number(n).as_str()),
-                        )?;
-                    }
-                }
-            }
-
-            _ => {}
+        if value.starts_with("0x") || value.contains('_') || value.len() <= 6 {
+            return Ok(());
         }
 
+        let mut new_value = String::with_capacity(value.len() + value.len() / 3);
+        
+        for (idx, ch) in value.chars().rev().enumerate() {
+            if idx != 0 && idx % 3 == 0 {
+                new_value.push('_');
+            }
+    
+            new_value.push(ch);
+        }
+    
+        new_value = new_value.chars().rev().collect();
+
+        project.report.borrow_mut().add_entry(
+            context.path,
+            project.span_to_line(context.path, &context.expr.span())?,
+            Severity::Low,
+            format!(
+                "{} contains a large literal: `{value}`. Consider refactoring it to be more readable: `{new_value}`",
+                match context.item {
+                    ItemKind::Fn(item_fn) => if let Some(item_impl) = context.item_impl.as_ref() {
+                        format!(
+                            "The `{}::{}` function",
+                            item_impl.ty.span().as_str(),
+                            item_fn.fn_signature.name.as_str(),
+                        )
+                    } else {
+                        format!(
+                            "The `{}` function",
+                            item_fn.fn_signature.name.as_str(),
+                        )
+                    },
+
+                    ItemKind::Const(item_const) => match (context.item_impl.as_ref(), context.item_fn.as_ref()) {
+                        (Some(item_impl), Some(item_fn)) => format!(
+                            "The `{}` constant in the `{}::{}` function",
+                            item_const.name,
+                            item_impl.ty.span().as_str(),
+                            item_fn.fn_signature.name,
+                        ),
+
+                        (Some(item_impl), None) => format!(
+                            "The `{}::{}` constant",
+                            item_impl.ty.span().as_str(),
+                            item_const.name.as_str(),
+                        ),
+
+                        (None, Some(item_fn)) => format!(
+                            "The `{}` constant in the `{}` function",
+                            item_const.name,
+                            item_fn.fn_signature.name,
+                        ),
+
+                        (None, None) => format!(
+                            "The `{}` constant",
+                            item_const.name,
+                        ),
+                    },
+
+                    ItemKind::Storage(_) => format!("Storage"),
+                    ItemKind::Configurable(_) => format!("Configurable"),
+                    
+                    _ => panic!("Unhandled large literals scope: {:#?}", context.item),
+                },
+            ),
+        );
+        
         Ok(())
     }
-}
-
-fn add_report_entry(
-    project: &mut Project,
-    path: &Path,
-    span: Span,
-    placement: &str,
-    fn_name: Option<&str>,
-    info: &str,
-    solution: &str,
-) -> Result<(), Error> {
-    project.report.borrow_mut().add_entry(
-        path,
-        project.span_to_line(path, &span)?,
-        Severity::Low,
-        format!(
-            "Found large literal in {} {} => `{}`. Consider refactoring it in order to be more readable: `{}`.",
-            placement,
-            fn_name.unwrap_or(""),
-            info,
-            solution,
-        ),
-    );
-    Ok(())
-}
-
-/// Function to format large numbers with `_` separator
-fn format_large_number(n: u64) -> String {
-    let s = n.to_string();
-    let mut result = String::with_capacity(s.len() + s.len() / 3);
-
-    for (idx, ch) in s.chars().rev().enumerate() {
-        if idx != 0 && idx % 3 == 0 {
-            result.push('_');
-        }
-
-        result.push(ch);
-    }
-
-    result.chars().rev().collect()
 }
 
 #[cfg(test)]

@@ -1,12 +1,14 @@
 contract;
 
+use std::constants::ZERO_B256;
+
 // Case 1: Large literals usage in constant at contract level
 // Report entry should be created:
 // L6: Found large literal in contract => `const X: u64 = 1000000000`. Consider refactoring it in order to be more readable: `const X: u64 = 1_000_000_000`.
-const X: u64 = 1000000000;
+pub const X: u64 = 1000000000;
 
 // Report entry should not be created
-const Y: u64 = 10000;
+pub const Y: u64 = 10000;
 
 // Case2: Large literals in constants in configurable
 configurable {
@@ -22,9 +24,6 @@ abi TestLargeLiterals {
     fn large_literals_fn_calls();
     fn const_func_large_literals();
     fn let_func_large_literals();
-    fn function_call_single_large_literals(amount: u64);
-    fn function_call_nested_large_literals(amount: u64, to: Address);
-    fn function_call_nested_large_literals_2(from: Address, to: Address, amount: u64);
 }
 
 trait HasValue {
@@ -32,10 +31,7 @@ trait HasValue {
     const VALUE2: u64;
 }
 
-enum Error {
-    IncorrectAssetId: ContractId,
-    NotEnoughAssets: u64,
-}
+struct Error {}
 
 // Case 3: Large literals usage in trait impl
 impl HasValue for Error {
@@ -45,6 +41,11 @@ impl HasValue for Error {
     // Report entry should not be created
     const VALUE2: u64 = 1000;
 }
+
+// Dummies for large_literals
+fn function_call_single_large_literals(_amount: u64) {}
+fn function_call_nested_large_literals(_amount: u64, _to: Address) {}
+fn function_call_nested_large_literals_2(_from: Address, _to: Address, _amount: u64) {}
 
 impl TestLargeLiterals for Contract {
     fn const_func_large_literals() {
@@ -58,9 +59,9 @@ impl TestLargeLiterals for Contract {
     fn let_func_large_literals() {
         // Report entry should be created:
         // L61: Found large literal in function : `fn let_func_large_literals()` => `let big_a = 20000000000;`. Consider refactoring it in order to be more readable: `let big_a = 20_000_000_000;`.
-        let big_a = 20000000000;
+        let _big_a = 20000000000;
         // Report entry should not be created
-        let not_big_a = 200000;
+        let _not_big_a = 200000;
     }
 
     // Large literals
@@ -83,9 +84,4 @@ impl TestLargeLiterals for Contract {
         // Report entry should not be created
         function_call_nested_large_literals_2(Address::from(ZERO_B256), Address::from(ZERO_B256), 5000);
     }
-
-    // Dummies for large_literals
-    fn function_call_single_large_literals(amount: u64) {}
-    fn function_call_nested_large_literals(amount: u64, to: Address) {}
-    fn function_call_nested_large_literals_2(from: Address, to: Address, amount: u64) {}
 }

@@ -8,10 +8,10 @@ mod large_literals;
 mod missing_logs;
 mod msg_amount_in_loop;
 mod potential_infinite_loops;
-mod unused_imports;
 mod redundant_storage_access;
 mod storage_field_mutability;
 mod storage_not_updated;
+mod unused_imports;
 
 use crate::visitor::AstVisitor;
 
@@ -19,8 +19,8 @@ use self::{
     boolean_comparisons::*, discarded_assignments::*, division_before_multiplication::*,
     external_calls_in_loop::*, inline_assembly_usage::*, input_identity_validation::*,
     large_literals::*, missing_logs::*, msg_amount_in_loop::*, potential_infinite_loops::*,
-    unused_imports::*, redundant_storage_access::*, storage_field_mutability::*,
-    storage_not_updated::*,
+    redundant_storage_access::*, storage_field_mutability::*, storage_not_updated::*,
+    unused_imports::*,
 };
 
 type DetectorConstructor = fn() -> Box<dyn AstVisitor>;

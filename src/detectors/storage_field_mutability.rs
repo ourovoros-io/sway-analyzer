@@ -3,10 +3,7 @@ use crate::{
     project::Project,
     report::Severity,
     utils,
-    visitor::{
-        AstVisitor, BlockContext, ExprContext, FnContext, ModuleContext, StatementContext,
-        StorageFieldContext,
-    },
+    visitor::{AstVisitor, BlockContext, ExprContext, FnContext, ModuleContext, StatementContext},
 };
 use std::{collections::HashMap, path::PathBuf};
 use sway_ast::{Expr, Pattern, Statement, StatementLet};
@@ -46,8 +43,11 @@ struct StorageBinding {
 impl AstVisitor for StorageFieldMutabilityVisitor {
     fn visit_module(&mut self, context: &ModuleContext, _project: &mut Project) -> Result<(), Error> {
         // Create the module state
-        if !self.module_states.contains_key(context.path) {
-            self.module_states.insert(context.path.into(), ModuleState::default());
+        let module_state = self.module_states.entry(context.path.into()).or_insert_with(ModuleState::default);
+
+        // Create storage field states ahead of time
+        for storage_field in utils::collect_storage_fields(context.module) {
+            module_state.storage_field_states.insert(storage_field.name.span(), StorageFieldState::default());
         }
 
         Ok(())
@@ -71,16 +71,6 @@ impl AstVisitor for StorageFieldMutabilityVisitor {
                 );
             }
         }
-
-        Ok(())
-    }
-
-    fn visit_storage_field(&mut self, context: &StorageFieldContext, _project: &mut Project) -> Result<(), Error> {
-        // Get the module state
-        let module_state = self.module_states.get_mut(context.path).unwrap();
-
-        // Create the storage field state
-        module_state.storage_field_states.insert(context.field.name.span(), StorageFieldState::default());
 
         Ok(())
     }

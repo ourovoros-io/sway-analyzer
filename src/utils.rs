@@ -1,4 +1,4 @@
-use sway_ast::{attribute::Attribute, *};
+use sway_ast::{attribute::{Attribute, Annotated}, *};
 use sway_types::{BaseIdent, Span, Spanned};
 
 pub fn fold_punctuated<T, P>(punctuated: &Punctuated<T, P>) -> Vec<&T> {
@@ -956,4 +956,26 @@ pub fn pattern_to_constructor_suffix_and_value(name: &str, pattern: &Pattern) ->
     let args = fold_punctuated(&args.inner);
     let Some(Pattern::AmbiguousSingleIdent(ident)) = args.first() else { return None };
     Some((suffix.1.name.clone(), ident.clone()))
+}
+
+pub fn collect_storage_fields(module: &Module) -> Vec<&StorageField> {
+    let Some(Annotated {
+        value: ItemKind::Storage(storage),
+        ..
+    }) = module.items.iter().find(|x| matches!(x.value, ItemKind::Storage(_))) else { return vec![] };
+
+    fold_punctuated(&storage.fields.inner).iter().map(|x| &x.value).collect()
+}
+
+pub fn is_boolean_literal_or_negation(expr: &Expr) -> bool {
+    match expr {
+        Expr::Literal(x) => {
+            let x = x.span();
+            x.as_str() == "true" || x.as_str() == "false"
+        }
+
+        Expr::Not { expr, .. } => is_boolean_literal_or_negation(expr),
+
+        _ => false,
+    }
 }

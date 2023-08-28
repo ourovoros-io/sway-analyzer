@@ -4,6 +4,8 @@ abi TestBooleanComparisons {
     fn test_no_boolean_literal_comparisons() -> bool;
     fn test_boolean_literal_comparisons() -> bool;
     fn test_boolean_negation_comparisons() -> bool;
+    fn test_if_condition_literal();
+    fn test_if_condition_negation();
 }
 
 // Report entry should not be created
@@ -59,5 +61,17 @@ impl TestBooleanComparisons for Contract {
     // L61: The `Contract::test_boolean_negation_comparisons` function contains a comparison with a boolean literal, which is unnecessary: `true != false`
     fn test_boolean_negation_comparisons() -> bool {
         !true != !false
+    }
+
+    // Report entry should be created:
+    // L69: The `Contract::test_if_condition_literal` function contains a comparison with a boolean literal, which is unnecessary: `true`
+    fn test_if_condition_literal() {
+        if true {}
+    }
+
+    // Report entry should be created:
+    // L75: The `Contract::test_if_condition_negation` function contains a comparison with a boolean literal, which is unnecessary: `!false`
+    fn test_if_condition_negation() {
+        if !false {}
     }
 }

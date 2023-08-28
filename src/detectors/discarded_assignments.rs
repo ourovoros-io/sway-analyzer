@@ -171,7 +171,7 @@ impl AstVisitor for DiscardedAssignmentsVisitor {
                 block_state.assignable_states.push(AssignableState {
                     name: ident.as_str().to_string(),
                     span: ident.span(),
-                    used: false,
+                    used: ident.as_str().starts_with('_'),
                     op: ReassignmentOpVariant::Equals,
                 });
             }

@@ -2557,7 +2557,7 @@ impl AstVisitor for AstVisitorRecursive {
                     let context = FnContext {
                         path: context.path,
                         module: context.module,
-                        item: context.item,
+                        item: &ItemKind::Fn(item_fn.clone()),
                         impl_attributes: Some(context.attributes),
                         item_impl: Some(context.item_impl),
                         fn_attributes: item.attribute_list.as_slice(),
@@ -2572,7 +2572,7 @@ impl AstVisitor for AstVisitorRecursive {
                     let context = ConstContext {
                         path: context.path,
                         module: context.module,
-                        item: context.item,
+                        item: &ItemKind::Const(item_const.clone()),
                         impl_attributes: Some(context.attributes),
                         item_impl: Some(context.item_impl),
                         fn_attributes: None,

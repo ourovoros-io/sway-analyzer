@@ -3,9 +3,7 @@ use crate::{
     project::Project,
     report::Severity,
     utils,
-    visitor::{
-        AstVisitor, BlockContext, FnContext, ModuleContext, StatementContext, StorageFieldContext,
-    },
+    visitor::{AstVisitor, BlockContext, FnContext, ModuleContext, StatementContext},
 };
 use std::{collections::HashMap, path::PathBuf};
 use sway_ast::Ty;
@@ -57,20 +55,16 @@ struct StorageValueBinding {
 
 impl AstVisitor for StorageNotUpdatedVisitor {
     fn visit_module(&mut self, context: &ModuleContext, _project: &mut Project) -> Result<(), Error> {
-        // Create the module state
-        if !self.module_states.contains_key(context.path) {
-            self.module_states.insert(context.path.into(), ModuleState::default());
+        // Get or create the module state
+        let module_state = self.module_states.entry(context.path.into()).or_insert_with(ModuleState::default);
+
+        // Store the storage field types ahead of time
+        for storage_field in utils::collect_storage_fields(context.module) {
+            module_state.storage_field_types.insert(
+                storage_field.name.as_str().into(),
+                storage_field.ty.clone()
+            );
         }
-
-        Ok(())
-    }
-
-    fn visit_storage_field(&mut self, context: &StorageFieldContext, _project: &mut Project) -> Result<(), Error> {
-        // Get the module state
-        let module_state = self.module_states.get_mut(context.path).unwrap();
-
-        // Insert the storage field type
-        module_state.storage_field_types.insert(context.field.name.as_str().into(), context.field.ty.clone());
 
         Ok(())
     }
