@@ -6,12 +6,9 @@ use crate::{
         AstVisitor, ConfigurableContext, ExprContext, ModuleContext, StatementContext, UseContext,
     },
 };
-use std::{
-    collections::HashMap,
-    path::PathBuf,
-};
+use std::{collections::HashMap, path::PathBuf};
 use sway_ast::{
-    attribute::Annotated, ItemConst, ItemKind, PathExpr, Statement, StatementLet, UseTree,
+    attribute::Annotated, Expr, ItemConst, ItemKind, PathExpr, Statement, StatementLet, UseTree,
 };
 use sway_types::{Span, Spanned};
 
@@ -91,7 +88,7 @@ impl AstVisitor for UnusedImportsVisitor {
             }
 
             Statement::Expr { expr, .. } => {
-                let sway_ast::Expr::FuncApp { func, args } = expr else { return Ok(()) };
+                let Expr::FuncApp { func, args } = expr else { return Ok(()) };
 
                 if let Some(matched) = module_state.span_usage_states.get(func.span().as_str()) {
                     module_state
@@ -122,7 +119,7 @@ impl AstVisitor for UnusedImportsVisitor {
         // Get the module state
         let module_state = self.module_states.get_mut(context.path).unwrap();
 
-        let sway_ast::Expr::Path(PathExpr{ prefix, ..  }) = context.expr else { return Ok(()) };
+        let Expr::Path(PathExpr{ prefix, ..  }) = context.expr else { return Ok(()) };
         let Some(matched) = module_state.span_usage_states.get(&prefix.span().str()) else { return Ok(()) };
 
         module_state

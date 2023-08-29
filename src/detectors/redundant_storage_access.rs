@@ -8,6 +8,7 @@ use crate::{
     },
 };
 use std::{collections::HashMap, path::PathBuf};
+use sway_ast::Statement;
 use sway_types::{Span, Spanned};
 
 #[derive(Default)]
@@ -112,7 +113,7 @@ impl AstVisitor for RedundantStorageAccessVisitor {
 
         // Check if the statement contains storage access
         match context.statement {
-            sway_ast::Statement::Let(stmt_let) => {
+            Statement::Let(stmt_let) => {
                 let expr = utils::find_storage_access_in_expr(&stmt_let.expr);
                 let Some(expr) = expr.as_ref() else { return Ok(()) };
                 
@@ -154,7 +155,7 @@ impl AstVisitor for RedundantStorageAccessVisitor {
                 block_state.storage_reads.push(idents[1].span());
             }
             
-            sway_ast::Statement::Expr { expr, .. } => {
+            Statement::Expr { expr, .. } => {
                 let expr = utils::find_storage_access_in_expr(expr);
                 let Some(expr) = expr.as_ref() else { return Ok(()) };
                 

@@ -2,9 +2,10 @@ use crate::{
     error::Error,
     project::Project,
     report::Severity,
+    utils,
     visitor::{AstVisitor, ExprContext},
 };
-use sway_ast::{Expr, ItemKind, Literal};
+use sway_ast::{Expr, Literal};
 use sway_types::Spanned;
 
 #[derive(Default)]
@@ -38,51 +39,7 @@ impl AstVisitor for LargeLiteralsVisitor {
             Severity::Low,
             format!(
                 "{} contains a large literal: `{value}`. Consider refactoring it to be more readable: `{new_value}`",
-                match context.item {
-                    ItemKind::Fn(item_fn) => if let Some(item_impl) = context.item_impl.as_ref() {
-                        format!(
-                            "The `{}::{}` function",
-                            item_impl.ty.span().as_str(),
-                            item_fn.fn_signature.name.as_str(),
-                        )
-                    } else {
-                        format!(
-                            "The `{}` function",
-                            item_fn.fn_signature.name.as_str(),
-                        )
-                    },
-
-                    ItemKind::Const(item_const) => match (context.item_impl.as_ref(), context.item_fn.as_ref()) {
-                        (Some(item_impl), Some(item_fn)) => format!(
-                            "The `{}` constant in the `{}::{}` function",
-                            item_const.name,
-                            item_impl.ty.span().as_str(),
-                            item_fn.fn_signature.name,
-                        ),
-
-                        (Some(item_impl), None) => format!(
-                            "The `{}::{}` constant",
-                            item_impl.ty.span().as_str(),
-                            item_const.name.as_str(),
-                        ),
-
-                        (None, Some(item_fn)) => format!(
-                            "The `{}` constant in the `{}` function",
-                            item_const.name,
-                            item_fn.fn_signature.name,
-                        ),
-
-                        (None, None) => format!(
-                            "The `{}` constant",
-                            item_const.name,
-                        ),
-                    },
-
-                    ItemKind::Storage(_) => format!("Storage"),
-                    ItemKind::Configurable(_) => format!("Configurable"),
-                    
-                    _ => panic!("Unhandled large literals scope: {:#?}", context.item),
-                },
+                utils::get_item_location(context.item, &context.item_impl, &context.item_fn),
             ),
         );
         

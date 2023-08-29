@@ -2,15 +2,9 @@ use crate::{
     error::Error,
     project::Project,
     report::Severity,
-    visitor::{
-        AstVisitor, BlockContext, ConfigurableContext, ConstContext, ExprContext, FnContext,
-        ModuleContext, StatementContext,
-    },
+    visitor::{AstVisitor, BlockContext, ExprContext, FnContext, ModuleContext, StatementContext}, utils,
 };
-use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
-};
+use std::{collections::HashMap, path::PathBuf};
 use sway_ast::{Expr, Statement, StatementLet};
 use sway_types::{Span, Spanned};
 
@@ -31,7 +25,7 @@ struct FnState {
 
 #[derive(Default)]
 struct BlockState {
-    variable_states: HashMap<Span, bool>,
+    variable_has_division: HashMap<Span, bool>,
 }
 
 impl AstVisitor for DivisionBeforeMultiplicationVisitor {
@@ -88,8 +82,9 @@ impl AstVisitor for DivisionBeforeMultiplicationVisitor {
         let block_span = context.blocks.last().unwrap();
         let block_state = fn_state.block_states.get_mut(block_span).unwrap();
 
+        // Check if the statement declares a variable which stores the result of a division
         if let Statement::Let(StatementLet { pattern, expr: Expr::Div { .. }, .. }) = context.statement {
-            block_state.variable_states.insert(pattern.span(), true);
+            block_state.variable_has_division.insert(pattern.span(), true);
         }
 
         Ok(())
@@ -99,158 +94,58 @@ impl AstVisitor for DivisionBeforeMultiplicationVisitor {
         // Get the module state
         let module_state = self.module_states.get(context.path).unwrap();
 
-        // Get the function state
-        let Some(item_fn) = context.item_fn.as_ref() else { return Ok(()) };
-        let fn_signature = item_fn.fn_signature.span();
-        let fn_state = module_state.fn_states.get(&fn_signature).unwrap();
-
+        // Only check multiplication expressions
         let Expr::Mul { lhs, .. } = context.expr else { return Ok(()) };
 
-        'var_lookup: for block_span in context.blocks.iter().rev() {
-            let block_state = fn_state.block_states.get(block_span).unwrap();
-
-            for (k, _) in block_state.variable_states.iter() {
-                if k.as_str() == lhs.span().as_str() {
-                    add_report_entry(
-                        project,
-                        context.path,
-                        context.expr.span(),
-                        "function",
-                        Some(context.item_fn.unwrap().fn_signature.span().as_str()),
-                        context.statement.unwrap().span().as_str(),
-                    )?;
-                    break 'var_lookup;
-                }
-            }    
+        fn check_for_division(expr: &Expr) -> bool {
+            match expr {
+                Expr::Parens(expr) => check_for_division(expr.inner.as_ref()),
+                Expr::Div { .. } => true,
+                _ => false,
+            }
         }
 
-        match *lhs.to_owned() {
-            Expr::Parens(expr) => {
-                let Expr::Div { .. } = expr.inner.as_ref() else { return Ok(()) };
+        let mut has_division = false;
 
-                // Check if we are in a function or not
-                if context.statement.is_some() {
-                    add_report_entry(
-                        project,
-                        context.path,
-                        context.expr.span(),
-                        "function",
-                        Some(context.item_fn.unwrap().fn_signature.span().as_str()),
-                        context.statement.unwrap().span().as_str(),
-                    )?;
+        if let Some(item_fn) = context.item_fn.as_ref() {
+            // Get the function state
+            let fn_signature = item_fn.fn_signature.span();
+            let fn_state = module_state.fn_states.get(&fn_signature).unwrap();
+    
+            // Check if `lhs` is a variable in scope that stores a division
+            'var_lookup: for block_span in context.blocks.iter().rev() {
+                let block_state = fn_state.block_states.get(block_span).unwrap();
+    
+                for (k, variable_has_division) in block_state.variable_has_division.iter() {
+                    if k.as_str() == lhs.span().as_str() {
+                        has_division = *variable_has_division;
+                        break 'var_lookup;
+                    }
                 }
             }
-
-            Expr::Div { .. } => {
-                // Check if we are in a function or not
-                if context.statement.is_some() {
-                    add_report_entry(
-                        project,
-                        context.path,
-                        context.expr.span(),
-                        "function",
-                        Some(context.item_fn.unwrap().fn_signature.span().as_str()),
-                        context.statement.unwrap().span().as_str(),
-                    )?;
-                }
-            }
-
-            _ => {}
         }
+
+        if !has_division {
+            has_division = check_for_division(lhs.as_ref());
+        }
+
+        if !has_division {
+            return Ok(());
+        }
+
+        project.report.borrow_mut().add_entry(
+            context.path,
+            project.span_to_line(context.path, &context.expr.span())?,
+            Severity::Low,
+            format!(
+                "{} contains a multiplication on the result of a division, which can truncate: `{}`. Consider refactoring in order to prevent value truncation.",
+                utils::get_item_location(context.item, &context.item_impl, &context.item_fn),
+                context.expr.span().as_str(),
+            ),
+        );
 
         Ok(())
     }
-
-    fn visit_const(&mut self, context: &ConstContext, project: &mut Project) -> Result<(), Error> {
-        let Some(expr) = context.item_const.expr_opt.as_ref() else { return Ok(()) };
-        let Expr::Mul { lhs, .. } = expr else { return Ok(()) };
-
-        match *lhs.to_owned() {
-            Expr::Parens(expr) => {
-                let Expr::Div { .. } = expr.inner.as_ref() else { return Ok(()) };
-
-                add_report_entry(
-                    project,
-                    context.path,
-                    expr.span(),
-                    "constant",
-                    None,
-                    context.item_const.span().as_str(),
-                )?;
-            }
-
-            Expr::Div { .. } => {
-                add_report_entry(
-                    project,
-                    context.path,
-                    expr.span(),
-                    "constant",
-                    None,
-                    context.item_const.span().as_str(),
-                )?;
-            }
-            _ => {}
-        }
-
-        Ok(())
-    }
-
-    fn visit_configurable(&mut self, context: &ConfigurableContext, project: &mut Project) -> Result<(), Error> {
-        for a in &context.item_configurable.fields.inner {
-            let Expr::Mul { lhs, .. } = &a.value.initializer else { continue };
-
-            match lhs.as_ref() {
-                Expr::Parens(paren_expr) => {
-                    let Expr::Div { .. } = *paren_expr.inner else {continue};
-                    add_report_entry(
-                        project,
-                        context.path,
-                        a.value.initializer.span(),
-                        "configurable",
-                        None,
-                        a.value.span().as_str(),
-                    )?;
-                }
-
-                Expr::Div { .. } => {
-                    add_report_entry(
-                        project,
-                        context.path,
-                        a.value.initializer.span(),
-                        "configurable",
-                        None,
-                        a.value.span().as_str(),
-                    )?;
-                }
-
-                _ => {}
-            }
-        }
-        
-        Ok(())
-    }
-}
-
-fn add_report_entry(
-    project: &mut Project,
-    path: &Path,
-    span: Span,
-    placement: &str,
-    fn_name: Option<&str>,
-    info: &str,
-) -> Result<(), Error> {
-    project.report.borrow_mut().add_entry(
-        path,
-        project.span_to_line(path, &span)?,
-        Severity::Medium,
-        format!(
-            "Found division before multiplication in {} {} => `{}`. Consider ordering multiplication before division.",
-            placement,
-            fn_name.unwrap_or(""),
-            info
-        ),
-    );
-    Ok(())
 }
 
 #[cfg(test)]

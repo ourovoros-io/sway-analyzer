@@ -979,3 +979,51 @@ pub fn is_boolean_literal_or_negation(expr: &Expr) -> bool {
         _ => false,
     }
 }
+
+pub fn get_item_location(item: &ItemKind, item_impl: &Option<&ItemImpl>, item_fn: &Option<&ItemFn>) -> String {
+    match item {
+        ItemKind::Fn(item_fn) => if let Some(item_impl) = item_impl.as_ref() {
+            format!(
+                "The `{}::{}` function",
+                item_impl.ty.span().as_str(),
+                item_fn.fn_signature.name.as_str(),
+            )
+        } else {
+            format!(
+                "The `{}` function",
+                item_fn.fn_signature.name.as_str(),
+            )
+        },
+
+        ItemKind::Const(item_const) => match (item_impl.as_ref(), item_fn.as_ref()) {
+            (Some(item_impl), Some(item_fn)) => format!(
+                "The `{}` constant in the `{}::{}` function",
+                item_const.name,
+                item_impl.ty.span().as_str(),
+                item_fn.fn_signature.name,
+            ),
+
+            (Some(item_impl), None) => format!(
+                "The `{}::{}` constant",
+                item_impl.ty.span().as_str(),
+                item_const.name.as_str(),
+            ),
+
+            (None, Some(item_fn)) => format!(
+                "The `{}` constant in the `{}` function",
+                item_const.name,
+                item_fn.fn_signature.name,
+            ),
+
+            (None, None) => format!(
+                "The `{}` constant",
+                item_const.name,
+            ),
+        },
+
+        ItemKind::Storage(_) => format!("Storage"),
+        ItemKind::Configurable(_) => format!("Configurable"),
+        
+        _ => panic!("Unhandled item location: {:#?}", item),
+    }
+}

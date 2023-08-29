@@ -17,10 +17,18 @@ pub struct MissingLogsVisitor {
     module_states: HashMap<PathBuf, ModuleState>,
 }
 
-#[derive(Default)]
 struct ModuleState {
     log_names: Vec<String>,
     fn_states: HashMap<Span, FnState>,
+}
+
+impl Default for ModuleState {
+    fn default() -> Self {
+        Self {
+            log_names: vec!["log".to_string()],
+            fn_states: Default::default(),
+        }
+    }
 }
 
 #[derive(Default)]
@@ -115,7 +123,9 @@ impl AstVisitor for MissingLogsVisitor {
 
         // Check each written storage variable to see if it has been logged
         for (storage_span, var_span) in block_state.written.iter() {
-            if block_state.logged.iter().find(|logged| logged.as_str() == var_span.as_str()).is_none() {
+            if block_state.logged.iter().find(|logged| {
+                logged.as_str() == var_span.as_str() || logged.as_str() == format!("storage.{}.read()", storage_span.as_str())
+            }).is_none() {
                 project.report.borrow_mut().add_entry(
                     context.path,
                     project.span_to_line(context.path, storage_span)?,
@@ -207,5 +217,25 @@ impl AstVisitor for MissingLogsVisitor {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{project::Project, Options};
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_missing_logs() {
+        let options = Options {
+            directory: Some(PathBuf::from("test/missing_logs")),
+            detectors: vec!["missing_logs".to_string()],
+            ..Default::default()
+        };
+
+        let mut project = Project::try_from(&options).unwrap();
+        project.analyze_modules().unwrap();
+
+        println!("{project}");
     }
 }
