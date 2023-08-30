@@ -652,6 +652,8 @@ impl AstVisitor for AstVisitorRecursive {
                 self.visit_type_alias(&context, project)?;
                 self.leave_type_alias(&context, project)?;
             }
+
+            ItemKind::Error(_, _) => {}
         }
 
         Ok(())

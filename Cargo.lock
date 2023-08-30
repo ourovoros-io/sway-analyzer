@@ -683,9 +683,9 @@ dependencies = [
 
 [[package]]
 name = "num-traits"
-version = "0.2.15"
+version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "578ede34cf02f8924ab9447f50c28075b4d3e5b269972345e7e0372b38c6cdcd"
+checksum = "f30b0abd723be7e2ffca1272140fac1a2f084c77ec3e123c192b66af1ee9e6c2"
 dependencies = [
  "autocfg",
 ]
@@ -1140,9 +1140,9 @@ dependencies = [
 
 [[package]]
 name = "sway-ast"
-version = "0.44.1"
+version = "0.45.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d7d2051d74f7fd6c6f6f9cc63691f215923314d9152dad740969e6993cd422b"
+checksum = "aa8472d32fdfe836e72ccdc31b562d9b563b1247c8becfc3d1fbbb52d273d4c6"
 dependencies = [
  "extension-trait",
  "num-bigint",
@@ -1154,9 +1154,9 @@ dependencies = [
 
 [[package]]
 name = "sway-error"
-version = "0.44.1"
+version = "0.45.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91711e78794d11e237aeabb8aa83fae3d726be54bf8c6178e229e61c3cb8d8c4"
+checksum = "9ce19c9be91431ce089ddfc330a42bafa099542152a4f6dc73dd5926a09a4c4c"
 dependencies = [
  "num-traits",
  "smallvec",
@@ -1166,9 +1166,9 @@ dependencies = [
 
 [[package]]
 name = "sway-parse"
-version = "0.44.1"
+version = "0.45.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2888d7b3ddc15434ba32001bcea2a3cef2dea222b1263ce774a8c928799a5d60"
+checksum = "fc94e82efb63bc6f868576b330809bbfcf13081fbe199f0554d92b2e88bbf8b8"
 dependencies = [
  "extension-trait",
  "num-bigint",
@@ -1183,15 +1183,16 @@ dependencies = [
 
 [[package]]
 name = "sway-types"
-version = "0.44.1"
+version = "0.45.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "47658fadc27a2819c1e279eea1344ebcd6bb1c3d9a7d66abb16dfa47220a3ad1"
+checksum = "2ca7280dfde804025e40b919ca6c67caa8b9156951f4a4b87eb473fe6b505b0e"
 dependencies = [
  "fuel-asm",
  "fuel-crypto",
  "fuel-tx",
  "lazy_static",
  "num-bigint",
+ "num-traits",
  "serde",
  "thiserror",
 ]
