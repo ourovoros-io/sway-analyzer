@@ -58,3 +58,4 @@ cargo uninstall sway-analyzer
 | `storage_field_mutability` | Checks for any storage fields that can be refactored into constants or configurable fields. |
 | `storage_not_updated` | Checks for local variables that are read from storage, then modified without being written back to storage. |
 | `unused_imports` | Checks for imported symbols that are not used. |
+| `weak_prng` | Checks for weak PRNG due to a modulo operation on a block timestamp. |

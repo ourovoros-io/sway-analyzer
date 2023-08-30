@@ -12,6 +12,7 @@ mod redundant_storage_access;
 mod storage_field_mutability;
 mod storage_not_updated;
 mod unused_imports;
+mod weak_prng;
 
 use crate::visitor::AstVisitor;
 
@@ -20,7 +21,7 @@ use self::{
     external_calls_in_loop::*, inline_assembly_usage::*, input_identity_validation::*,
     large_literals::*, missing_logs::*, msg_amount_in_loop::*, potential_infinite_loops::*,
     redundant_storage_access::*, storage_field_mutability::*, storage_not_updated::*,
-    unused_imports::*,
+    unused_imports::*, weak_prng::*,
 };
 
 type DetectorConstructor = fn() -> Box<dyn AstVisitor>;
@@ -41,4 +42,5 @@ pub const DETECTOR_TYPES: &[DetectorEntry] = &[
     ("storage_field_mutability", || Box::new(StorageFieldMutabilityVisitor::default())),
     ("storage_not_updated", || Box::new(StorageNotUpdatedVisitor::default())),
     ("unused_imports", || Box::new(UnusedImportsVisitor::default())),
+    ("weak_prng", || Box::new(WeakPrngVisitor::default())),
 ];

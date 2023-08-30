@@ -53,14 +53,14 @@ impl AstVisitor for MissingLogsVisitor {
     }
 
     fn visit_use(&mut self, context: &UseContext, _project: &mut Project) -> Result<(), Error> {
-        // Get the module state
-        let module_state = self.module_states.get_mut(context.path).unwrap();
-
         // Destructure the use tree
         let UseTree::Path { prefix, suffix, .. } = &context.item_use.tree else { return Ok(()) };
         let "std" = prefix.as_str() else { return Ok(()) };
         let UseTree::Path { prefix, suffix, .. } = suffix.as_ref() else { return Ok(()) };
         let "logging" = prefix.as_str() else { return Ok(()) };
+
+        // Get the module state
+        let module_state = self.module_states.get_mut(context.path).unwrap();
 
         match suffix.as_ref() {
             UseTree::Name { name } if name.as_str() == "log" => {
