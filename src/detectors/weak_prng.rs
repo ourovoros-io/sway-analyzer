@@ -249,20 +249,8 @@ impl AstVisitor for WeakPrngVisitor {
 
 #[cfg(test)]
 mod tests {
-    use crate::{project::Project, Options};
-    use std::path::PathBuf;
-
     #[test]
     fn test_weak_prng() {
-        let options = Options {
-            directory: Some(PathBuf::from("test/weak_prng")),
-            detectors: vec!["weak_prng".to_string()],
-            ..Default::default()
-        };
-
-        let mut project = Project::try_from(&options).unwrap();
-        project.analyze_modules().unwrap();
-
-        println!("{project}");
+        crate::tests::test_detector("weak_prng")
     }
 }

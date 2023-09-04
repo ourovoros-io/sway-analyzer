@@ -38,20 +38,8 @@ impl AstVisitor for InlineAssemblyUsageVisitor {
 
 #[cfg(test)]
 mod tests {
-    use crate::{project::Project, Options};
-    use std::path::PathBuf;
-
     #[test]
     fn test_inline_assembly_usage() {
-        let options = Options {
-            directory: Some(PathBuf::from("test/inline_assembly_usage")),
-            detectors: vec!["inline_assembly_usage".to_string()],
-            ..Default::default()
-        };
-
-        let mut project = Project::try_from(&options).unwrap();
-        project.analyze_modules().unwrap();
-
-        println!("{project}");
+        crate::tests::test_detector("inline_assembly_usage")
     }
 }

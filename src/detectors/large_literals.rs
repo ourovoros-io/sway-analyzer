@@ -49,21 +49,8 @@ impl AstVisitor for LargeLiteralsVisitor {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::Options;
-    use std::path::PathBuf;
-
     #[test]
     fn test_large_literals() {
-        let options = Options {
-            directory: Some(PathBuf::from("test/large_literals")),
-            detectors: vec!["large_literals".to_string()],
-            ..Default::default()
-        };
-
-        let mut project = Project::try_from(&options).unwrap();
-        project.analyze_modules().unwrap();
-
-        println!("{project}");
+        crate::tests::test_detector("large_literals")
     }
 }

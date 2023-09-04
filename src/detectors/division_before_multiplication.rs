@@ -150,20 +150,8 @@ impl AstVisitor for DivisionBeforeMultiplicationVisitor {
 
 #[cfg(test)]
 mod tests {
-    use crate::{project::Project, Options};
-    use std::path::PathBuf;
-
     #[test]
     fn test_division_before_multiplication() {
-        let options = Options {
-            directory: Some(PathBuf::from("test/division_before_multiplication")),
-            detectors: vec!["division_before_multiplication".to_string()],
-            ..Default::default()
-        };
-
-        let mut project = Project::try_from(&options).unwrap();
-        project.analyze_modules().unwrap();
-
-        println!("{project}");
+        crate::tests::test_detector("division_before_multiplication")
     }
 }

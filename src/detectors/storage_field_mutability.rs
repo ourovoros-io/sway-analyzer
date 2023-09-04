@@ -188,20 +188,8 @@ impl AstVisitor for StorageFieldMutabilityVisitor {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::Options;
-
     #[test]
     fn test_storage_field_mutability() {
-        let options = Options {
-            directory: Some(PathBuf::from("test/storage_field_mutability")),
-            detectors: vec!["storage_field_mutability".to_string()],
-            ..Default::default()
-        };
-
-        let mut project = Project::try_from(&options).unwrap();
-        project.analyze_modules().unwrap();
-
-        println!("{project}");
+        crate::tests::test_detector("storage_field_mutability")
     }
 }

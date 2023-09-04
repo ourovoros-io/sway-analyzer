@@ -216,20 +216,8 @@ impl AstVisitor for MsgAmountInLoopVisitor {
 
 #[cfg(test)]
 mod tests {
-    use crate::{project::Project, Options};
-    use std::path::PathBuf;
-
     #[test]
     fn test_msg_amount_in_loop() {
-        let options = Options {
-            directory: Some(PathBuf::from("test/msg_amount_in_loop")),
-            detectors: vec!["msg_amount_in_loop".to_string()],
-            ..Default::default()
-        };
-
-        let mut project = Project::try_from(&options).unwrap();
-        project.analyze_modules().unwrap();
-
-        println!("{project}");
+        crate::tests::test_detector("msg_amount_in_loop")
     }
 }

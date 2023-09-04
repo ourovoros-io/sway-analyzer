@@ -222,20 +222,8 @@ impl AstVisitor for MissingLogsVisitor {
 
 #[cfg(test)]
 mod tests {
-    use crate::{project::Project, Options};
-    use std::path::PathBuf;
-
     #[test]
     fn test_missing_logs() {
-        let options = Options {
-            directory: Some(PathBuf::from("test/missing_logs")),
-            detectors: vec!["missing_logs".to_string()],
-            ..Default::default()
-        };
-
-        let mut project = Project::try_from(&options).unwrap();
-        project.analyze_modules().unwrap();
-
-        println!("{project}");
+        crate::tests::test_detector("missing_logs")
     }
 }

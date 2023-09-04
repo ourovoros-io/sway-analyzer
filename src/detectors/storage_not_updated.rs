@@ -273,3 +273,11 @@ impl AstVisitor for StorageNotUpdatedVisitor {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_storage_not_updated() {
+        crate::tests::test_detector("storage_not_updated")
+    }
+}

@@ -206,20 +206,8 @@ impl AstVisitor for RedundantStorageAccessVisitor {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::Options;
-
     #[test]
     fn test_redundant_storage_access() {
-        let options = Options {
-            directory: Some(PathBuf::from("test/redundant_storage_access")),
-            detectors: vec!["redundant_storage_access".to_string()],
-            ..Default::default()
-        };
-
-        let mut project = Project::try_from(&options).unwrap();
-        project.analyze_modules().unwrap();
-
-        println!("{project}");
+        crate::tests::test_detector("redundant_storage_access")
     }
 }

@@ -77,21 +77,8 @@ fn add_report_entry(project: &mut Project, path: &Path, expr: &Expr, item_impl: 
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::Options;
-    use std::path::PathBuf;
-
     #[test]
     fn test_boolean_comparisons() {
-        let options = Options {
-            directory: Some(PathBuf::from("test/boolean_comparisons")),
-            detectors: vec!["boolean_comparisons".to_string()],
-            ..Default::default()
-        };
-
-        let mut project = Project::try_from(&options).unwrap();
-        project.analyze_modules().unwrap();
-
-        println!("{project}");
+        crate::tests::test_detector("boolean_comparisons")
     }
 }

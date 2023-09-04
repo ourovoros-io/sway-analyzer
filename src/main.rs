@@ -60,8 +60,21 @@ fn main() -> Result<(), Error> {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
+
+    pub fn test_detector(name: &str) {
+        let options = Options {
+            directory: Some(format!("test/{name}").into()),
+            detectors: vec![name.to_string()],
+            ..Default::default()
+        };
+
+        let mut project = Project::try_from(&options).unwrap();
+        project.analyze_modules().unwrap();
+
+        println!("{project}");
+    }
 
     #[test]
     fn test_detectors() {

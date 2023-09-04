@@ -342,3 +342,11 @@ impl AstVisitor for DiscardedAssignmentsVisitor {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_discarded_assignments() {
+        crate::tests::test_detector("discarded_assignments")
+    }
+}

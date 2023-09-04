@@ -100,20 +100,8 @@ impl AstVisitor for UnsafeTimestampUsageVisitor {
 
 #[cfg(test)]
 mod tests {
-    use crate::{project::Project, Options};
-    use std::path::PathBuf;
-
     #[test]
     fn test_unsafe_timestamp_usage() {
-        let options = Options {
-            directory: Some(PathBuf::from("test/unsafe_timestamp_usage")),
-            detectors: vec!["unsafe_timestamp_usage".to_string()],
-            ..Default::default()
-        };
-
-        let mut project = Project::try_from(&options).unwrap();
-        project.analyze_modules().unwrap();
-
-        println!("{project}");
+        crate::tests::test_detector("unsafe_timestamp_usage")
     }
 }

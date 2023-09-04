@@ -168,20 +168,8 @@ impl AstVisitor for UnusedImportsVisitor {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::Options;
-
     #[test]
     fn test_redundant_import() {
-        let options = Options {
-            directory: Some(PathBuf::from("test/unused_imports")),
-            detectors: vec!["unused_imports".to_string()],
-            ..Default::default()
-        };
-
-        let mut project = Project::try_from(&options).unwrap();
-        project.analyze_modules().unwrap();
-
-        println!("{project}");
+        crate::tests::test_detector("redundant_import")
     }
 }
