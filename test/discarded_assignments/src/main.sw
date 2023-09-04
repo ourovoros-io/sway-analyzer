@@ -8,7 +8,7 @@ abi TestDiscardedAssignments {
     fn test_assignment_not_discarded_2();
 
     #[storage(read)] fn test_assignment_discarded_3();
-    #[storage(read)] fn test_assignment_not_discarded_3();
+    #[storage(read, write)] fn test_assignment_not_discarded_3();
 }
 
 struct Counter {
@@ -65,7 +65,7 @@ impl TestDiscardedAssignments for Contract {
         counter.value += 1;
     }
 
-    #[storage(read)]
+    #[storage(read, write)]
     fn test_assignment_not_discarded_3() {
         let mut counter = storage.counter.read();
         counter.value += 1;
