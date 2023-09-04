@@ -254,16 +254,13 @@ impl AstVisitor for DiscardedAssignmentsVisitor {
                 let block_state = fn_state.block_states.get_mut(block_span).unwrap();
 
                 // Check if the assignable state exists
-                let Some(assignable_state) = block_state.assignable_states.iter_mut().find(|x| x.name == assignable_span.as_str()) else { continue };
+                let Some(assignable_state) = block_state.assignable_states.iter_mut().rev().find(|x| x.name == assignable_span.as_str()) else { continue };
             
+                println!("var: {}, used: {}", assignable_state.span.as_str(), assignable_state.used);
+
                 // Check for assignment invariants
-                let assignment_discarded = match (&reassignment_op.variant, &assignable_state.op) {
-                    (ReassignmentOpVariant::Equals, ReassignmentOpVariant::AddEquals) |
-                    (ReassignmentOpVariant::Equals, ReassignmentOpVariant::SubEquals) |
-                    (ReassignmentOpVariant::Equals, ReassignmentOpVariant::MulEquals) |
-                    (ReassignmentOpVariant::Equals, ReassignmentOpVariant::DivEquals) |
-                    (ReassignmentOpVariant::Equals, ReassignmentOpVariant::ShlEquals) |
-                    (ReassignmentOpVariant::Equals, ReassignmentOpVariant::ShrEquals) => !assignable_state.used,
+                let assignment_discarded = match &reassignment_op.variant {
+                    ReassignmentOpVariant::Equals => !assignable_state.used,
                     _ => false,
                 };
 
@@ -328,12 +325,12 @@ impl AstVisitor for DiscardedAssignmentsVisitor {
                 let block_state = fn_state.block_states.get_mut(block_span).unwrap();
 
                 // If the assignable state is a direct match, mark it as used
-                if let Some(assignable_state) = block_state.assignable_states.iter_mut().find(|x| x.name == ident_span.as_str()) {
+                if let Some(assignable_state) = block_state.assignable_states.iter_mut().rev().find(|x| x.name == ident_span.as_str()) {
                     assignable_state.used = true;
                 }
 
                 // If the identifier span is a higher level variable, but fields of it were updated, mark all of their assignable states as used
-                for assignable_state in block_state.assignable_states.iter_mut().filter(|x| x.name.starts_with(format!("{}.", ident_span.as_str()).as_str())) {
+                for assignable_state in block_state.assignable_states.iter_mut().rev().filter(|x| x.name.starts_with(format!("{}.", ident_span.as_str()).as_str())) {
                     assignable_state.used = true;
                 }
             }
