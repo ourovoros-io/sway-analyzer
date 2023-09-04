@@ -256,8 +256,6 @@ impl AstVisitor for DiscardedAssignmentsVisitor {
                 // Check if the assignable state exists
                 let Some(assignable_state) = block_state.assignable_states.iter_mut().rev().find(|x| x.name == assignable_span.as_str()) else { continue };
             
-                println!("var: {}, used: {}", assignable_state.span.as_str(), assignable_state.used);
-
                 // Check for assignment invariants
                 let assignment_discarded = match &reassignment_op.variant {
                     ReassignmentOpVariant::Equals => !assignable_state.used,
