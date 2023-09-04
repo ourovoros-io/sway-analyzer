@@ -57,5 +57,6 @@ cargo uninstall sway-analyzer
 | `redundant_storage_access` | Checks for redundant calls to `storage.x.read()` and `storage.x.write(x)`. |
 | `storage_field_mutability` | Checks for any storage fields that can be refactored into constants or configurable fields. |
 | `storage_not_updated` | Checks for local variables that are read from storage, then modified without being written back to storage. |
+| `unsafe_timestamp_usage` | Checks for dependence on `std::block::timestamp` or `std::block::timestamp_of_block`, which can be manipulated by an attacker. |
 | `unused_imports` | Checks for imported symbols that are not used. |
 | `weak_prng` | Checks for weak PRNG due to a modulo operation on a block timestamp. |
