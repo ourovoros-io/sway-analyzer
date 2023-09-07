@@ -44,7 +44,7 @@ cargo uninstall sway-analyzer
 
 | Name | Description |
 |-|-|
-| `boolean_comparisons` | Determines if an expression contains a comparison with a boolean literal, which is unnecessary. |
+| `boolean_comparisons` | Checks if an expression contains a comparison with a boolean literal, which is unnecessary. |
 | `discarded_assignments` | Checks for variables that are assigned to without being utilized. |
 | `division_before_multiplication` | Checks for division operations before multiplications, which can result in value truncation. |
 | `external_calls_in_loop` | Checks if any functions contain any loops which performs calls to external functions. |
@@ -57,6 +57,7 @@ cargo uninstall sway-analyzer
 | `redundant_storage_access` | Checks for redundant calls to `storage.x.read()` and `storage.x.write(x)`. |
 | `storage_field_mutability` | Checks for any storage fields that can be refactored into constants or configurable fields. |
 | `storage_not_updated` | Checks for local variables that are read from storage, then modified without being written back to storage. |
+| ~~`unprotected_storage_variables`~~ (WIP) | Checks for functions that make changes to storage variables without access restriction. |
 | `unsafe_timestamp_usage` | Checks for dependence on `std::block::timestamp` or `std::block::timestamp_of_block`, which can be manipulated by an attacker. |
 | `unused_imports` | Checks for imported symbols that are not used. |
 | `weak_prng` | Checks for weak PRNG due to a modulo operation on a block timestamp. |

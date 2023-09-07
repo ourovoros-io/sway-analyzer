@@ -7,7 +7,7 @@ use crate::{
     }, report::Severity, utils,
 };
 use std::{collections::HashMap, path::PathBuf};
-use sway_ast::{Assignable, Expr, Pattern, Statement, UseTree};
+use sway_ast::{Assignable, Expr, Pattern, Statement};
 use sway_types::{Span, Spanned};
 
 #[derive(Default)]
@@ -81,26 +81,13 @@ impl AstVisitor for WeakPrngVisitor {
         // Get the module state
         let module_state = self.module_states.get_mut(context.path).unwrap();
 
-        // Destructure the use tree
-        let UseTree::Path { prefix, suffix, .. } = &context.item_use.tree else { return Ok(()) };
-        let "std" = prefix.as_str() else { return Ok(()) };
-        let UseTree::Path { prefix, suffix, .. } = suffix.as_ref() else { return Ok(()) };
-        let "block" = prefix.as_str() else { return Ok(()) };
-
-        match suffix.as_ref() {
-            UseTree::Name { name } => match name.as_str() {
-                "timestamp" => module_state.timestamp_names.push(name.as_str().to_string()),
-                "timestamp_of_block" => module_state.timestamp_of_block_names.push(name.as_str().to_string()),
-                _ => {}
-            }
-
-            UseTree::Rename { name, alias, .. } => match name.as_str() {
-                "timestamp" => module_state.timestamp_names.push(alias.as_str().to_string()),
-                "timestamp_of_block" => module_state.timestamp_of_block_names.push(alias.as_str().to_string()),
-                _ => {}
-            }
-
-            _ => {}
+        // Check the use tree for `std::block::timestamp`
+        if let Some(name) = utils::use_tree_to_name(&context.item_use.tree, "std::block::timestamp") {
+            module_state.timestamp_names.push(name);
+        }
+        // Check the use tree for `std::block::timestamp_of_block`
+        else if let Some(name) = utils::use_tree_to_name(&context.item_use.tree, "std::block::timestamp_of_block") {
+            module_state.timestamp_of_block_names.push(name);
         }
 
         Ok(())

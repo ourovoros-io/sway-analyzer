@@ -9,7 +9,7 @@ use crate::{
     report::Severity,
 };
 use std::{collections::HashMap, path::PathBuf};
-use sway_ast::{Expr, UseTree};
+use sway_ast::Expr;
 use sway_types::{Span, Spanned};
 
 #[derive(Default)]
@@ -25,7 +25,8 @@ struct ModuleState {
 impl Default for ModuleState {
     fn default() -> Self {
         Self {
-            log_names: vec!["log".to_string()],
+            // Since `std::logging::log` is part of the prelude, include it here
+            log_names: vec!["log".into()],
             fn_states: Default::default(),
         }
     }
@@ -53,25 +54,12 @@ impl AstVisitor for MissingLogsVisitor {
     }
 
     fn visit_use(&mut self, context: &UseContext, _project: &mut Project) -> Result<(), Error> {
-        // Destructure the use tree
-        let UseTree::Path { prefix, suffix, .. } = &context.item_use.tree else { return Ok(()) };
-        let "std" = prefix.as_str() else { return Ok(()) };
-        let UseTree::Path { prefix, suffix, .. } = suffix.as_ref() else { return Ok(()) };
-        let "logging" = prefix.as_str() else { return Ok(()) };
-
         // Get the module state
         let module_state = self.module_states.get_mut(context.path).unwrap();
 
-        match suffix.as_ref() {
-            UseTree::Name { name } if name.as_str() == "log" => {
-                module_state.log_names.push(name.as_str().to_string());
-            }
-
-            UseTree::Rename { name, alias, .. } if name.as_str() == "log" => {
-                module_state.log_names.push(alias.as_str().to_string());
-            }
-
-            _ => {}
+        // Check the use tree for `std::logging::log`
+        if let Some(name) = utils::use_tree_to_name(&context.item_use.tree, "std::logging::log") {
+            module_state.log_names.push(name);
         }
 
         Ok(())

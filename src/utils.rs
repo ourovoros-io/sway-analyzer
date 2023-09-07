@@ -1027,3 +1027,73 @@ pub fn get_item_location(item: &ItemKind, item_impl: &Option<&ItemImpl>, item_fn
         _ => panic!("Unhandled item location: {:#?}", item),
     }
 }
+
+pub fn use_tree_to_name(mut use_tree: &UseTree, path: &str) -> Option<String> {
+    let tokens = path.split("::").collect::<Vec<_>>();
+    
+    if tokens.len() > 1 {
+        let prefixes = &tokens[..tokens.len() - 1];
+
+        for p in prefixes {
+            match use_tree {
+                UseTree::Group { imports } => {
+                    let mut has_prefix = false;
+
+                    for import in &imports.inner {
+                        match import {
+                            UseTree::Path { prefix, suffix, .. } if prefix.as_str() == *p => {
+                                use_tree = suffix.as_ref();
+                                has_prefix = true;
+                                break;
+                            }
+
+                            _ => {}
+                        }
+                    }
+
+                    if !has_prefix {
+                        return None;
+                    }
+                }
+                
+                UseTree::Path { prefix, suffix, .. } if prefix.as_str() == *p => {
+                    use_tree = suffix.as_ref();
+                }
+
+                _ => return None,
+            }
+        }
+    }
+
+    let Some(import_name) = tokens.last() else { return None };
+
+    match use_tree {
+        UseTree::Name { name } if name.as_str() == *import_name => {
+            Some(name.as_str().to_string())
+        }
+
+        UseTree::Rename { name, alias, .. } if name.as_str() == *import_name => {
+            Some(alias.as_str().to_string())
+        }
+
+        UseTree::Group { imports } => {
+            for import in &imports.inner {
+                match import {
+                    UseTree::Name { name } if name.as_str() == *import_name => {
+                        return Some(name.as_str().to_string());
+                    }
+            
+                    UseTree::Rename { name, alias, .. } if name.as_str() == *import_name => {
+                        return Some(alias.as_str().to_string());
+                    }
+
+                    _ => {}
+                }
+            }
+
+            None
+        }
+
+        _ => None,
+    }
+}

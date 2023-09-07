@@ -2,13 +2,14 @@ use crate::{
     error::Error,
     project::Project,
     report::Severity,
+    utils,
     visitor::{
         AstVisitor, BlockContext, ExprContext, FnContext, ModuleContext, UseContext,
         WhileExprContext,
     },
 };
 use std::{collections::HashMap, path::PathBuf};
-use sway_ast::{Expr, UseTree};
+use sway_ast::Expr;
 use sway_types::{Span, Spanned};
 
 #[derive(Default)]
@@ -47,24 +48,13 @@ impl AstVisitor for MsgAmountInLoopVisitor {
         // Get the module state
         let module_state = self.module_states.get_mut(context.path).unwrap();
 
-        // Destructure the use tree
-        let UseTree::Path { prefix, suffix, .. } = &context.item_use.tree else { return Ok(()) };
-        let "std" = prefix.as_str() else { return Ok(()) };
-        let UseTree::Path { prefix, suffix, .. } = suffix.as_ref() else { return Ok(()) };
-        let ("context" | "registers") = prefix.as_str() else { return Ok(()) };
-
-        match suffix.as_ref() {
-            UseTree::Name { name } => {
-                let ("balance" | "msg_amount") = name.as_str() else { return Ok(()) };
-                module_state.msg_amount_names.push(name.as_str().to_string());
-            }
-
-            UseTree::Rename { name, alias, .. } => {
-                let ("balance" | "msg_amount") = name.as_str() else { return Ok(()) };
-                module_state.msg_amount_names.push(alias.as_str().to_string());
-            }
-
-            _ => {}
+        // Check the use tree for `std::context::msg_amount`
+        if let Some(name) = utils::use_tree_to_name(&context.item_use.tree, "std::context::msg_amount") {
+            module_state.msg_amount_names.push(name);
+        }
+        // Check the use tree for `std::registers::balance`
+        else if let Some(name) = utils::use_tree_to_name(&context.item_use.tree, "std::registers::balance") {
+            module_state.msg_amount_names.push(name);
         }
 
         Ok(())
