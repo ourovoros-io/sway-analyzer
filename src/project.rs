@@ -31,15 +31,15 @@ impl FromStr for DisplayFormat {
 }
 
 #[derive(Default)]
-pub struct Project {
+pub struct Project<'a> {
     display_format: DisplayFormat,
     line_ranges: HashMap<PathBuf, Vec<(usize, usize)>>,
     modules: Rc<RefCell<HashMap<PathBuf, Module>>>,
-    detectors: Rc<RefCell<AstVisitorRecursive>>,
+    detectors: Rc<RefCell<AstVisitorRecursive<'a>>>,
     pub report: Rc<RefCell<Report>>,
 }
 
-impl Display for Project {
+impl Display for Project<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.display_format {
             DisplayFormat::Text => {
@@ -56,7 +56,7 @@ impl Display for Project {
     }
 }
 
-impl TryFrom<&Options> for Project {
+impl TryFrom<&Options> for Project<'_> {
     type Error = Error;
 
     fn try_from(options: &Options) -> Result<Self, Self::Error> {
@@ -117,7 +117,7 @@ impl TryFrom<&Options> for Project {
     }
 }
 
-impl Project {
+impl Project<'_> {
     /// Attempts to parse the file from the supplied `path`.
     pub fn parse_file<P: AsRef<Path>>(&mut self, path: P) -> Result<(), Error> {
         let path = PathBuf::from(path.as_ref().to_string_lossy().replace("\\\\", "\\").replace("//", "/"));

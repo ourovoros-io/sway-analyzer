@@ -1,6 +1,6 @@
 use crate::{error::Error, project::Project};
 use std::path::Path;
-use sway_ast::{attribute::Annotated, expr::asm::AsmFinalExpr, *};
+use sway_ast::{expr::asm::AsmFinalExpr, *};
 use sway_types::{Span, Spanned};
 
 #[derive(Clone)]
@@ -442,14 +442,76 @@ pub trait AstVisitor {
 }
 
 #[derive(Default)]
-pub struct AstVisitorRecursive {
+pub struct AstVisitorRecursive<'a> {
     pub visitors: Vec<Box<dyn AstVisitor>>,
+    pub visit_module_hooks: Vec<Box<dyn FnMut(&ModuleContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub leave_module_hooks: Vec<Box<dyn FnMut(&ModuleContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub visit_module_item_hooks: Vec<Box<dyn FnMut(&ItemContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub leave_module_item_hooks: Vec<Box<dyn FnMut(&ItemContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub visit_submodule_hooks: Vec<Box<dyn FnMut(&SubmoduleContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub leave_submodule_hooks: Vec<Box<dyn FnMut(&SubmoduleContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub visit_use_hooks: Vec<Box<dyn FnMut(&UseContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub leave_use_hooks: Vec<Box<dyn FnMut(&UseContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub visit_struct_hooks: Vec<Box<dyn FnMut(&StructContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub leave_struct_hooks: Vec<Box<dyn FnMut(&StructContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub visit_struct_field_hooks: Vec<Box<dyn FnMut(&StructFieldContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub leave_struct_field_hooks: Vec<Box<dyn FnMut(&StructFieldContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub visit_enum_hooks: Vec<Box<dyn FnMut(&EnumContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub leave_enum_hooks: Vec<Box<dyn FnMut(&EnumContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub visit_enum_field_hooks: Vec<Box<dyn FnMut(&EnumFieldContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub leave_enum_field_hooks: Vec<Box<dyn FnMut(&EnumFieldContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub visit_fn_hooks: Vec<Box<dyn FnMut(&FnContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub leave_fn_hooks: Vec<Box<dyn FnMut(&FnContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub visit_statement_hooks: Vec<Box<dyn FnMut(&StatementContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub leave_statement_hooks: Vec<Box<dyn FnMut(&StatementContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub visit_statement_let_hooks: Vec<Box<dyn FnMut(&StatementLetContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub leave_statement_let_hooks: Vec<Box<dyn FnMut(&StatementLetContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub visit_expr_hooks: Vec<Box<dyn FnMut(&ExprContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub leave_expr_hooks: Vec<Box<dyn FnMut(&ExprContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub visit_block_hooks: Vec<Box<dyn FnMut(&BlockContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub leave_block_hooks: Vec<Box<dyn FnMut(&BlockContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub visit_asm_block_hooks: Vec<Box<dyn FnMut(&AsmBlockContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub leave_asm_block_hooks: Vec<Box<dyn FnMut(&AsmBlockContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub visit_asm_instruction_hooks: Vec<Box<dyn FnMut(&AsmInstructionContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub leave_asm_instruction_hooks: Vec<Box<dyn FnMut(&AsmInstructionContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub visit_asm_final_expr_hooks: Vec<Box<dyn FnMut(&AsmFinalExprContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub leave_asm_final_expr_hooks: Vec<Box<dyn FnMut(&AsmFinalExprContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub visit_if_expr_hooks: Vec<Box<dyn FnMut(&IfExprContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub leave_if_expr_hooks: Vec<Box<dyn FnMut(&IfExprContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub visit_match_expr_hooks: Vec<Box<dyn FnMut(&MatchExprContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub leave_match_expr_hooks: Vec<Box<dyn FnMut(&MatchExprContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub visit_match_branch_hooks: Vec<Box<dyn FnMut(&MatchBranchContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub leave_match_branch_hooks: Vec<Box<dyn FnMut(&MatchBranchContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub visit_while_expr_hooks: Vec<Box<dyn FnMut(&WhileExprContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub leave_while_expr_hooks: Vec<Box<dyn FnMut(&WhileExprContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub visit_trait_hooks: Vec<Box<dyn FnMut(&TraitContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub leave_trait_hooks: Vec<Box<dyn FnMut(&TraitContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub visit_impl_hooks: Vec<Box<dyn FnMut(&ImplContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub leave_impl_hooks: Vec<Box<dyn FnMut(&ImplContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub visit_abi_hooks: Vec<Box<dyn FnMut(&AbiContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub leave_abi_hooks: Vec<Box<dyn FnMut(&AbiContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub visit_const_hooks: Vec<Box<dyn FnMut(&ConstContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub leave_const_hooks: Vec<Box<dyn FnMut(&ConstContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub visit_storage_hooks: Vec<Box<dyn FnMut(&StorageContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub leave_storage_hooks: Vec<Box<dyn FnMut(&StorageContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub visit_storage_field_hooks: Vec<Box<dyn FnMut(&StorageFieldContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub leave_storage_field_hooks: Vec<Box<dyn FnMut(&StorageFieldContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub visit_configurable_hooks: Vec<Box<dyn FnMut(&ConfigurableContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub leave_configurable_hooks: Vec<Box<dyn FnMut(&ConfigurableContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub visit_configurable_field_hooks: Vec<Box<dyn FnMut(&ConfigurableFieldContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub leave_configurable_field_hooks: Vec<Box<dyn FnMut(&ConfigurableFieldContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub visit_type_alias_hooks: Vec<Box<dyn FnMut(&TypeAliasContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub leave_type_alias_hooks: Vec<Box<dyn FnMut(&TypeAliasContext, &mut Project) -> Result<(), Error> + 'a>>,
 }
 
-impl AstVisitor for AstVisitorRecursive {
+impl AstVisitor for AstVisitorRecursive<'_> {
     fn visit_module(&mut self, context: &ModuleContext, project: &mut Project) -> Result<(), Error> {
         for visitor in self.visitors.iter_mut() {
             visitor.visit_module(context, project)?;
+        }
+
+        for hook in self.visit_module_hooks.iter_mut() {
+            hook(context, project)?;
         }
 
         for item in context.module.items.iter() {
@@ -478,12 +540,20 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.leave_module(context, project)?;
         }
 
+        for hook in self.leave_module_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         Ok(())
     }
 
     fn visit_module_item(&mut self, context: &ItemContext, project: &mut Project) -> Result<(), Error> {
         for visitor in self.visitors.iter_mut() {
             visitor.visit_module_item(context, project)?;
+        }
+
+        for hook in self.visit_module_item_hooks.iter_mut() {
+            hook(context, project)?;
         }
 
         match &context.item {
@@ -664,12 +734,20 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.leave_module_item(context, project)?;
         }
 
+        for hook in self.leave_module_item_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         Ok(())
     }
 
     fn visit_submodule(&mut self, context: &SubmoduleContext, project: &mut Project) -> Result<(), Error> {
         for visitor in self.visitors.iter_mut() {
             visitor.visit_submodule(context, project)?;
+        }
+
+        for hook in self.visit_submodule_hooks.iter_mut() {
+            hook(context, project)?;
         }
 
         Ok(())
@@ -680,6 +758,10 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.leave_submodule(context, project)?;
         }
         
+        for hook in self.leave_submodule_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         Ok(())
     }
 
@@ -688,6 +770,10 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.visit_use(context, project)?;
         }
         
+        for hook in self.visit_use_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         Ok(())
     }
 
@@ -696,6 +782,10 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.leave_use(context, project)?;
         }
         
+        for hook in self.leave_use_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         Ok(())
     }
 
@@ -704,6 +794,10 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.visit_struct(context, project)?;
         }
         
+        for hook in self.visit_struct_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         for field in &context.item_struct.fields.inner {
             let context = StructFieldContext {
                 path: context.path,
@@ -727,12 +821,20 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.leave_struct(context, project)?;
         }
         
+        for hook in self.leave_struct_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         Ok(())
     }
 
     fn visit_struct_field(&mut self, context: &StructFieldContext, project: &mut Project) -> Result<(), Error> {
         for visitor in self.visitors.iter_mut() {
             visitor.visit_struct_field(context, project)?;
+        }
+
+        for hook in self.visit_struct_field_hooks.iter_mut() {
+            hook(context, project)?;
         }
 
         Ok(())
@@ -743,6 +845,10 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.leave_struct_field(context, project)?;
         }
 
+        for hook in self.leave_struct_field_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         Ok(())
     }
 
@@ -751,6 +857,10 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.visit_enum(context, project)?;
         }
         
+        for hook in self.visit_enum_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         for field in &context.item_enum.fields.inner {
             let context = EnumFieldContext {
                 path: context.path,
@@ -774,6 +884,10 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.leave_enum(context, project)?;
         }
         
+        for hook in self.leave_enum_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         Ok(())
     }
 
@@ -782,6 +896,10 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.visit_enum_field(context, project)?;
         }
         
+        for hook in self.visit_enum_field_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         Ok(())
     }
 
@@ -790,12 +908,20 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.leave_enum_field(context, project)?;
         }
         
+        for hook in self.leave_enum_field_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         Ok(())
     }
 
     fn visit_fn(&mut self, context: &FnContext, project: &mut Project) -> Result<(), Error> {
         for visitor in self.visitors.iter_mut() {
             visitor.visit_fn(context, project)?;
+        }
+
+        for hook in self.visit_fn_hooks.iter_mut() {
+            hook(context, project)?;
         }
 
         let body_context = BlockContext {
@@ -823,6 +949,10 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.leave_fn(context, project)?;
         }
         
+        for hook in self.leave_fn_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         Ok(())
     }
 
@@ -831,6 +961,10 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.visit_statement(context, project)?;
         }
         
+        for hook in self.visit_statement_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         match context.statement {
             Statement::Let(statement_let) => {
                 let context = StatementLetContext {
@@ -897,6 +1031,10 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.leave_statement(context, project)?;
         }
         
+        for hook in self.leave_statement_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         Ok(())
     }
 
@@ -905,6 +1043,10 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.visit_statement_let(context, project)?;
         }
         
+        for hook in self.visit_statement_let_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         let context = ExprContext {
             path: context.path,
             module: context.module,
@@ -929,12 +1071,20 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.leave_statement_let(context, project)?;
         }
         
+        for hook in self.leave_statement_let_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         Ok(())
     }
 
     fn visit_expr(&mut self, context: &ExprContext, project: &mut Project) -> Result<(), Error> {
         for visitor in self.visitors.iter_mut() {
             visitor.visit_expr(context, project)?;
+        }
+
+        for hook in self.visit_expr_hooks.iter_mut() {
+            hook(context, project)?;
         }
 
         match context.expr {
@@ -2110,12 +2260,20 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.leave_expr(context, project)?;
         }
         
+        for hook in self.leave_expr_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         Ok(())
     }
 
     fn visit_block(&mut self, context: &BlockContext, project: &mut Project) -> Result<(), Error> {
         for visitor in self.visitors.iter_mut() {
             visitor.visit_block(context, project)?;
+        }
+
+        for hook in self.visit_block_hooks.iter_mut() {
+            hook(context, project)?;
         }
 
         let mut blocks = context.blocks.clone();
@@ -2164,12 +2322,20 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.leave_block(context, project)?;
         }
         
+        for hook in self.leave_block_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         Ok(())
     }
 
     fn visit_asm_block(&mut self, context: &AsmBlockContext, project: &mut Project) -> Result<(), Error> {
         for visitor in self.visitors.iter_mut() {
             visitor.visit_asm_block(context, project)?;
+        }
+
+        for hook in self.visit_asm_block_hooks.iter_mut() {
+            hook(context, project)?;
         }
 
         for instruction in context.asm.contents.inner.instructions.iter() {
@@ -2220,6 +2386,10 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.leave_asm_block(context, project)?;
         }
         
+        for hook in self.leave_asm_block_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         Ok(())
     }
 
@@ -2228,6 +2398,10 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.visit_asm_instruction(context, project)?;
         }
         
+        for hook in self.visit_asm_instruction_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         Ok(())
     }
 
@@ -2236,6 +2410,10 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.leave_asm_instruction(context, project)?;
         }
         
+        for hook in self.leave_asm_instruction_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         Ok(())
     }
 
@@ -2244,6 +2422,10 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.visit_asm_final_expr(context, project)?;
         }
         
+        for hook in self.visit_asm_final_expr_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         Ok(())
     }
 
@@ -2252,12 +2434,20 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.leave_asm_final_expr(context, project)?;
         }
         
+        for hook in self.leave_asm_final_expr_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         Ok(())
     }
 
     fn visit_if_expr(&mut self, context: &IfExprContext, project: &mut Project) -> Result<(), Error> {
         for visitor in self.visitors.iter_mut() {
             visitor.visit_if_expr(context, project)?;
+        }
+
+        for hook in self.visit_if_expr_hooks.iter_mut() {
+            hook(context, project)?;
         }
 
         match &context.if_expr.condition {
@@ -2369,12 +2559,20 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.leave_if_expr(context, project)?;
         }
         
+        for hook in self.leave_if_expr_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         Ok(())
     }
 
     fn visit_match_expr(&mut self, context: &MatchExprContext, project: &mut Project) -> Result<(), Error> {
         for visitor in self.visitors.iter_mut() {
             visitor.visit_match_expr(context, project)?;
+        }
+
+        for hook in self.visit_match_expr_hooks.iter_mut() {
+            hook(context, project)?;
         }
 
         let value_context = ExprContext {
@@ -2421,12 +2619,20 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.leave_match_expr(context, project)?;
         }
         
+        for hook in self.leave_match_expr_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         Ok(())
     }
 
     fn visit_match_branch(&mut self, context: &MatchBranchContext, project: &mut Project) -> Result<(), Error> {
         for visitor in self.visitors.iter_mut() {
             visitor.visit_match_branch(context, project)?;
+        }
+
+        for hook in self.visit_match_branch_hooks.iter_mut() {
+            hook(context, project)?;
         }
 
         //
@@ -2480,12 +2686,20 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.leave_match_branch(context, project)?;
         }
         
+        for hook in self.leave_match_branch_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         Ok(())
     }
 
     fn visit_while_expr(&mut self, context: &WhileExprContext, project: &mut Project) -> Result<(), Error> {
         for visitor in self.visitors.iter_mut() {
             visitor.visit_while_expr(context, project)?;
+        }
+
+        for hook in self.visit_while_expr_hooks.iter_mut() {
+            hook(context, project)?;
         }
 
         let condition_context = ExprContext {
@@ -2529,12 +2743,20 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.leave_while_expr(context, project)?;
         }
         
+        for hook in self.leave_while_expr_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         Ok(())
     }
 
     fn visit_trait(&mut self, context: &TraitContext, project: &mut Project) -> Result<(), Error> {
         for visitor in self.visitors.iter_mut() {
             visitor.visit_trait(context, project)?;
+        }
+
+        for hook in self.visit_trait_hooks.iter_mut() {
+            hook(context, project)?;
         }
 
         Ok(())
@@ -2545,12 +2767,20 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.leave_trait(context, project)?;
         }
         
+        for hook in self.leave_trait_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         Ok(())
     }
 
     fn visit_impl(&mut self, context: &ImplContext, project: &mut Project) -> Result<(), Error> {
         for visitor in self.visitors.iter_mut() {
             visitor.visit_impl(context, project)?;
+        }
+
+        for hook in self.visit_impl_hooks.iter_mut() {
+            hook(context, project)?;
         }
 
         for item in context.item_impl.contents.inner.iter() {
@@ -2599,6 +2829,10 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.leave_impl(context, project)?;
         }
 
+        for hook in self.leave_impl_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         Ok(())
     }
 
@@ -2607,6 +2841,10 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.visit_abi(context, project)?;
         }
         
+        for hook in self.visit_abi_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         Ok(())
     }
 
@@ -2615,6 +2853,10 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.leave_abi(context, project)?;
         }
         
+        for hook in self.leave_abi_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         Ok(())
     }
 
@@ -2623,6 +2865,10 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.visit_const(context, project)?;
         }
         
+        for hook in self.visit_const_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         if let Some(expr) = context.item_const.expr_opt.as_ref() {
             let context = ExprContext {
                 path: context.path,
@@ -2649,6 +2895,10 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.leave_const(context, project)?;
         }
         
+        for hook in self.leave_const_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         Ok(())
     }
 
@@ -2657,7 +2907,11 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.visit_storage(context, project)?;
         }
 
-        let mut visit_field = |field: &Annotated<StorageField>| -> Result<(), Error> {
+        for hook in self.visit_storage_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
+        for field in &context.item_storage.fields.inner {
             let context = StorageFieldContext {
                 path: context.path,
                 module: context.module,
@@ -2670,12 +2924,6 @@ impl AstVisitor for AstVisitorRecursive {
 
             self.visit_storage_field(&context, project)?;
             self.leave_storage_field(&context, project)?;
-
-            Ok(())
-        };
-
-        for field in &context.item_storage.fields.inner {
-            visit_field(field)?;
         }
         
         Ok(())
@@ -2686,12 +2934,20 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.leave_storage(context, project)?;
         }
         
+        for hook in self.leave_storage_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         Ok(())
     }
 
     fn visit_storage_field(&mut self, context: &StorageFieldContext, project: &mut Project) -> Result<(), Error> {
         for visitor in self.visitors.iter_mut() {
             visitor.visit_storage_field(context, project)?;
+        }
+
+        for hook in self.visit_storage_field_hooks.iter_mut() {
+            hook(context, project)?;
         }
 
         let context = ExprContext {
@@ -2718,6 +2974,10 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.leave_storage_field(context, project)?;
         }
         
+        for hook in self.leave_storage_field_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         Ok(())
     }
     
@@ -2726,7 +2986,11 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.visit_configurable(context, project)?;
         }
 
-        let mut visit_field = |field: &Annotated<ConfigurableField>| -> Result<(), Error> {
+        for hook in self.visit_configurable_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
+        for field in &context.item_configurable.fields.inner {
             let context = ConfigurableFieldContext {
                 path: context.path,
                 module: context.module,
@@ -2739,12 +3003,6 @@ impl AstVisitor for AstVisitorRecursive {
 
             self.visit_configurable_field(&context, project)?;
             self.leave_configurable_field(&context, project)?;
-
-            Ok(())
-        };
-
-        for field in &context.item_configurable.fields.inner {
-            visit_field(field)?;
         }
         
         Ok(())
@@ -2755,12 +3013,20 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.leave_configurable(context, project)?;
         }
         
+        for hook in self.leave_configurable_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         Ok(())
     }
 
     fn visit_configurable_field(&mut self, context: &ConfigurableFieldContext, project: &mut Project) -> Result<(), Error> {
         for visitor in self.visitors.iter_mut() {
             visitor.visit_configurable_field(context, project)?;
+        }
+
+        for hook in self.visit_configurable_field_hooks.iter_mut() {
+            hook(context, project)?;
         }
 
         let context = ExprContext {
@@ -2787,6 +3053,10 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.leave_configurable_field(context, project)?;
         }
         
+        for hook in self.leave_configurable_field_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         Ok(())
     }
 
@@ -2795,6 +3065,10 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.visit_type_alias(context, project)?;
         }
         
+        for hook in self.visit_type_alias_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         Ok(())
     }
 
@@ -2803,6 +3077,10 @@ impl AstVisitor for AstVisitorRecursive {
             visitor.leave_type_alias(context, project)?;
         }
         
+        for hook in self.leave_type_alias_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
         Ok(())
     }
 }

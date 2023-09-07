@@ -1,10 +1,12 @@
 use crate::{
     error::Error,
     project::Project,
+    report::Severity,
     utils,
-    visitor::{AstVisitor, BlockContext, FnContext, ModuleContext, UseContext},
+    visitor::{AstVisitor, BlockContext, ExprContext, FnContext, ModuleContext, UseContext, StatementLetContext, AstVisitorRecursive},
 };
 use std::{collections::HashMap, path::PathBuf};
+use sway_ast::Expr;
 use sway_types::{Span, Spanned};
 
 #[derive(Default)]
@@ -30,6 +32,8 @@ impl Default for ModuleState {
 #[derive(Default)]
 pub struct FnState {
     block_states: HashMap<Span, BlockState>,
+    has_storage_write: bool,
+    has_msg_sender_check: bool,
 }
 
 #[derive(Default)]
@@ -43,10 +47,43 @@ pub struct VarState {
 }
 
 impl AstVisitor for UnprotectedStorageVariablesVisitor {
-    fn visit_module(&mut self, context: &ModuleContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_module(&mut self, context: &ModuleContext, project: &mut Project) -> Result<(), Error> {
         // Create the module state
         if !self.module_states.contains_key(context.path) {
             self.module_states.insert(context.path.into(), ModuleState::default());
+        }
+
+        // Check all functions ahead of time
+        let mut fn_state_visitor = AstVisitorRecursive::default();
+
+        fn_state_visitor.visit_fn_hooks.push(Box::new(|context: &FnContext, _project: &mut Project| -> Result<(), Error> {
+            // Get the module state
+            let module_state = self.module_states.get_mut(context.path).unwrap();
+    
+            // Get the function state
+            let fn_signature = context.item_fn.fn_signature.span();
+            let fn_state = module_state.fn_states.entry(fn_signature).or_insert_with(FnState::default);
+
+            // Check if the function has a storage write attribute
+            if utils::check_attribute_decls(context.fn_attributes, "storage", &["write"]) {
+                fn_state.has_storage_write = true;
+            }
+    
+            Ok(())
+        }));
+
+        fn_state_visitor.visit_module(context, project)?;
+        fn_state_visitor.leave_module(context, project)?;
+        
+        std::mem::drop(fn_state_visitor);
+
+        // Get the module state
+        let module_state = self.module_states.get(context.path).unwrap();
+
+        for (fn_signature, fn_state) in module_state.fn_states.iter() {
+            println!("{}:", fn_signature.as_str());
+            println!("\thas storage write? {}", fn_state.has_storage_write);
+            println!("\thas msg_sender check? {}", fn_state.has_msg_sender_check);
         }
 
         Ok(())
@@ -78,6 +115,29 @@ impl AstVisitor for UnprotectedStorageVariablesVisitor {
         Ok(())
     }
 
+    fn leave_fn(&mut self, context: &FnContext, project: &mut Project) -> Result<(), Error> {
+        // Get the module state
+        let module_state = self.module_states.get(context.path).unwrap();
+
+        // Get the function state
+        let fn_signature = context.item_fn.fn_signature.span();
+        let fn_state = module_state.fn_states.get(&fn_signature).unwrap();
+
+        if fn_state.has_storage_write && !fn_state.has_msg_sender_check {
+            project.report.borrow_mut().add_entry(
+                context.path,
+                project.span_to_line(context.path, &fn_signature)?,
+                Severity::High,
+                format!(
+                    "{} writes to storage without access restriction. Consider checking against `msg_sender()` in order to limit access.",
+                    utils::get_item_location(context.item, &context.item_impl, &Some(context.item_fn)),
+                ),
+            );
+        }
+
+        Ok(())
+    }
+
     fn visit_block(&mut self, context: &BlockContext, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let module_state = self.module_states.get_mut(context.path).unwrap();
@@ -93,6 +153,35 @@ impl AstVisitor for UnprotectedStorageVariablesVisitor {
             fn_state.block_states.insert(block_span, BlockState::default());
         }
         
+        Ok(())
+    }
+
+    fn visit_statement_let(&mut self, context: &StatementLetContext, _project: &mut Project) -> Result<(), Error> {
+        //
+        // TODO: create variable states for each declaration in the let pattern
+        //
+
+        let idents = utils::fold_pattern_idents(&context.statement_let.pattern);
+
+        //
+        // TODO: check if let value is msg_sender
+        //
+        // let sender = msg_sender().unwrap();
+        //
+        // let sender = match msg_sender() {
+        //     Ok(sender) => sender,
+        //     Err(_) => revert(0),
+        // };
+        //
+
+        Ok(())
+    }
+
+    fn visit_expr(&mut self, context: &ExprContext, _project: &mut Project) -> Result<(), Error> {
+        //
+        // TODO
+        //
+
         Ok(())
     }
 
