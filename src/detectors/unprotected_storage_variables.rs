@@ -9,7 +9,7 @@ use crate::{
     },
 };
 use std::{cell::RefCell, collections::HashMap, path::PathBuf, rc::Rc};
-use sway_ast::{Expr, IfCondition, IfExpr, Pattern};
+use sway_ast::{Expr, IfCondition, IfExpr, Pattern, Statement, ItemKind, ItemImplItem};
 use sway_types::{Span, Spanned};
 
 #[derive(Default)]
@@ -115,129 +115,185 @@ pub struct VarState {
 }
 
 impl AstVisitor for UnprotectedStorageVariablesVisitor {
-    fn visit_module(&mut self, context: &ModuleContext, project: &mut Project) -> Result<(), Error> {
+    fn visit_module(&mut self, context: &ModuleContext, _project: &mut Project) -> Result<(), Error> {
         // Create the module state
         if !self.module_states.borrow().contains_key(context.path) {
             self.module_states.borrow_mut().insert(context.path.into(), ModuleState::default());
         }
 
-        let mut visitor = AstVisitorRecursive::default();
+        Ok(())
+    }
 
-        // Check for `msg_sender` use statements ahead of time
-        visitor.visit_use_hooks.push(Box::new(|context: &UseContext, _project: &mut Project| -> Result<(), Error> {
-            // Get the module state
-            let mut module_states = self.module_states.borrow_mut();
-            let module_state = module_states.get_mut(context.path).unwrap();
+    fn leave_module(&mut self, context: &ModuleContext, project: &mut Project) -> Result<(), Error> {
+        let mut postprocess_visitor = AstVisitorRecursive::default();
+
+        // Propogate function states for called functions to the function calling them
+        postprocess_visitor.visit_statement_hooks.push(Box::new(|context: &StatementContext, _project: &mut Project| -> Result<(), Error> {
+            // Only check function calls
+            let Statement::Expr { expr: Expr::FuncApp { func, .. }, .. } = context.statement else { return Ok(()) };
     
-            // Check the use tree for `std::auth::msg_sender`
-            if let Some(name) = utils::use_tree_to_name(&context.item_use.tree, "std::auth::msg_sender") {
-                module_state.msg_sender_names.push(name);
+            let mut fn_signature = None;
+    
+            // Check if function is in toplevel scope
+            for item in context.module.items.iter() {
+                let ItemKind::Fn(item_fn) = &item.value else { continue };
+                
+                if item_fn.fn_signature.name.as_str() == func.span().as_str() {
+                    fn_signature = Some(item_fn.fn_signature.span());
+                    break;
+                }
             }
     
-            Ok(())
-        }));
-
-        // Check for storage write functions ahead of time
-        visitor.visit_fn_hooks.push(Box::new(|context: &FnContext, _project: &mut Project| -> Result<(), Error> {
+            // Check if function is in impl scope
+            if fn_signature.is_none() {
+                if let Some(item_impl) = context.item_impl.as_ref() {
+                    for item in item_impl.contents.inner.iter() {
+                        let ItemImplItem::Fn(item_fn) = &item.value else { continue };
+                        
+                        if item_fn.fn_signature.name.as_str() == func.span().as_str() {
+                            fn_signature = Some(item_fn.fn_signature.span());
+                            break;
+                        }
+                    }
+                }
+            }
+    
             // Get the module state
             let mut module_states = self.module_states.borrow_mut();
             let module_state = module_states.get_mut(context.path).unwrap();
     
-            // Get the function state
+            // Get the called function state
+            let Some(fn_signature) = fn_signature else { return Ok(()) };
+            let fn_state = module_state.fn_states.get(&fn_signature).unwrap();
+            let has_storage_write = fn_state.has_storage_write;
+            let has_msg_sender_check = fn_state.has_msg_sender_check;
+            
+            // Update the current function state
             let fn_signature = context.item_fn.fn_signature.span();
-            let fn_state = module_state.fn_states.entry(fn_signature).or_insert_with(FnState::default);
-
-            // Check if the function has a storage write attribute
-            if utils::check_attribute_decls(context.fn_attributes, "storage", &["write"]) {
+            let fn_state = module_state.fn_states.get_mut(&fn_signature).unwrap();
+            
+            if has_storage_write {
                 fn_state.has_storage_write = true;
             }
     
+            if has_msg_sender_check {
+                fn_state.has_msg_sender_check = true;
+            }
+    
             Ok(())
         }));
 
-        // Check for variables bound to `msg_sender()` ahead of time
-        visitor.visit_statement_let_hooks.push(Box::new(|context: &StatementLetContext, _project: &mut Project| -> Result<(), Error> {
+        // Check functions for missing access restriction
+        postprocess_visitor.leave_fn_hooks.push(Box::new(|context: &FnContext, project: &mut Project| -> Result<(), Error> {
             // Get the module state
-            let mut module_states = self.module_states.borrow_mut();
-            let module_state = module_states.get_mut(context.path).unwrap();
+            let module_states = self.module_states.borrow();
+            let module_state = module_states.get(context.path).unwrap();
     
-            // Check if the variable stores `msg_sender()`
-            let mut is_msg_sender = module_state.expr_is_msg_sender_call(&context.statement_let.expr);
-
             // Get the function state
             let fn_signature = context.item_fn.fn_signature.span();
-            let fn_state = module_state.fn_states.entry(fn_signature).or_insert_with(FnState::default);
-
-            let Pattern::AmbiguousSingleIdent(ident) = &context.statement_let.pattern else { return Ok(()) };
-
-            // Check if the variable stores another variable that stores `msg_sender()`
-            if !is_msg_sender {
-                for block_span in context.blocks.iter().rev() {
-                    let block_state = fn_state.block_states.entry(block_span.clone()).or_insert_with(BlockState::default);
-
-                    if block_state.expr_is_msg_sender_var(&context.statement_let.expr) {
-                        is_msg_sender = true;
-                        break;
-                    }
-                }
+            let fn_state = module_state.fn_states.get(&fn_signature).unwrap();
+    
+            if fn_state.has_storage_write && !fn_state.has_msg_sender_check {
+                project.report.borrow_mut().add_entry(
+                    context.path,
+                    project.span_to_line(context.path, &fn_signature)?,
+                    Severity::High,
+                    format!(
+                        "{} writes to storage without access restriction. Consider checking against `msg_sender()` in order to limit access.",
+                        utils::get_item_location(context.item, &context.item_impl, &Some(context.item_fn)),
+                    ),
+                );
             }
-
-            // Add the variable state to the current block state
-            if is_msg_sender {
-                let block_span = context.blocks.last().unwrap();
-                let block_state = fn_state.block_states.entry(block_span.clone()).or_insert_with(BlockState::default);
-                
-                block_state.var_states.push(VarState {
-                    name: ident.as_str().to_string(),
-                    is_msg_sender,
-                });
-            }
-
+    
             Ok(())
         }));
-        
-        // Check for require or if/revert on `msg_sender()` ahead of time
-        visitor.visit_expr_hooks.push(Box::new(|context: &ExprContext, _project: &mut Project| -> Result<(), Error> {
-            // Get the module state
-            let mut module_states = self.module_states.borrow_mut();
-            let module_state = module_states.get_mut(context.path).unwrap();
-    
-            // Check for require on `msg_sender()`
-            if let Some(require_args) = utils::get_require_args(context.expr) {
-                for expr in require_args {
-                    let mut has_msg_sender = module_state.expr_contains_msg_sender_call(expr);
 
-                    // Get the function state
-                    let Some(item_fn) = context.item_fn.as_ref() else { return Ok(()) };
-                    let fn_signature = item_fn.fn_signature.span();            
-                    let fn_state = module_state.fn_states.entry(fn_signature).or_insert_with(FnState::default);
+        // Perform postprocessing steps
+        postprocess_visitor.visit_module(context, project)?;
+        postprocess_visitor.leave_module(context, project)?;
 
-                    if !has_msg_sender {
-                        // Check for `msg_sender` variables in all available blocks
-                        for block_span in context.blocks.iter().rev() {
-                            let block_state = fn_state.block_states.entry(block_span.clone()).or_insert_with(BlockState::default);
-    
-                            if block_state.expr_contains_msg_sender_var(expr) {
-                                has_msg_sender = true;
-                                break;
-                            }
-                        }
-                    }
+        Ok(())
+    }
 
-                    if has_msg_sender {
-                        // Note that the function has a `msg_sender()` check
-                        fn_state.has_msg_sender_check = true;
-                        break;
-                    }
+    fn visit_use(&mut self, context: &UseContext, _project: &mut Project) -> Result<(), Error> {
+        // Get the module state
+        let mut module_states = self.module_states.borrow_mut();
+        let module_state = module_states.get_mut(context.path).unwrap();
+
+        // Check the use tree for `std::auth::msg_sender`
+        if let Some(name) = utils::use_tree_to_name(&context.item_use.tree, "std::auth::msg_sender") {
+            module_state.msg_sender_names.push(name);
+        }
+
+        Ok(())
+    }
+
+    fn visit_fn(&mut self, context: &FnContext, _project: &mut Project) -> Result<(), Error> {
+        // Get the module state
+        let mut module_states = self.module_states.borrow_mut();
+        let module_state = module_states.get_mut(context.path).unwrap();
+
+        // Get the function state
+        let fn_signature = context.item_fn.fn_signature.span();
+        let fn_state = module_state.fn_states.entry(fn_signature).or_insert_with(FnState::default);
+
+        // Check if the function has a storage write attribute
+        if utils::check_attribute_decls(context.fn_attributes, "storage", &["write"]) {
+            fn_state.has_storage_write = true;
+        }
+
+        Ok(())
+    }
+
+    fn visit_statement_let(&mut self, context: &StatementLetContext, _project: &mut Project) -> Result<(), Error> {
+        // Get the module state
+        let mut module_states = self.module_states.borrow_mut();
+        let module_state = module_states.get_mut(context.path).unwrap();
+
+        // Check if the variable stores `msg_sender()`
+        let mut is_msg_sender = module_state.expr_is_msg_sender_call(&context.statement_let.expr);
+
+        // Get the function state
+        let fn_signature = context.item_fn.fn_signature.span();
+        let fn_state = module_state.fn_states.entry(fn_signature).or_insert_with(FnState::default);
+
+        let Pattern::AmbiguousSingleIdent(ident) = &context.statement_let.pattern else { return Ok(()) };
+
+        // Check if the variable stores another variable that stores `msg_sender()`
+        if !is_msg_sender {
+            for block_span in context.blocks.iter().rev() {
+                let block_state = fn_state.block_states.entry(block_span.clone()).or_insert_with(BlockState::default);
+
+                if block_state.expr_is_msg_sender_var(&context.statement_let.expr) {
+                    is_msg_sender = true;
+                    break;
                 }
             }
-            // Check for if/revert on `msg_sender()`
-            else if let Expr::If(IfExpr { condition: IfCondition::Expr(expr), then_block, .. }) = context.expr {
-                if !utils::block_has_revert(then_block) {
-                    return Ok(());
-                }
+        }
 
-                let mut has_msg_sender = module_state.expr_contains_msg_sender_call(expr.as_ref());
+        // Add the variable state to the current block state
+        if is_msg_sender {
+            let block_span = context.blocks.last().unwrap();
+            let block_state = fn_state.block_states.entry(block_span.clone()).or_insert_with(BlockState::default);
+            
+            block_state.var_states.push(VarState {
+                name: ident.as_str().to_string(),
+                is_msg_sender,
+            });
+        }
+
+        Ok(())
+    }
+
+    fn visit_expr(&mut self, context: &ExprContext, _project: &mut Project) -> Result<(), Error> {
+        // Get the module state
+        let mut module_states = self.module_states.borrow_mut();
+        let module_state = module_states.get_mut(context.path).unwrap();
+
+        // Check for require on `msg_sender()`
+        if let Some(require_args) = utils::get_require_args(context.expr) {
+            for expr in require_args {
+                let mut has_msg_sender = module_state.expr_contains_msg_sender_call(expr);
 
                 // Get the function state
                 let Some(item_fn) = context.item_fn.as_ref() else { return Ok(()) };
@@ -259,62 +315,41 @@ impl AstVisitor for UnprotectedStorageVariablesVisitor {
                 if has_msg_sender {
                     // Note that the function has a `msg_sender()` check
                     fn_state.has_msg_sender_check = true;
-                    return Ok(());
+                    break;
+                }
+            }
+        }
+        // Check for if/revert on `msg_sender()`
+        else if let Expr::If(IfExpr { condition: IfCondition::Expr(expr), then_block, .. }) = context.expr {
+            if !utils::block_has_revert(then_block) {
+                return Ok(());
+            }
+
+            let mut has_msg_sender = module_state.expr_contains_msg_sender_call(expr.as_ref());
+
+            // Get the function state
+            let Some(item_fn) = context.item_fn.as_ref() else { return Ok(()) };
+            let fn_signature = item_fn.fn_signature.span();            
+            let fn_state = module_state.fn_states.entry(fn_signature).or_insert_with(FnState::default);
+
+            if !has_msg_sender {
+                // Check for `msg_sender` variables in all available blocks
+                for block_span in context.blocks.iter().rev() {
+                    let block_state = fn_state.block_states.entry(block_span.clone()).or_insert_with(BlockState::default);
+
+                    if block_state.expr_contains_msg_sender_var(expr) {
+                        has_msg_sender = true;
+                        break;
+                    }
                 }
             }
 
-            Ok(())
-        }));
-
-        visitor.visit_module(context, project)?;
-        visitor.leave_module(context, project)?;
-
-        Ok(())
-    }
-
-    fn visit_fn(&mut self, context: &FnContext, _project: &mut Project) -> Result<(), Error> {
-        // Get the module state
-        let mut module_states = self.module_states.borrow_mut();
-        let module_state = module_states.get_mut(context.path).unwrap();
-
-        // Create the function state
-        let fn_signature = context.item_fn.fn_signature.span();
-        
-        if !module_state.fn_states.contains_key(&fn_signature) {
-            module_state.fn_states.insert(fn_signature, FnState::default());
+            if has_msg_sender {
+                // Note that the function has a `msg_sender()` check
+                fn_state.has_msg_sender_check = true;
+                return Ok(());
+            }
         }
-        
-        Ok(())
-    }
-
-    fn leave_fn(&mut self, context: &FnContext, project: &mut Project) -> Result<(), Error> {
-        // Get the module state
-        let module_states = self.module_states.borrow();
-        let module_state = module_states.get(context.path).unwrap();
-
-        // Get the function state
-        let fn_signature = context.item_fn.fn_signature.span();
-        let fn_state = module_state.fn_states.get(&fn_signature).unwrap();
-
-        if fn_state.has_storage_write && !fn_state.has_msg_sender_check {
-            project.report.borrow_mut().add_entry(
-                context.path,
-                project.span_to_line(context.path, &fn_signature)?,
-                Severity::High,
-                format!(
-                    "{} writes to storage without access restriction. Consider checking against `msg_sender()` in order to limit access.",
-                    utils::get_item_location(context.item, &context.item_impl, &Some(context.item_fn)),
-                ),
-            );
-        }
-
-        Ok(())
-    }
-
-    fn visit_statement(&mut self, context: &StatementContext, _project: &mut Project) -> Result<(), Error> {
-        //
-        // TODO: check if statement is a function call and propogate its `has_storage_write` and `has_msg_sender_check` to the current function
-        //
 
         Ok(())
     }

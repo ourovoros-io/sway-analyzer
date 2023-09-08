@@ -4,7 +4,8 @@ use std::constants::ZERO_B256;
 use std::auth::msg_sender as imported_msg_sender;
 
 abi TestUnprotectedStorageVariables {
-    #[storage(read, write)] fn test_unprotected_storage_variable();
+    #[storage(read, write)] fn test_unprotected_storage_variable_1();
+    #[storage(read, write)] fn test_unprotected_storage_variable_2();
 
     #[storage(read, write)] fn test_protected_storage_variable_1a();
     #[storage(read, write)] fn test_protected_storage_variable_1b();
@@ -42,6 +43,8 @@ abi TestUnprotectedStorageVariables {
     #[storage(read, write)] fn test_protected_storage_variable_12a();
     #[storage(read, write)] fn test_protected_storage_variable_12b();
     #[storage(read, write)] fn test_protected_storage_variable_12c();
+    #[storage(read, write)] fn test_protected_storage_variable_13();
+    #[storage(read, write)] fn test_protected_storage_variable_14();
 }
 
 storage {
@@ -49,14 +52,35 @@ storage {
     value: u64 = 0,
 }
 
+#[storage(read)]
+fn only_owner() {
+    require(msg_sender().unwrap() == storage.owner.read(), "Only owner");
+}
+
+// Report entry should be created:
+// L63: The `increment_value_unsafe` function writes to storage without access restriction. Consider checking against `msg_sender()` in order to limit access.
+#[storage(read, write)]
+fn increment_value_unsafe() {
+    let mut value = storage.value.read();
+    value += 1;
+    storage.value.write(value);
+}
+
 impl TestUnprotectedStorageVariables for Contract {
     // Report entry should be created:
-    // L54: The `Contract::test_unprotected_storage_variable` function writes to storage without access restriction. Consider checking against `msg_sender()` in order to limit access.
+    // L73: The `Contract::test_unprotected_storage_variable_1` function writes to storage without access restriction. Consider checking against `msg_sender()` in order to limit access.
     #[storage(read, write)]
-    fn test_unprotected_storage_variable() {
+    fn test_unprotected_storage_variable_1() {
         let mut value = storage.value.read();
         value += 1;
         storage.value.write(value);
+    }
+
+    // Report entry should be created:
+    // L82: The `Contract::test_unprotected_storage_variable_2` function writes to storage without access restriction. Consider checking against `msg_sender()` in order to limit access.
+    #[storage(read, write)]
+    fn test_unprotected_storage_variable_2() {
+        increment_value_unsafe();
     }
     
     // Report entry should not be created
@@ -477,5 +501,21 @@ impl TestUnprotectedStorageVariables for Contract {
         let mut value = storage.value.read();
         value += 1;
         storage.value.write(value);
+    }
+
+    // Report entry should not be created
+    #[storage(read, write)]
+    fn test_protected_storage_variable_13() {
+        only_owner();
+        let mut value = storage.value.read();
+        value += 1;
+        storage.value.write(value);
+    }
+
+    // Report entry should not be created
+    #[storage(read, write)]
+    fn test_protected_storage_variable_14() {
+        only_owner();
+        increment_value_unsafe();
     }
 }
