@@ -4,12 +4,12 @@ use crate::{
     report::Severity,
     utils,
     visitor::{
-        AstVisitor, AstVisitorRecursive, ExprContext, FnContext, ModuleContext, StatementContext,
+        AstVisitor, AstVisitorRecursive, ExprContext, FnContext, ModuleContext,
         StatementLetContext, UseContext,
     },
 };
 use std::{cell::RefCell, collections::HashMap, path::PathBuf, rc::Rc};
-use sway_ast::{Expr, IfCondition, IfExpr, Pattern, Statement, ItemKind, ItemImplItem};
+use sway_ast::{Expr, IfCondition, IfExpr, ItemImplItem, ItemKind, Pattern};
 use sway_types::{Span, Spanned};
 
 #[derive(Default)]
@@ -128,9 +128,9 @@ impl AstVisitor for UnprotectedStorageVariablesVisitor {
         let mut postprocess_visitor = AstVisitorRecursive::default();
 
         // Propogate function states for called functions to the function calling them
-        postprocess_visitor.visit_statement_hooks.push(Box::new(|context: &StatementContext, _project: &mut Project| -> Result<(), Error> {
+        postprocess_visitor.visit_expr_hooks.push(Box::new(|context, _project| {
             // Only check function calls
-            let Statement::Expr { expr: Expr::FuncApp { func, .. }, .. } = context.statement else { return Ok(()) };
+            let Expr::FuncApp { func, .. } = context.expr else { return Ok(()) };
     
             let mut fn_signature = None;
     
@@ -169,7 +169,8 @@ impl AstVisitor for UnprotectedStorageVariablesVisitor {
             let has_msg_sender_check = fn_state.has_msg_sender_check;
             
             // Update the current function state
-            let fn_signature = context.item_fn.fn_signature.span();
+            let Some(item_fn) = context.item_fn.as_ref() else { return Ok(()) };
+            let fn_signature = item_fn.fn_signature.span();
             let fn_state = module_state.fn_states.get_mut(&fn_signature).unwrap();
             
             if has_storage_write {
@@ -184,7 +185,7 @@ impl AstVisitor for UnprotectedStorageVariablesVisitor {
         }));
 
         // Check functions for missing access restriction
-        postprocess_visitor.leave_fn_hooks.push(Box::new(|context: &FnContext, project: &mut Project| -> Result<(), Error> {
+        postprocess_visitor.leave_fn_hooks.push(Box::new(|context, project| {
             // Get the module state
             let module_states = self.module_states.borrow();
             let module_state = module_states.get(context.path).unwrap();
