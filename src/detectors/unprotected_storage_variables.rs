@@ -263,7 +263,7 @@ impl AstVisitor for UnprotectedStorageVariablesVisitor {
         Ok(())
     }
 
-    fn visit_if_expr(&mut self, context: &IfExprContext, project: &mut Project) -> Result<(), Error> {
+    fn visit_if_expr(&mut self, context: &IfExprContext, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let mut module_states = self.module_states.borrow_mut();
         let module_state = module_states.get_mut(context.path).unwrap();
