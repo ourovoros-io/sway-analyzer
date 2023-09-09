@@ -259,8 +259,6 @@ impl AstVisitor for UnprotectedStorageVariablesVisitor {
         let fn_signature = context.item_fn.fn_signature.span();
         let fn_state = module_state.fn_states.entry(fn_signature).or_insert_with(FnState::default);
 
-        let Pattern::AmbiguousSingleIdent(ident) = &context.statement_let.pattern else { return Ok(()) };
-
         // Check if the variable stores another variable that stores `msg_sender()`
         if !is_msg_sender {
             for block_span in context.blocks.iter().rev() {
@@ -273,15 +271,26 @@ impl AstVisitor for UnprotectedStorageVariablesVisitor {
             }
         }
 
-        // Add the variable state to the current block state
-        if is_msg_sender {
-            let block_span = context.blocks.last().unwrap();
-            let block_state = fn_state.block_states.entry(block_span.clone()).or_insert_with(BlockState::default);
-            
-            block_state.var_states.push(VarState {
-                name: ident.as_str().to_string(),
-                is_msg_sender,
-            });
+        // Add the variable state(s) to the current block state
+        let block_span = context.blocks.last().unwrap();
+        let block_state = fn_state.block_states.entry(block_span.clone()).or_insert_with(BlockState::default);
+        
+        match &context.statement_let.pattern {
+            Pattern::AmbiguousSingleIdent(ident) => {
+                block_state.var_states.push(VarState {
+                    name: ident.as_str().to_string(),
+                    is_msg_sender,
+                });
+            }
+
+            pattern => {
+                for ident in utils::fold_pattern_idents(pattern) {
+                    block_state.var_states.push(VarState {
+                        name: ident.as_str().to_string(),
+                        is_msg_sender: false,
+                    });
+                }
+            }
         }
 
         Ok(())
