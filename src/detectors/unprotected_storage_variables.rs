@@ -4,7 +4,7 @@ use crate::{
     report::Severity,
     utils,
     visitor::{
-        AstVisitor, AstVisitorRecursive, ExprContext, FnContext, ModuleContext,
+        AstVisitor, AstVisitorRecursive, ExprContext, ModuleContext, StatementContext,
         StatementLetContext, UseContext,
     },
 };
@@ -69,8 +69,8 @@ impl ModuleState {
 #[derive(Default)]
 pub struct FnState {
     block_states: HashMap<Span, BlockState>,
-    has_storage_write: bool,
     has_msg_sender_check: bool,
+    written_variables: Vec<String>,
 }
 
 #[derive(Default)]
@@ -115,15 +115,6 @@ pub struct VarState {
 }
 
 impl AstVisitor for UnprotectedStorageVariablesVisitor {
-    fn visit_module(&mut self, context: &ModuleContext, _project: &mut Project) -> Result<(), Error> {
-        // Create the module state
-        if !self.module_states.borrow().contains_key(context.path) {
-            self.module_states.borrow_mut().insert(context.path.into(), ModuleState::default());
-        }
-
-        Ok(())
-    }
-
     fn leave_module(&mut self, context: &ModuleContext, project: &mut Project) -> Result<(), Error> {
         let mut postprocess_visitor = AstVisitorRecursive::default();
 
@@ -160,26 +151,30 @@ impl AstVisitor for UnprotectedStorageVariablesVisitor {
     
             // Get the module state
             let mut module_states = self.module_states.borrow_mut();
-            let module_state = module_states.get_mut(context.path).unwrap();
+            let module_state = module_states.entry(context.path.into()).or_insert_with(ModuleState::default);
     
             // Get the called function state
             let Some(fn_signature) = fn_signature else { return Ok(()) };
-            let fn_state = module_state.fn_states.get(&fn_signature).unwrap();
-            let has_storage_write = fn_state.has_storage_write;
+            let fn_state = module_state.fn_states.entry(fn_signature.clone()).or_insert_with(FnState::default);
             let has_msg_sender_check = fn_state.has_msg_sender_check;
+            let written_variables = fn_state.written_variables.clone();
             
             // Update the current function state
             let Some(item_fn) = context.item_fn.as_ref() else { return Ok(()) };
             let fn_signature = item_fn.fn_signature.span();
-            let fn_state = module_state.fn_states.get_mut(&fn_signature).unwrap();
+            let fn_state = module_state.fn_states.entry(fn_signature.clone()).or_insert_with(FnState::default);
             
-            if has_storage_write {
-                fn_state.has_storage_write = true;
-            }
-    
             if has_msg_sender_check {
                 fn_state.has_msg_sender_check = true;
             }
+
+            for written_variable in written_variables {
+                if !fn_state.written_variables.contains(&written_variable) {
+                    fn_state.written_variables.push(written_variable);
+                }
+            }
+
+            fn_state.written_variables.sort();
     
             Ok(())
         }));
@@ -187,21 +182,23 @@ impl AstVisitor for UnprotectedStorageVariablesVisitor {
         // Check functions for missing access restriction
         postprocess_visitor.leave_fn_hooks.push(Box::new(|context, project| {
             // Get the module state
-            let module_states = self.module_states.borrow();
-            let module_state = module_states.get(context.path).unwrap();
+            let mut module_states = self.module_states.borrow_mut();
+            let module_state = module_states.entry(context.path.into()).or_insert_with(ModuleState::default);
     
             // Get the function state
             let fn_signature = context.item_fn.fn_signature.span();
-            let fn_state = module_state.fn_states.get(&fn_signature).unwrap();
+            let fn_state = module_state.fn_states.entry(fn_signature.clone()).or_insert_with(FnState::default);
     
-            if fn_state.has_storage_write && !fn_state.has_msg_sender_check {
+            if !fn_state.written_variables.is_empty() && !fn_state.has_msg_sender_check {
                 project.report.borrow_mut().add_entry(
                     context.path,
                     project.span_to_line(context.path, &fn_signature)?,
                     Severity::High,
                     format!(
-                        "{} writes to storage without access restriction. Consider checking against `msg_sender()` in order to limit access.",
+                        "{} writes to the {} storage {} without access restriction. Consider checking against `msg_sender()` in order to limit access.",
                         utils::get_item_location(context.item, &context.item_impl, &Some(context.item_fn)),
+                        fn_state.written_variables.iter().map(|s| format!("`{s}`")).collect::<Vec<_>>().join(", "),
+                        if fn_state.written_variables.len() == 1 { "variable" } else { "variables" },
                     ),
                 );
             }
@@ -219,7 +216,7 @@ impl AstVisitor for UnprotectedStorageVariablesVisitor {
     fn visit_use(&mut self, context: &UseContext, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let mut module_states = self.module_states.borrow_mut();
-        let module_state = module_states.get_mut(context.path).unwrap();
+        let module_state = module_states.entry(context.path.into()).or_insert_with(ModuleState::default);
 
         // Check the use tree for `std::auth::msg_sender`
         if let Some(name) = utils::use_tree_to_name(&context.item_use.tree, "std::auth::msg_sender") {
@@ -229,18 +226,22 @@ impl AstVisitor for UnprotectedStorageVariablesVisitor {
         Ok(())
     }
 
-    fn visit_fn(&mut self, context: &FnContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_statement(&mut self, context: &StatementContext, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let mut module_states = self.module_states.borrow_mut();
-        let module_state = module_states.get_mut(context.path).unwrap();
+        let module_state = module_states.entry(context.path.into()).or_insert_with(ModuleState::default);
 
         // Get the function state
         let fn_signature = context.item_fn.fn_signature.span();
         let fn_state = module_state.fn_states.entry(fn_signature).or_insert_with(FnState::default);
 
-        // Check if the function has a storage write attribute
-        if utils::check_attribute_decls(context.fn_attributes, "storage", &["write"]) {
-            fn_state.has_storage_write = true;
+        // Get the storage variable name from the storage write statement
+        let Some(storage_ident) = utils::storage_write_statement_to_storage_variable_ident(context.statement) else { return Ok(()) };
+        let storage_variable = storage_ident.as_str().to_string();
+
+        // Add the storage variable name to the function state's written variables
+        if !fn_state.written_variables.contains(&storage_variable) {
+            fn_state.written_variables.push(storage_variable);
         }
 
         Ok(())
@@ -249,7 +250,7 @@ impl AstVisitor for UnprotectedStorageVariablesVisitor {
     fn visit_statement_let(&mut self, context: &StatementLetContext, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let mut module_states = self.module_states.borrow_mut();
-        let module_state = module_states.get_mut(context.path).unwrap();
+        let module_state = module_states.entry(context.path.into()).or_insert_with(ModuleState::default);
 
         // Check if the variable stores `msg_sender()`
         let mut is_msg_sender = module_state.expr_is_msg_sender_call(&context.statement_let.expr);
@@ -289,7 +290,7 @@ impl AstVisitor for UnprotectedStorageVariablesVisitor {
     fn visit_expr(&mut self, context: &ExprContext, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let mut module_states = self.module_states.borrow_mut();
-        let module_state = module_states.get_mut(context.path).unwrap();
+        let module_state = module_states.entry(context.path.into()).or_insert_with(ModuleState::default);
 
         // Check for require on `msg_sender()`
         if let Some(require_args) = utils::get_require_args(context.expr) {

@@ -58,7 +58,7 @@ fn only_owner() {
 }
 
 // Report entry should be created:
-// L63: The `increment_value_unsafe` function writes to storage without access restriction. Consider checking against `msg_sender()` in order to limit access.
+// L63: The `increment_value_unsafe` function writes to the `value` storage variable without access restriction. Consider checking against `msg_sender()` in order to limit access.
 #[storage(read, write)]
 fn increment_value_unsafe() {
     let mut value = storage.value.read();
@@ -68,7 +68,7 @@ fn increment_value_unsafe() {
 
 impl TestUnprotectedStorageVariables for Contract {
     // Report entry should be created:
-    // L73: The `Contract::test_unprotected_storage_variable_1` function writes to storage without access restriction. Consider checking against `msg_sender()` in order to limit access.
+    // L73: The `Contract::test_unprotected_storage_variable_1` function writes to the `value` storage variable without access restriction. Consider checking against `msg_sender()` in order to limit access.
     #[storage(read, write)]
     fn test_unprotected_storage_variable_1() {
         let mut value = storage.value.read();
@@ -77,7 +77,7 @@ impl TestUnprotectedStorageVariables for Contract {
     }
 
     // Report entry should be created:
-    // L82: The `Contract::test_unprotected_storage_variable_2` function writes to storage without access restriction. Consider checking against `msg_sender()` in order to limit access.
+    // L82: The `Contract::test_unprotected_storage_variable_2` function writes to the `value` storage variable without access restriction. Consider checking against `msg_sender()` in order to limit access.
     #[storage(read, write)]
     fn test_unprotected_storage_variable_2() {
         increment_value_unsafe();

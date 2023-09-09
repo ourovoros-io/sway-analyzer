@@ -867,6 +867,52 @@ pub fn statement_to_reassignment_idents(statement: &Statement) -> Option<Vec<Bas
     Some(fold_assignable_idents(assignable))
 }
 
+fn is_storage_bytes_write_fn(s: &str) -> bool {
+    matches!(s, "write_slice" | "clear")
+}
+
+fn is_storage_key_write_fn(s: &str) -> bool {
+    matches!(s, "write")
+}
+
+fn is_storage_map_write_fn(s: &str) -> bool {
+    matches!(s, "insert" | "remove")
+}
+
+fn is_storage_string_write_fn(s: &str) -> bool {
+    matches!(s, "write_slice" | "clear")
+}
+
+fn is_storage_vec_write_fn(s: &str) -> bool {
+    matches!(s, "push" | "pop" | "remove" | "swap_remove" | "set" | "insert" | "clear" | "swap" | "reverse" | "fill" | "resize")
+}
+
+pub fn storage_write_statement_to_storage_variable_ident(statement: &Statement) -> Option<BaseIdent> {
+    let Statement::Expr { expr, .. } = statement else { return None };
+    let Expr::MethodCall { .. } = expr else { return None };
+
+    let storage_idents = fold_expr_idents(expr);
+
+    if storage_idents.len() < 3 {
+        return None;
+    }
+
+    if storage_idents[0].as_str() != "storage" {
+        return None;
+    }
+
+    match storage_idents.last().unwrap().as_str() {
+        s if is_storage_bytes_write_fn(s) => {}
+        s if is_storage_key_write_fn(s) => {}
+        s if is_storage_map_write_fn(s) => {}
+        s if is_storage_string_write_fn(s) => {}
+        s if is_storage_vec_write_fn(s) => {}
+        _ => return None,
+    }
+
+    Some(storage_idents[1].clone())
+}
+
 pub fn statement_to_storage_write_idents(statement: &Statement) -> Option<(BaseIdent, BaseIdent)> {
     let Statement::Expr {
         expr,
@@ -888,7 +934,14 @@ pub fn statement_to_storage_write_idents(statement: &Statement) -> Option<(BaseI
         return None;
     }
 
-    let ("write" | "insert") = storage_idents.last().unwrap().as_str() else { return None };
+    match storage_idents.last().unwrap().as_str() {
+        s if is_storage_bytes_write_fn(s) => {}
+        s if is_storage_key_write_fn(s) => {}
+        s if is_storage_map_write_fn(s) => {}
+        s if is_storage_string_write_fn(s) => {}
+        s if is_storage_vec_write_fn(s) => {}
+        _ => return None,
+    }
 
     let args = fold_punctuated(&args.inner);
     let Some(arg) = args.last() else { return None };
