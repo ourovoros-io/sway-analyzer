@@ -47,6 +47,7 @@ cargo uninstall sway-analyzer
 | `boolean_comparisons` | Checks if an expression contains a comparison with a boolean literal, which is unnecessary. |
 | `discarded_assignments` | Checks for variables that are assigned to without being utilized. |
 | `division_before_multiplication` | Checks for division operations before multiplications, which can result in value truncation. |
+| `explicit_return_statements` | Checks for functions that end with explicit `return` statements, which is unnecessary. |
 | `external_calls_in_loop` | Checks if any functions contain any loops which performs calls to external functions. |
 | `inline_assembly_usage` | Checks functions for inline assembly usage. |
 | `input_identity_validation` | Checks to see if `Identity`, `Address` and `ContractId` parameters are checked for a zero value. |

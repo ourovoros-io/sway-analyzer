@@ -1,6 +1,7 @@
 mod boolean_comparisons;
 mod discarded_assignments;
 mod division_before_multiplication;
+mod explicit_return_statements;
 mod external_calls_in_loop;
 mod inline_assembly_usage;
 mod input_identity_validation;
@@ -20,10 +21,11 @@ use crate::visitor::AstVisitor;
 
 use self::{
     boolean_comparisons::*, discarded_assignments::*, division_before_multiplication::*,
-    external_calls_in_loop::*, inline_assembly_usage::*, input_identity_validation::*,
-    large_literals::*, missing_logs::*, msg_amount_in_loop::*, potential_infinite_loops::*,
-    redundant_storage_access::*, storage_field_mutability::*, storage_not_updated::*,
-    unprotected_storage_variables::*, unsafe_timestamp_usage::*, unused_imports::*, weak_prng::*,
+    explicit_return_statements::*, external_calls_in_loop::*, inline_assembly_usage::*,
+    input_identity_validation::*, large_literals::*, missing_logs::*, msg_amount_in_loop::*,
+    potential_infinite_loops::*, redundant_storage_access::*, storage_field_mutability::*,
+    storage_not_updated::*, unprotected_storage_variables::*, unsafe_timestamp_usage::*,
+    unused_imports::*, weak_prng::*,
 };
 
 type DetectorConstructor = fn() -> Box<dyn AstVisitor>;
@@ -33,6 +35,7 @@ pub const DETECTOR_TYPES: &[DetectorEntry] = &[
     ("boolean_comparisons", || Box::new(BooleanComparisonsVisitor::default())),
     ("discarded_assignments", || Box::new(DiscardedAssignmentsVisitor::default())),
     ("division_before_multiplication", || Box::new(DivisionBeforeMultiplicationVisitor::default())),
+    ("explicit_return_statements", || Box::new(ExplicitReturnStatementsVisitor::default())),
     ("external_calls_in_loop", || Box::new(ExternalCallsInLoopVisitor::default())),
     ("inline_assembly_usage", || Box::new(InlineAssemblyUsageVisitor::default())),
     ("input_identity_validation", || Box::new(InputIdentityValidationVisitor::default())),
