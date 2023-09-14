@@ -1150,3 +1150,28 @@ pub fn use_tree_to_name(mut use_tree: &UseTree, path: &str) -> Option<String> {
         _ => None,
     }
 }
+
+pub fn expr_binary_operands(expr: &Expr) -> Option<(&Expr, &Expr)> {
+    match expr {
+        Expr::Mul { lhs, rhs, .. } => Some((lhs.as_ref(), rhs.as_ref())),
+        Expr::Div { lhs, rhs, .. } => Some((lhs.as_ref(), rhs.as_ref())),
+        Expr::Pow { lhs, rhs, .. } => Some((lhs.as_ref(), rhs.as_ref())),
+        Expr::Modulo { lhs, rhs, .. } => Some((lhs.as_ref(), rhs.as_ref())),
+        Expr::Add { lhs, rhs, .. } => Some((lhs.as_ref(), rhs.as_ref())),
+        Expr::Sub { lhs, rhs, .. } => Some((lhs.as_ref(), rhs.as_ref())),
+        Expr::Shl { lhs, rhs, .. } => Some((lhs.as_ref(), rhs.as_ref())),
+        Expr::Shr { lhs, rhs, .. } => Some((lhs.as_ref(), rhs.as_ref())),
+        Expr::BitAnd { lhs, rhs, .. } => Some((lhs.as_ref(), rhs.as_ref())),
+        Expr::BitXor { lhs, rhs, .. } => Some((lhs.as_ref(), rhs.as_ref())),
+        Expr::BitOr { lhs, rhs, .. } => Some((lhs.as_ref(), rhs.as_ref())),
+        Expr::Equal { lhs, rhs, .. } => Some((lhs.as_ref(), rhs.as_ref())),
+        Expr::NotEqual { lhs, rhs, .. } => Some((lhs.as_ref(), rhs.as_ref())),
+        Expr::LessThan { lhs, rhs, .. } => Some((lhs.as_ref(), rhs.as_ref())),
+        Expr::GreaterThan { lhs, rhs, .. } => Some((lhs.as_ref(), rhs.as_ref())),
+        Expr::LessThanEq { lhs, rhs, .. } => Some((lhs.as_ref(), rhs.as_ref())),
+        Expr::GreaterThanEq { lhs, rhs, .. } => Some((lhs.as_ref(), rhs.as_ref())),
+        Expr::LogicalAnd { lhs, rhs, .. } => Some((lhs.as_ref(), rhs.as_ref())),
+        Expr::LogicalOr { lhs, rhs, .. } => Some((lhs.as_ref(), rhs.as_ref())),
+        _ => None,
+    }
+}

@@ -6,6 +6,7 @@ mod external_calls_in_loop;
 mod inline_assembly_usage;
 mod input_identity_validation;
 mod large_literals;
+mod magic_numbers;
 mod missing_logs;
 mod msg_amount_in_loop;
 mod potential_infinite_loops;
@@ -23,10 +24,10 @@ use crate::visitor::AstVisitor;
 use self::{
     boolean_comparisons::*, discarded_assignments::*, division_before_multiplication::*,
     explicit_return_statements::*, external_calls_in_loop::*, inline_assembly_usage::*,
-    input_identity_validation::*, large_literals::*, missing_logs::*, msg_amount_in_loop::*,
-    potential_infinite_loops::*, redundant_storage_access::*, storage_field_mutability::*,
-    storage_not_updated::*, storage_read_in_loop_condition::*, unprotected_storage_variables::*,
-    unsafe_timestamp_usage::*, unused_imports::*, weak_prng::*,
+    input_identity_validation::*, large_literals::*, magic_numbers::*, missing_logs::*,
+    msg_amount_in_loop::*, potential_infinite_loops::*, redundant_storage_access::*,
+    storage_field_mutability::*, storage_not_updated::*, storage_read_in_loop_condition::*,
+    unprotected_storage_variables::*, unsafe_timestamp_usage::*, unused_imports::*, weak_prng::*,
 };
 
 type DetectorConstructor = fn() -> Box<dyn AstVisitor>;
@@ -41,6 +42,7 @@ pub const DETECTOR_TYPES: &[DetectorEntry] = &[
     ("inline_assembly_usage", || Box::new(InlineAssemblyUsageVisitor::default())),
     ("input_identity_validation", || Box::new(InputIdentityValidationVisitor::default())),
     ("large_literals", || Box::new(LargeLiteralsVisitor::default())),
+    ("magic_numbers", || Box::new(MagicNumbersVisitor::default())),
     ("missing_logs", || Box::new(MissingLogsVisitor::default())),
     ("msg_amount_in_loop", || Box::new(MsgAmountInLoopVisitor::default())),
     ("potential_infinite_loops", || Box::new(PotentialInfiniteLoopsVisitor::default())),

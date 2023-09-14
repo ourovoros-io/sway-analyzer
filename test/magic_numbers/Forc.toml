@@ -1,0 +1,7 @@
+[project]
+authors = ["Camden Smallwood"]
+entry = "main.sw"
+license = "Apache-2.0"
+name = "magic_numbers"
+
+[dependencies]
