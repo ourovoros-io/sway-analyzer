@@ -8,7 +8,7 @@ use std::{
     collections::{HashMap, HashSet},
     path::PathBuf,
 };
-use sway_ast::{Expr, ItemKind, LitInt, Literal};
+use sway_ast::{Expr, ItemKind, Literal};
 use sway_types::{Span, Spanned};
 
 #[derive(Default)]
