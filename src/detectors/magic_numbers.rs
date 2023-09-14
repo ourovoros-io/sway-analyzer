@@ -45,14 +45,10 @@ impl AstVisitor for MagicNumbersVisitor {
             return Ok(());
         }
 
-        fn lit_int_has_common_value(value: &LitInt) -> bool {
-            value.parsed == 0u8.into() || value.parsed == 1u8.into()
-        }
-
         // Skip commonly-used values
         for x in [lhs, rhs] {
             if let Expr::Literal(Literal::Int(value)) = x {
-                if lit_int_has_common_value(value) {
+                if value.parsed == 0u8.into() || value.parsed == 1u8.into() {
                     return Ok(());
                 }
             }

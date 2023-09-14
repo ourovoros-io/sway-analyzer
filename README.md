@@ -52,6 +52,7 @@ cargo uninstall sway-analyzer
 | `inline_assembly_usage` | Checks functions for inline assembly usage. |
 | `input_identity_validation` | Checks to see if `Identity`, `Address` and `ContractId` parameters are checked for a zero value. |
 | `large_literals` | Checks for expressions that contain large literal values, which may be difficult to read or interpreted incorrectly. |
+| `magic_numbers` | Checks for expressions that contain irregular numerical constants that can be introduced as named constants. |
 | `missing_logs` | Checks for publicly-accessible functions that make changes to storage variables without emitted logs. |
 | `msg_amount_in_loop` | Checks for calls to `std::context::msg_amount()` or `std::registers::balance()` inside a while loop. In most cases, the result of the call should be stored in a local variable and decremented over each loop iteration. |
 | `potential_infinite_loops` | Checks for potentially infinite loops. |
