@@ -103,19 +103,8 @@ impl AstVisitor for DiscardedAssignmentsVisitor {
                     project.span_to_line(context.path, &assignable_state.span)?,
                     Severity::High,
                     format!(
-                        "The `{}` function makes an assignment to `{}` which is discarded.",
-                        if let Some(item_impl) = context.item_impl.as_ref() {
-                            format!(
-                                "{}::{}",
-                                item_impl.ty.span().as_str(),
-                                context.item_fn.fn_signature.name.as_str(),
-                            )
-                        } else {
-                            format!(
-                                "{}",
-                                context.item_fn.fn_signature.name.as_str(),
-                            )
-                        },
+                        "{} makes an assignment to `{}` which is discarded.",
+                        utils::get_item_location(context.item, &context.item_impl, &Some(context.item_fn)),
                         assignable_state.span.as_str(),
                     ),
                 );
@@ -269,19 +258,8 @@ impl AstVisitor for DiscardedAssignmentsVisitor {
                         project.span_to_line(context.path, &assignable_state.span)?,
                         Severity::High,
                         format!(
-                            "The `{}` functions makes an assignment to `{}` which is discarded by the assignment made on L{}.",
-                            if let Some(item_impl) = context.item_impl.as_ref() {
-                                format!(
-                                    "{}::{}",
-                                    item_impl.ty.span().as_str(),
-                                    item_fn.fn_signature.name.as_str(),
-                                )
-                            } else {
-                                format!(
-                                    "{}",
-                                    item_fn.fn_signature.name.as_str(),
-                                )
-                            },
+                            "{} makes an assignment to `{}` which is discarded by the assignment made on L{}.",
+                            utils::get_item_location(context.item, &context.item_impl, &context.item_fn),
                             assignable_state.span.as_str(),
                             project.span_to_line(context.path, &assignable_span)?.unwrap(),
                         ),

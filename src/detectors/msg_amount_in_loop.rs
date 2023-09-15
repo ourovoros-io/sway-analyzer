@@ -123,19 +123,8 @@ impl AstVisitor for MsgAmountInLoopVisitor {
                         project.span_to_line(context.path, msg_amount_span)?,
                         Severity::Medium,
                         format!(
-                            "The `{}` function makes a call to `{}` in a loop. Store the value in a variable outside the loop and decrement it over each iteration.",
-                            if let Some(item_impl) = context.item_impl.as_ref() {
-                                format!(
-                                    "{}::{}",
-                                    item_impl.ty.span().as_str(),
-                                    context.item_fn.fn_signature.name.as_str(),
-                                )
-                            } else {
-                                format!(
-                                    "{}",
-                                    context.item_fn.fn_signature.name.as_str(),
-                                )
-                            },
+                            "{} makes a call to `{}` in a loop. Store the value in a variable outside the loop and decrement it over each iteration.",
+                            utils::get_item_location(context.item, &context.item_impl, &Some(context.item_fn)),
                             msg_amount_span.as_str(),
                         ),
                     );

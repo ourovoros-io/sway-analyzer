@@ -2,6 +2,7 @@ use crate::{
     error::Error,
     project::Project,
     report::Severity,
+    utils,
     visitor::{
         AstVisitor, BlockContext, FnContext, ModuleContext, StatementLetContext, WhileExprContext,
     },
@@ -180,19 +181,8 @@ impl AstVisitor for PotentialInfiniteLoopsVisitor {
                 project.span_to_line(context.path, &context.expr.span())?,
                 Severity::High,
                 format!(
-                    "The `{}` function contains a potentially infinite loop. Consider adding a `break` statement.",
-                    if let Some(item_impl) = context.item_impl.as_ref() {
-                        format!(
-                            "{}::{}",
-                            item_impl.ty.span().as_str(),
-                            context.item_fn.fn_signature.name.as_str(),
-                        )
-                    } else {
-                        format!(
-                            "{}",
-                            context.item_fn.fn_signature.name.as_str(),
-                        )
-                    }
+                    "{} contains a potentially infinite loop. Consider adding a `break` statement.",
+                    utils::get_item_location(context.item, &context.item_impl, &Some(context.item_fn)),
                 ),
             );
         }

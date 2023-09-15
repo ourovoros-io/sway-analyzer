@@ -127,19 +127,8 @@ impl AstVisitor for StorageNotUpdatedVisitor {
                     Severity::High,
                     if let Some(shadowing_variable_name) = storage_value_binding.shadowing_variable_name.as_ref() {
                         format!(
-                            "The `{}` function has storage bound to local variable `{}` which is shadowed{} before being written back to `storage.{}`.",
-                            if let Some(item_impl) = context.item_impl.as_ref() {
-                                format!(
-                                    "{}::{}",
-                                    item_impl.ty.span().as_str(),
-                                    context.item_fn.fn_signature.name.as_str(),
-                                )
-                            } else {
-                                format!(
-                                    "{}",
-                                    context.item_fn.fn_signature.name.as_str(),
-                                )
-                            },
+                            "{} has storage bound to local variable `{}` which is shadowed{} before being written back to `storage.{}`.",
+                            utils::get_item_location(context.item, &context.item_impl, &Some(context.item_fn)),
                             storage_value_binding.variable_name.as_str(),
                             if let Some(line) = project.span_to_line(context.path, &shadowing_variable_name.span())? {
                                 format!(" at L{}", line)
@@ -150,19 +139,8 @@ impl AstVisitor for StorageNotUpdatedVisitor {
                         )
                     } else {
                         format!(
-                            "The `{}` function has storage bound to local variable `{}` which is not written back to `storage.{}`.",
-                            if let Some(item_impl) = context.item_impl.as_ref() {
-                                format!(
-                                    "{}::{}",
-                                    item_impl.ty.span().as_str(),
-                                    context.item_fn.fn_signature.name.as_str(),
-                                )
-                            } else {
-                                format!(
-                                    "{}",
-                                    context.item_fn.fn_signature.name.as_str(),
-                                )
-                            },
+                            "{} has storage bound to local variable `{}` which is not written back to `storage.{}`.",
+                            utils::get_item_location(context.item, &context.item_impl, &Some(context.item_fn)),
                             storage_value_binding.variable_name.as_str(),
                             storage_value_binding.storage_name.as_str(),
                         )
@@ -174,19 +152,8 @@ impl AstVisitor for StorageNotUpdatedVisitor {
                     project.span_to_line(context.path, &post_write_name.span())?,
                     Severity::High,
                     format!(
-                        "The `{}` function has storage bound to local variable `{}` which is updated after writing back to `storage.{}` without writing updated value.",
-                        if let Some(item_impl) = context.item_impl.as_ref() {
-                            format!(
-                                "{}::{}",
-                                item_impl.ty.span().as_str(),
-                                context.item_fn.fn_signature.name.as_str(),
-                            )
-                        } else {
-                            format!(
-                                "{}",
-                                context.item_fn.fn_signature.name.as_str(),
-                            )
-                        },
+                        "{} has storage bound to local variable `{}` which is updated after writing back to `storage.{}` without writing updated value.",
+                        utils::get_item_location(context.item, &context.item_impl, &Some(context.item_fn)),
                         storage_value_binding.variable_name.as_str(),
                         storage_value_binding.storage_name.as_str(),
                     ),

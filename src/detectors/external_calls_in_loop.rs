@@ -145,19 +145,8 @@ impl AstVisitor for ExternalCallsInLoopVisitor {
                 project.span_to_line(context.path, &context.expr.span())?,
                 Severity::Medium,
                 format!(
-                    "The `{}` function performs an external call in a loop: `{}`",
-                    if let Some(item_impl) = context.item_impl.as_ref() {
-                        format!(
-                            "{}::{}",
-                            item_impl.ty.span().as_str(),
-                            item_fn.fn_signature.name.as_str(),
-                        )
-                    } else {
-                        format!(
-                            "{}",
-                            item_fn.fn_signature.name.as_str(),
-                        )
-                    },
+                    "{} performs an external call in a loop: `{}`",
+                    utils::get_item_location(context.item, &context.item_impl, &context.item_fn),
                     context.expr.span().as_str(),
                 ),
             );

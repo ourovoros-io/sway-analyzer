@@ -2,6 +2,7 @@ use crate::{
     error::Error,
     project::Project,
     report::Severity,
+    utils,
     visitor::{AsmBlockContext, AstVisitor},
 };
 use sway_types::Spanned;
@@ -16,19 +17,8 @@ impl AstVisitor for InlineAssemblyUsageVisitor {
             project.span_to_line(context.path, &context.asm.span())?,
             Severity::Medium,
             format!(
-                "The `{}` function contains inline assembly usage.",
-                if let Some(item_impl) = context.item_impl.as_ref() {
-                    format!(
-                        "{}::{}",
-                        item_impl.ty.span().as_str(),
-                        context.item_fn.fn_signature.name.as_str(),
-                    )
-                } else {
-                    format!(
-                        "{}",
-                        context.item_fn.fn_signature.name.as_str(),
-                    )
-                }
+                "{} contains inline assembly usage.",
+                utils::get_item_location(context.item, &context.item_impl, &Some(context.item_fn)),
             ),
         );
 

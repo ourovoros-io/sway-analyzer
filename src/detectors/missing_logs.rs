@@ -119,19 +119,8 @@ impl AstVisitor for MissingLogsVisitor {
                     project.span_to_line(context.path, storage_span)?,
                     Severity::Medium,
                     format!(
-                        "The `{}` function writes to `storage.{}` without being logged.",
-                        if let Some(item_impl) = context.item_impl.as_ref() {
-                            format!(
-                                "{}::{}",
-                                item_impl.ty.span().as_str(),
-                                context.item_fn.fn_signature.name.as_str(),
-                            )
-                        } else {
-                            format!(
-                                "{}",
-                                context.item_fn.fn_signature.name.as_str(),
-                            )
-                        },
+                        "{} writes to `storage.{}` without being logged.",
+                        utils::get_item_location(context.item, &context.item_impl, &Some(context.item_fn)),
                         storage_span.as_str(),
                     ),
                 );

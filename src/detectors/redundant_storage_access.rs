@@ -82,19 +82,8 @@ impl AstVisitor for RedundantStorageAccessVisitor {
                 project.span_to_line(context.path, &expr.span())?,
                 Severity::Low,
                 format!(
-                    "The `{}` function contains a loop condition with redundant storage access: `{}`. Consider storing the value in a local variable in order to lower gas costs.",
-                    if let Some(item_impl) = context.item_impl.as_ref() {
-                        format!(
-                            "{}::{}",
-                            item_impl.ty.span().as_str(),
-                            context.item_fn.fn_signature.name.as_str(),
-                        )
-                    } else {
-                        format!(
-                            "{}",
-                            context.item_fn.fn_signature.name.as_str(),
-                        )
-                    },
+                    "{} contains a loop condition with redundant storage access: `{}`. Consider storing the value in a local variable in order to lower gas costs.",
+                    utils::get_item_location(context.item, &context.item_impl, &Some(context.item_fn)),
                     expr.span().as_str(),
                 ),
             );
@@ -129,19 +118,8 @@ impl AstVisitor for RedundantStorageAccessVisitor {
                             project.span_to_line(context.path, &expr.span())?,
                             Severity::Low,
                             format!(
-                                "The `{}` function contains a redundant storage access: `{}`. Consider storing the value in a local variable in order to lower gas costs.",
-                                if let Some(item_impl) = context.item_impl.as_ref() {
-                                    format!(
-                                        "{}::{}",
-                                        item_impl.ty.span().as_str(),
-                                        context.item_fn.fn_signature.name.as_str(),
-                                    )
-                                } else {
-                                    format!(
-                                        "{}",
-                                        context.item_fn.fn_signature.name.as_str(),
-                                    )
-                                },
+                                "{} contains a redundant storage access: `{}`. Consider storing the value in a local variable in order to lower gas costs.",
+                                utils::get_item_location(context.item, &context.item_impl, &Some(context.item_fn)),
                                 expr.span().as_str(),
                             ),
                         );
@@ -171,19 +149,8 @@ impl AstVisitor for RedundantStorageAccessVisitor {
                             project.span_to_line(context.path, &expr.span())?,
                             Severity::Low,
                             format!(
-                                "The `{}` function contains a redundant storage update: `{}`. Consider limiting to a single storage write in order to lower gas costs.",
-                                if let Some(item_impl) = context.item_impl.as_ref() {
-                                    format!(
-                                        "{}::{}",
-                                        item_impl.ty.span().as_str(),
-                                        context.item_fn.fn_signature.name.as_str(),
-                                    )
-                                } else {
-                                    format!(
-                                        "{}",
-                                        context.item_fn.fn_signature.name.as_str(),
-                                    )
-                                },
+                                "{} contains a redundant storage update: `{}`. Consider limiting to a single storage write in order to lower gas costs.",
+                                utils::get_item_location(context.item, &context.item_impl, &Some(context.item_fn)),
                                 expr.span().as_str(),
                             ),
                         );
