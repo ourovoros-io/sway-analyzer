@@ -6,7 +6,6 @@ use crate::{
     visitor::{AstVisitor, ExprContext, FnContext, ModuleContext},
 };
 use std::{collections::HashMap, path::PathBuf};
-use sway_ast::Expr;
 use sway_types::{Span, Spanned};
 
 #[derive(Default)]
@@ -89,10 +88,8 @@ impl AstVisitor for UnprotectedInitializationVisitor {
             fn_state.has_requirement = true;
         }
         // Check for `if/revert` and update the function state
-        else if let Expr::If(if_expr) = context.expr {
-            if utils::block_has_revert(&if_expr.then_block) {
-                fn_state.has_requirement = true;
-            }
+        else if utils::get_if_revert_condition(context.expr).is_some() {
+            fn_state.has_requirement = true;
         }
 
         Ok(())

@@ -1002,6 +1002,12 @@ pub fn get_require_args(expr: &Expr) -> Option<Vec<&Expr>> {
     Some(fold_punctuated(&args.inner))
 }
 
+pub fn get_if_revert_condition(expr: &Expr) -> Option<&IfCondition> {
+    let Expr::If(IfExpr { condition, then_block, .. }) = expr else { return None };
+    if !block_has_revert(then_block) { return None; }
+    Some(condition)
+}
+
 pub fn pattern_to_constructor_suffix_and_value(name: &str, pattern: &Pattern) -> Option<(BaseIdent, BaseIdent)> {
     let Pattern::Constructor { path, args } = pattern else { return None };
     if path.prefix.name.as_str() != name { return None; }
@@ -1113,7 +1119,7 @@ pub fn use_tree_to_name(mut use_tree: &UseTree, path: &str) -> Option<String> {
                     use_tree = suffix.as_ref();
                 }
 
-                _ => return None,
+                _ => {}
             }
         }
     }

@@ -55,8 +55,9 @@ impl AstVisitor for UnsafeTimestampUsageVisitor {
         if let Some(name) = utils::use_tree_to_name(&context.item_use.tree, "std::block::timestamp") {
             module_state.timestamp_names.push(name);
         }
+        
         // Check the use tree for `std::block::timestamp_of_block`
-        else if let Some(name) = utils::use_tree_to_name(&context.item_use.tree, "std::block::timestamp_of_block") {
+        if let Some(name) = utils::use_tree_to_name(&context.item_use.tree, "std::block::timestamp_of_block") {
             module_state.timestamp_of_block_names.push(name);
         }
 

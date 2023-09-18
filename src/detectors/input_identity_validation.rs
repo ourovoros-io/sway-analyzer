@@ -314,17 +314,8 @@ impl AstVisitor for InputIdentityValidationVisitor {
                     };
 
                     let check_for_if_revert = |expr: &Expr| {
-                        let Expr::If(IfExpr {
-                            condition: IfCondition::Expr(input),
-                            then_block,
-                            ..
-                        }) = expr else { return };
-
+                        let Some(IfCondition::Expr(input)) = utils::get_if_revert_condition(expr) else { return };
                         let Expr::Equal { lhs, rhs, .. } = input.as_ref() else { return };
-
-                        if !utils::block_has_revert(then_block) {
-                            return;
-                        }
 
                         if utils::is_zero_value_comparison(identity_kind.as_str(), identity_value.span().as_str(), lhs.as_ref(), rhs.as_ref()) {
                             match identity_kind.as_str() {
@@ -586,17 +577,8 @@ impl AstVisitor for InputIdentityValidationVisitor {
                             };
 
                             let check_for_if_revert = |expr: &Expr| {
-                                let Expr::If(IfExpr {
-                                    condition: IfCondition::Expr(input),
-                                    then_block,
-                                    ..
-                                }) = expr else { return };
-
+                                let Some(IfCondition::Expr(input)) = utils::get_if_revert_condition(expr) else { return };
                                 let Expr::Equal { lhs, rhs, .. } = input.as_ref() else { return };
-
-                                if !utils::block_has_revert(then_block) {
-                                    return;
-                                }
 
                                 if utils::is_zero_value_comparison(identity_kind.as_str(), identity_value.span().as_str(), lhs.as_ref(), rhs.as_ref()) {
                                     match identity_kind.as_str() {

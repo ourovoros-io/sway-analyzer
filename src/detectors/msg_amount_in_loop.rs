@@ -52,8 +52,9 @@ impl AstVisitor for MsgAmountInLoopVisitor {
         if let Some(name) = utils::use_tree_to_name(&context.item_use.tree, "std::context::msg_amount") {
             module_state.msg_amount_names.push(name);
         }
+        
         // Check the use tree for `std::registers::balance`
-        else if let Some(name) = utils::use_tree_to_name(&context.item_use.tree, "std::registers::balance") {
+        if let Some(name) = utils::use_tree_to_name(&context.item_use.tree, "std::registers::balance") {
             module_state.msg_amount_names.push(name);
         }
 
