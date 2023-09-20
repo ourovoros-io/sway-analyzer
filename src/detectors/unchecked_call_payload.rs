@@ -62,13 +62,6 @@ struct AsmBlockState {
     bytes_arg_registers: Vec<(String, Span)>,
 }
 
-//
-// TODO:
-// * Check if function uses assembly `call` instruction
-// * Check if `call` instruction uses a `raw_ptr` parameter
-// * Check if `call` instruction uses a `Bytes` parameter without checking `.len() >= 8`
-//
-
 impl AstVisitor for UncheckedCallPayloadVisitor {
     fn visit_module(&mut self, context: &ModuleContext, _project: &mut Project) -> Result<(), Error> {
         // Create the module state
