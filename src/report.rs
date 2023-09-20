@@ -1,7 +1,11 @@
 use crate::error::Error;
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
-use std::{fmt::Display, path::PathBuf, str::FromStr};
+use std::{
+    fmt::Display,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
 pub enum Sorting {
@@ -101,6 +105,13 @@ impl Report {
             Sorting::Line => file_entry.1.sort_unstable_by_key(|x| (x.line, x.severity)),
             Sorting::Severity => file_entry.1.sort_unstable_by_key(|x| (x.severity, x.line)),
         }
+    }
+
+    pub fn entry_count<P: AsRef<Path>>(&self, path: P) -> usize {
+        self.entries.iter()
+            .find(|(entry_path, _)| entry_path == path.as_ref())
+            .map(|(_, entries)| entries.len())
+            .unwrap_or(0)
     }
 }
 
