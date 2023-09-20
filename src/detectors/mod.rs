@@ -5,7 +5,7 @@ mod division_before_multiplication;
 mod explicit_return_statements;
 mod external_calls_in_loop;
 mod inline_assembly_usage;
-mod input_identity_validation;
+mod non_zero_identity_validation;
 mod large_literals;
 mod magic_numbers;
 mod missing_logs;
@@ -26,7 +26,7 @@ use crate::visitor::AstVisitor;
 use self::{
     arbitrary_asset_transfer::*, boolean_comparisons::*, discarded_assignments::*,
     division_before_multiplication::*, explicit_return_statements::*, external_calls_in_loop::*,
-    inline_assembly_usage::*, input_identity_validation::*, large_literals::*, magic_numbers::*,
+    inline_assembly_usage::*, non_zero_identity_validation::*, large_literals::*, magic_numbers::*,
     missing_logs::*, msg_amount_in_loop::*, potential_infinite_loops::*,
     redundant_storage_access::*, storage_field_mutability::*, storage_not_updated::*,
     storage_read_in_loop_condition::*, unprotected_initialization::*,
@@ -44,11 +44,11 @@ pub const DETECTOR_TYPES: &[DetectorEntry] = &[
     ("explicit_return_statements", || Box::new(ExplicitReturnStatementsVisitor::default())),
     ("external_calls_in_loop", || Box::new(ExternalCallsInLoopVisitor::default())),
     ("inline_assembly_usage", || Box::new(InlineAssemblyUsageVisitor::default())),
-    ("input_identity_validation", || Box::new(InputIdentityValidationVisitor::default())),
     ("large_literals", || Box::new(LargeLiteralsVisitor::default())),
     ("magic_numbers", || Box::new(MagicNumbersVisitor::default())),
     ("missing_logs", || Box::new(MissingLogsVisitor::default())),
     ("msg_amount_in_loop", || Box::new(MsgAmountInLoopVisitor::default())),
+    ("non_zero_identity_validation", || Box::new(NonZeroIdentityValidationVisitor::default())),
     ("potential_infinite_loops", || Box::new(PotentialInfiniteLoopsVisitor::default())),
     ("redundant_storage_access", || Box::new(RedundantStorageAccessVisitor::default())),
     ("storage_field_mutability", || Box::new(StorageFieldMutabilityVisitor::default())),

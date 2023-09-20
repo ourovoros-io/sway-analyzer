@@ -14,7 +14,7 @@ use sway_ast::{
 use sway_types::{Span, Spanned};
 
 #[derive(Default)]
-pub struct InputIdentityValidationVisitor {
+pub struct NonZeroIdentityValidationVisitor {
     module_states: HashMap<PathBuf, ModuleState>,
 }
 
@@ -92,7 +92,7 @@ struct BlockState {
     variables: Vec<Span>,
 }
 
-impl AstVisitor for InputIdentityValidationVisitor {
+impl AstVisitor for NonZeroIdentityValidationVisitor {
     fn visit_module(&mut self, context: &ModuleContext, _project: &mut Project) -> Result<(), Error> {
         // Create the module state
         if !self.module_states.contains_key(context.path) {
