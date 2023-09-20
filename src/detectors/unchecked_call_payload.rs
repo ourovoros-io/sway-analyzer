@@ -9,7 +9,7 @@ use crate::{
     },
 };
 use std::{collections::HashMap, path::PathBuf};
-use sway_ast::{FnArgs, IfCondition, Pattern, Expr, Literal};
+use sway_ast::{FnArgs, IfCondition, Pattern, Expr};
 use sway_types::{Span, Spanned};
 
 #[derive(Default)]
@@ -320,9 +320,10 @@ impl AstVisitor for UncheckedCallPayloadVisitor {
                 project.span_to_line(context.path, &call_span)?,
                 Severity::Low,
                 format!(
-                    "{} uses the `{}: raw_ptr` parameter as a payload in a `CALL` instruction, which may revert if the data is incorrect: `{}`",
+                    "{} uses the `{}: raw_ptr` parameter as the payload in a `CALL` instruction via register `{}`, which may revert if the data is incorrect: `{}`",
                     utils::get_item_location(context.item, &context.item_impl, &Some(context.item_fn)),
                     arg_ident_span.as_str(),
+                    call_register_arg_idents[0].as_str(),
                     call_span.as_str(),
                 ),
             );
@@ -337,10 +338,11 @@ impl AstVisitor for UncheckedCallPayloadVisitor {
                     project.span_to_line(context.path, &call_span)?,
                     Severity::Low,
                     format!(
-                        "{} uses the `{}: {}` parameter as a payload in a `CALL` instruction without checking its length, which may revert if the data is incorrect: `{}`",
+                        "{} uses the `{}: {}` parameter as the payload in a `CALL` instruction via register `{}` without checking its length, which may revert if the data is incorrect: `{}`",
                         utils::get_item_location(context.item, &context.item_impl, &Some(context.item_fn)),
                         arg_state.ident_span.as_str(),
                         arg_state.type_name,
+                        call_register_arg_idents[0].as_str(),
                         call_span.as_str(),
                     ),
                 );
