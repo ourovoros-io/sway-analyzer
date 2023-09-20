@@ -1,0 +1,13 @@
+[[package]]
+name = "core"
+source = "path+from-root-8B12053BF453DE21"
+
+[[package]]
+name = "std"
+source = "git+https://github.com/fuellabs/sway?rev#44f46a0a905e3f99b40c2f0019f31ba487e20cb0"
+dependencies = ["core"]
+
+[[package]]
+name = "unchecked_call_payload"
+source = "member"
+dependencies = ["std"]

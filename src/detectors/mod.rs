@@ -15,6 +15,7 @@ mod redundant_storage_access;
 mod storage_field_mutability;
 mod storage_not_updated;
 mod storage_read_in_loop_condition;
+mod unchecked_call_payload;
 mod unprotected_initialization;
 mod unprotected_storage_variables;
 mod unsafe_timestamp_usage;
@@ -26,10 +27,10 @@ use crate::visitor::AstVisitor;
 use self::{
     arbitrary_asset_transfer::*, boolean_comparisons::*, discarded_assignments::*,
     division_before_multiplication::*, explicit_return_statements::*, external_calls_in_loop::*,
-    inline_assembly_usage::*, non_zero_identity_validation::*, large_literals::*, magic_numbers::*,
-    missing_logs::*, msg_amount_in_loop::*, potential_infinite_loops::*,
+    inline_assembly_usage::*, large_literals::*, magic_numbers::*, missing_logs::*,
+    msg_amount_in_loop::*, non_zero_identity_validation::*, potential_infinite_loops::*,
     redundant_storage_access::*, storage_field_mutability::*, storage_not_updated::*,
-    storage_read_in_loop_condition::*, unprotected_initialization::*,
+    storage_read_in_loop_condition::*, unchecked_call_payload::*, unprotected_initialization::*,
     unprotected_storage_variables::*, unsafe_timestamp_usage::*, unused_imports::*, weak_prng::*,
 };
 
@@ -54,6 +55,7 @@ pub const DETECTOR_TYPES: &[DetectorEntry] = &[
     ("storage_field_mutability", || Box::new(StorageFieldMutabilityVisitor::default())),
     ("storage_not_updated", || Box::new(StorageNotUpdatedVisitor::default())),
     ("storage_read_in_loop_condition", || Box::new(StorageReadInLoopConditionVisitor::default())),
+    ("unchecked_call_payload", || Box::new(UncheckedCallPayloadVisitor::default())),
     ("unprotected_initialization", || Box::new(UnprotectedInitializationVisitor::default())),
     ("unprotected_storage_variables", || Box::new(UnprotectedStorageVariablesVisitor::default())),
     ("unsafe_timestamp_usage", || Box::new(UnsafeTimestampUsageVisitor::default())),
