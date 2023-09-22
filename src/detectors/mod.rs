@@ -1,4 +1,5 @@
 mod arbitrary_asset_transfer;
+mod arbitrary_code_execution;
 mod boolean_comparisons;
 mod discarded_assignments;
 mod division_before_multiplication;
@@ -25,13 +26,14 @@ mod weak_prng;
 use crate::visitor::AstVisitor;
 
 use self::{
-    arbitrary_asset_transfer::*, boolean_comparisons::*, discarded_assignments::*,
-    division_before_multiplication::*, explicit_return_statements::*, external_calls_in_loop::*,
-    inline_assembly_usage::*, large_literals::*, magic_numbers::*, missing_logs::*,
-    msg_amount_in_loop::*, non_zero_identity_validation::*, potential_infinite_loops::*,
-    redundant_storage_access::*, storage_field_mutability::*, storage_not_updated::*,
-    storage_read_in_loop_condition::*, unchecked_call_payload::*, unprotected_initialization::*,
-    unprotected_storage_variables::*, unsafe_timestamp_usage::*, unused_imports::*, weak_prng::*,
+    arbitrary_asset_transfer::*, arbitrary_code_execution::*, boolean_comparisons::*,
+    discarded_assignments::*, division_before_multiplication::*, explicit_return_statements::*,
+    external_calls_in_loop::*, inline_assembly_usage::*, large_literals::*, magic_numbers::*,
+    missing_logs::*, msg_amount_in_loop::*, non_zero_identity_validation::*,
+    potential_infinite_loops::*, redundant_storage_access::*, storage_field_mutability::*,
+    storage_not_updated::*, storage_read_in_loop_condition::*, unchecked_call_payload::*,
+    unprotected_initialization::*, unprotected_storage_variables::*, unsafe_timestamp_usage::*,
+    unused_imports::*, weak_prng::*,
 };
 
 type DetectorConstructor = fn() -> Box<dyn AstVisitor>;
@@ -39,6 +41,7 @@ type DetectorEntry = (&'static str, DetectorConstructor);
 
 pub const DETECTOR_TYPES: &[DetectorEntry] = &[
     ("arbitrary_asset_transfer", || Box::new(ArbitraryAssetTransferVisitor::default())),
+    ("arbitrary_code_execution", || Box::new(ArbitraryCodeExecutionVisitor::default())),
     ("boolean_comparisons", || Box::new(BooleanComparisonsVisitor::default())),
     ("discarded_assignments", || Box::new(DiscardedAssignmentsVisitor::default())),
     ("division_before_multiplication", || Box::new(DivisionBeforeMultiplicationVisitor::default())),

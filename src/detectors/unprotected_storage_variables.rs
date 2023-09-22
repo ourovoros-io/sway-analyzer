@@ -152,6 +152,19 @@ impl AstVisitor for UnprotectedStorageVariablesVisitor {
         Ok(())
     }
 
+    fn visit_use(&mut self, context: &UseContext, _project: &mut Project) -> Result<(), Error> {
+        // Get the module state
+        let mut module_states = self.module_states.borrow_mut();
+        let module_state = module_states.get_mut(context.path).unwrap();
+
+        // Check the use tree for `std::auth::msg_sender`
+        if let Some(name) = utils::use_tree_to_name(&context.item_use.tree, "std::auth::msg_sender") {
+            module_state.msg_sender_names.push(name);
+        }
+
+        Ok(())
+    }
+
     fn visit_fn(&mut self, context: &FnContext, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let mut module_states = self.module_states.borrow_mut();
@@ -183,19 +196,6 @@ impl AstVisitor for UnprotectedStorageVariablesVisitor {
             fn_state.block_states.insert(block_span, BlockState::default());
         }
         
-        Ok(())
-    }
-
-    fn visit_use(&mut self, context: &UseContext, _project: &mut Project) -> Result<(), Error> {
-        // Get the module state
-        let mut module_states = self.module_states.borrow_mut();
-        let module_state = module_states.get_mut(context.path).unwrap();
-
-        // Check the use tree for `std::auth::msg_sender`
-        if let Some(name) = utils::use_tree_to_name(&context.item_use.tree, "std::auth::msg_sender") {
-            module_state.msg_sender_names.push(name);
-        }
-
         Ok(())
     }
 

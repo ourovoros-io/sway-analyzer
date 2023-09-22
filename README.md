@@ -50,7 +50,8 @@ cargo uninstall sway-analyzer
 
 |  | Name | Description |
 |-|-|-|
-| 🔴 | `arbitrary_asset_transfer` | Checks for unprotected functions that transfer native assets to an arbitrary address. |
+| 🔴 | `arbitrary_asset_transfer` | Checks for functions that transfer native assets to an arbitrary address without access restriction. |
+| 🔴 | `arbitrary_code_execution` | Checks for functions that make use of the `LDC` assembly instruction without access restriction. |
 | 🟢 | `boolean_comparisons` | Checks if an expression contains a comparison with a boolean literal, which is unnecessary. |
 | 🔴 | `discarded_assignments` | Checks for variables that are assigned to without being utilized. |
 | 🟢 | `division_before_multiplication` | Checks for division operations before multiplications, which can result in value truncation. |
