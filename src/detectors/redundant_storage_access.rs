@@ -17,17 +17,17 @@ pub struct RedundantStorageAccessVisitor {
 }
 
 #[derive(Default)]
-pub struct ModuleState {
+struct ModuleState {
     fn_states: HashMap<Span, FnState>,
 }
 
 #[derive(Default)]
-pub struct FnState {
+struct FnState {
     block_states: HashMap<Span, BlockState>,
 }
 
 #[derive(Default)]
-pub struct BlockState {
+struct BlockState {
     storage_reads: Vec<Span>,
     storage_writes: Vec<Span>,
 }
