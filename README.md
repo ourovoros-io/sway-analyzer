@@ -68,6 +68,7 @@ cargo uninstall sway-analyzer
 | 🟢 | `storage_field_mutability` | Checks for any storage fields that can be refactored into constants or configurable fields. |
 | 🔴 | `storage_not_updated` | Checks for local variables that are read from storage, then modified without being written back to storage. |
 | 🟢 | `storage_read_in_loop_condition` | Checks for loops that contain a storage read in their condition, which can increase gas costs for each iteration. |
+| 🔴 | `strict_equality` | Checks for the use of strict equalities, which can be manipulated by an attacker. |
 | 🟢 | `unchecked_call_payload` | Checks for functions that supply a `raw_ptr` argument to the `CALL` assembly instruction, or a `Bytes` argument without checking its length. |
 | 🔴 | `unprotected_initialization` | Checks for initializer functions that can be called without requirements. |
 | 🔴 | `unprotected_storage_variables` | Checks for functions that make changes to storage variables without access restriction. |
