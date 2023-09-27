@@ -1181,3 +1181,11 @@ pub fn expr_binary_operands(expr: &Expr) -> Option<(&Expr, &Expr)> {
         _ => None,
     }
 }
+
+pub fn expr_negation_result(expr: &Expr) -> bool {
+    match expr {
+        Expr::Parens(expr) => expr_negation_result(expr.inner.as_ref()),
+        Expr::Not { expr, .. } => !expr_negation_result(expr.as_ref()),
+        _ => true,
+    }
+}

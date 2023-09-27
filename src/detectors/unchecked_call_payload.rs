@@ -295,7 +295,7 @@ impl AstVisitor for UncheckedCallPayloadVisitor {
 
         // Get or create the `asm` block state
         let asm_block_span = context.asm.span();
-        let asm_block_state = block_state.asm_block_states.get_mut(&asm_block_span).unwrap();
+        let asm_block_state = block_state.asm_block_states.entry(asm_block_span).or_insert_with(AsmBlockState::default);
 
         // Only check `CALL` instructions
         let "call" = context.instruction.op_code_ident().as_str() else { return Ok(()) };
