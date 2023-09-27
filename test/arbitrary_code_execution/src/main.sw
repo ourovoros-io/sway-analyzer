@@ -87,3 +87,5 @@ impl TestArbitraryCodeExecution for Contract {
         };
     }
 }
+
+// TODO add tests with the higher-level built-in of LDC

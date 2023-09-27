@@ -30,7 +30,6 @@ abi TestArbitraryAssetTransfer {
     fn transfer_to_msg_sender();
     fn transfer_to_msg_sender_msg_value();
 
-    #[storage(read)]
     fn arbitrary_asset_transfer(to_ident: Identity, to_address: Address, to_contract: ContractId, asset_id: AssetId, amount: u64, target: ContractId,
         function_selector: Bytes,
         calldata: Bytes,
@@ -145,7 +144,6 @@ impl TestArbitraryAssetTransfer for Contract {
         transfer_to_address(sender, BASE_ASSET_ID, msg_amount());
     }
 
-    #[storage(read)]
     fn arbitrary_asset_transfer(to_ident: Identity, to_address: Address, to_contract: ContractId, asset_id: AssetId, amount: u64, target: ContractId,
         function_selector: Bytes,
         calldata: Bytes,

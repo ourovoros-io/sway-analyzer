@@ -7,14 +7,12 @@ abi TestNonZeroIdentityValidation {
     fn test_address_validated_2(input: Address);
     fn test_address_validated_3(input: Address);
     fn test_address_validated_4(input: Address);
-    fn test_address_not_validated(input: Address);
-
+    fn test_address_validated_5(input: Address);
     fn test_contract_id_validated_1(input: ContractId);
     fn test_contract_id_validated_2(input: ContractId);
     fn test_contract_id_validated_3(input: ContractId);
     fn test_contract_id_validated_4(input: ContractId);
-    fn test_contract_id_not_validated(input: ContractId);
-
+    fn test_contract_id_validated_5(input: ContractId);
     fn test_identity_validated_1(input: Identity);
     fn test_identity_validated_2(input: Identity);
     fn test_identity_validated_3(input: Identity);
@@ -31,7 +29,9 @@ abi TestNonZeroIdentityValidation {
     fn test_identity_validated_14(input: Identity);
     fn test_identity_validated_15(input: Identity);
     fn test_identity_validated_16(input: Identity);
-    fn test_identity_not_validated(input: Identity);
+    fn test_identity_validated_17(input: Identity);
+    fn test_identity_validated_18(input: Identity);
+    fn test_identity_validated_19(input: Identity);
 }
 
 impl TestNonZeroIdentityValidation for Contract {
@@ -64,8 +64,8 @@ impl TestNonZeroIdentityValidation for Contract {
     }
 
     // Report entry should be created:
-    // L68: The `Contract::test_address_not_validated` function does not check its `input` parameter for a zero value.
-    fn test_address_not_validated(input: Address) {
+    // L68: The `Contract::test_address_validated_5` function does not check its `input` parameter for a zero value.
+    fn test_address_validated_5(input: Address) {
         log(input);
     }
 
@@ -98,8 +98,8 @@ impl TestNonZeroIdentityValidation for Contract {
     }
 
     // Report entry should be created:
-    // L102: The `Contract::test_contract_id_not_validated` function does not check its `input` parameter for a zero value.
-    fn test_contract_id_not_validated(input: ContractId) {
+    // L102: The `Contract::test_contract_id_validated_5` function does not check its `input` parameter for a zero value.
+    fn test_contract_id_validated_5(input: ContractId) {
         log(input);
     }
 
@@ -231,6 +231,24 @@ impl TestNonZeroIdentityValidation for Contract {
 
     // Report entry should not be created
     fn test_identity_validated_11(input: Identity) {
+        match input {
+            Identity::Address(x) => require(Address::from(ZERO_B256) != x, "Zero identity"),
+            Identity::ContractId(x) => require(ContractId::from(ZERO_B256) != x, "Zero identity"),
+        }
+        log(input);
+    }
+
+    // Report entry should not be created
+    fn test_identity_validated_12(input: Identity) {
+        match input {
+            Identity::Address(x) => require(x != Address::from(ZERO_B256), "Zero identity"),
+            Identity::ContractId(x) => require(x != ContractId::from(ZERO_B256), "Zero identity"),
+        }
+        log(input);
+    }
+
+    // Report entry should not be created
+    fn test_identity_validated_13(input: Identity) {
         if let Identity::Address(x) = input {
             if x == Address::from(ZERO_B256) {
                 revert(0);
@@ -244,7 +262,7 @@ impl TestNonZeroIdentityValidation for Contract {
     }
 
     // Report entry should not be created
-    fn test_identity_validated_12(input: Identity) {
+    fn test_identity_validated_14(input: Identity) {
         if let Identity::Address(x) = input {
             if Address::from(ZERO_B256) == x {
                 revert(0);
@@ -258,7 +276,7 @@ impl TestNonZeroIdentityValidation for Contract {
     }
 
     // Report entry should not be created
-    fn test_identity_validated_13(input: Identity) {
+    fn test_identity_validated_15(input: Identity) {
         if match input {
             Identity::Address(x) => x == Address::from(ZERO_B256),
             Identity::ContractId(x) => x == ContractId::from(ZERO_B256),
@@ -269,7 +287,7 @@ impl TestNonZeroIdentityValidation for Contract {
     }
 
     // Report entry should not be created
-    fn test_identity_validated_14(input: Identity) {
+    fn test_identity_validated_16(input: Identity) {
         if match input {
             Identity::Address(x) => Address::from(ZERO_B256) == x,
             Identity::ContractId(x) => ContractId::from(ZERO_B256) == x,
@@ -280,7 +298,7 @@ impl TestNonZeroIdentityValidation for Contract {
     }
 
     // Report entry should not be created
-    fn test_identity_validated_15(input: Identity) {
+    fn test_identity_validated_17(input: Identity) {
         if if let Identity::Address(x) = input {
             x == Address::from(ZERO_B256)
         } else if let Identity::ContractId(x) = input {
@@ -294,7 +312,7 @@ impl TestNonZeroIdentityValidation for Contract {
     }
 
     // Report entry should not be created
-    fn test_identity_validated_16(input: Identity) {
+    fn test_identity_validated_18(input: Identity) {
         if if let Identity::Address(x) = input {
             Address::from(ZERO_B256) == x
         } else if let Identity::ContractId(x) = input {
@@ -308,8 +326,8 @@ impl TestNonZeroIdentityValidation for Contract {
     }
 
     // Report entry should be created:
-    // L312: The `Contract::test_identity_not_validated` function does not check its `input` parameter for a zero value.
-    fn test_identity_not_validated(input: Identity) {
+    // L330: The `Contract::test_identity_validated_19` function does not check its `input` parameter for a zero value.
+    fn test_identity_validated_19(input: Identity) {
         log(input);
     }
 }

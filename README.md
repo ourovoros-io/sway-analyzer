@@ -52,18 +52,18 @@ cargo uninstall sway-analyzer
 |-|-|-|
 | 🔴 | `arbitrary_asset_transfer` | Checks for functions that transfer native assets to an arbitrary address without access restriction. |
 | 🔴 | `arbitrary_code_execution` | Checks for functions that make use of the `LDC` assembly instruction without access restriction. |
-| 🟢 | `boolean_comparisons` | Checks if an expression contains a comparison with a boolean literal, which is unnecessary. |
-| 🔴 | `discarded_assignments` | Checks for variables that are assigned to without being utilized. |
+| 🟢 | `boolean_comparison` | Checks if an expression contains a comparison with a boolean literal, which is unnecessary. |
+| 🔴 | `discarded_assignment` | Checks for variables that are assigned to without being utilized. |
 | 🟢 | `division_before_multiplication` | Checks for division operations before multiplications, which can result in value truncation. |
-| 🟢 | `explicit_return_statements` | Checks for functions that end with explicit `return` statements, which is unnecessary. |
-| 🟡 | `external_calls_in_loop` | Checks if any functions contain any loops which performs calls to external functions. |
+| 🟢 | `explicit_return_statement` | Checks for functions that end with explicit `return` statements, which is unnecessary. |
+| 🟡 | `external_call_in_loop` | Checks if any functions contain any loops which performs calls to external functions. |
 | 🟡 | `inline_assembly_usage` | Checks functions for inline assembly usage. |
-| 🟢 | `large_literals` | Checks for expressions that contain large literal values, which may be difficult to read or interpreted incorrectly. |
-| 🟢 | `magic_numbers` | Checks for expressions that contain irregular numerical constants that can be introduced as named constants. |
+| 🟢 | `large_literal` | Checks for expressions that contain large literal values, which may be difficult to read or interpreted incorrectly. |
+| 🟢 | `magic_number` | Checks for expressions that contain irregular numerical constants that can be introduced as named constants. |
 | 🟡 | `missing_logs` | Checks for publicly-accessible functions that make changes to storage variables without emitting logs. |
 | 🟡 | `msg_amount_in_loop` | Checks for calls to `std::context::msg_amount()` or `std::registers::balance()` inside a while loop. In most cases, the result of the call should be stored in a local variable and decremented over each loop iteration. |
 | 🟢 | `non_zero_identity_validation` | Checks to see if functions containing `Identity`, `Address` and `ContractId` parameters are checked for a zero value. |
-| 🔴 | `potential_infinite_loops` | Checks for potentially infinite loops. |
+| 🔴 | `potential_infinite_loop` | Checks for potentially infinite loops. |
 | 🟡 | `redundant_storage_access` | Checks for redundant calls to `storage.x.read()` and `storage.x.write(x)`. |
 | 🟢 | `storage_field_mutability` | Checks for any storage fields that can be refactored into constants or configurable fields. |
 | 🔴 | `storage_not_updated` | Checks for local variables that are read from storage, then modified without being written back to storage. |
@@ -71,7 +71,7 @@ cargo uninstall sway-analyzer
 | 🔴 | `strict_equality` | Checks for the use of strict equalities, which can be manipulated by an attacker. |
 | 🟢 | `unchecked_call_payload` | Checks for functions that supply a `raw_ptr` argument to the `CALL` assembly instruction, or a `Bytes` argument without checking its length. |
 | 🔴 | `unprotected_initialization` | Checks for initializer functions that can be called without requirements. |
-| 🔴 | `unprotected_storage_variables` | Checks for functions that make changes to storage variables without access restriction. |
+| 🔴 | `unprotected_storage_variable` | Checks for functions that make changes to storage variables without access restriction. |
 | 🟡 | `unsafe_timestamp_usage` | Checks for dependence on `std::block::timestamp` or `std::block::timestamp_of_block`, which can be manipulated by an attacker. |
-| 🟢 | `unused_imports` | Checks for imported symbols that are not used. |
+| 🟢 | `unused_import` | Checks for imported symbols that are not used. |
 | 🟡 | `weak_prng` | Checks for weak PRNG due to a modulo operation on a block timestamp. |
