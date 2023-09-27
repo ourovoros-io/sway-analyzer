@@ -130,8 +130,22 @@ impl TestPotentialInfiniteLoops for Contract {
             break;
         }
 
+        let mut s = 10;
+        let z = 10;
+        // Report entry should not be created
+        while s == z {
+            s = s - 1;
+        }
+
+        let mut s = 1; 
+        let z = 10;
+        // Report entry should not be created
+        while s != z {
+            s = s + 1;
+        }
+
         // Report entry should be created:
-    	// L135: The `Contract::potential_infinite_loop` function contains a potentially infinite loop: `while true { ... }`. Consider adding a `break` statement.
+    	// L149: The `Contract::potential_infinite_loop` function contains a potentially infinite loop: `while true { ... }`. Consider adding a `break` statement.
         while true {
             let a = 1;
             let b = 2;
@@ -160,7 +174,7 @@ impl TestPotentialInfiniteLoops for Contract {
         }
 
         // Report entry should be created:
-        // L164: The `Contract::potential_infinite_loop` function contains a potentially infinite loop: `while z { ... }`. Consider adding a `break` statement.
+        // L178: The `Contract::potential_infinite_loop` function contains a potentially infinite loop: `while z { ... }`. Consider adding a `break` statement.
         while z {}
     }
 }

@@ -200,12 +200,22 @@ impl AstVisitor for PotentialInfiniteLoopsVisitor {
                         loop_block_state.condition_updated = true;
                     }
 
-                    Expr::Equal { lhs, rhs, .. } => {
-                        // TODO: check for bool or int cases
-                    }
+                    Expr::Equal { lhs, rhs, .. } | Expr::NotEqual { lhs, rhs, .. } => {
+                        // Don't check function applications or method calls
+                        if matches!(lhs.as_ref(), Expr::FuncApp { .. } | Expr::MethodCall { .. }) || matches!(rhs.as_ref(), Expr::FuncApp { .. } | Expr::MethodCall { .. }) {
+                            loop_block_state.condition_updated = true;
+                            return Ok(());
+                        }
 
-                    Expr::NotEqual { lhs, rhs, .. } => {
-                        // TODO: check for bool or int cases
+                        let assignable_idents = utils::fold_assignable_idents(assignable);
+                        let lhs_idents = utils::fold_expr_idents(lhs.as_ref());
+                        let rhs_idents = utils::fold_expr_idents(rhs.as_ref());
+
+                        if assignable_idents.iter().zip(lhs_idents).all(|(a, b)| a.as_str() == b.as_str()) {
+                            loop_block_state.condition_updated = true;
+                        } else if assignable_idents.iter().zip(rhs_idents).all(|(a, b)| a.as_str() == b.as_str()) {
+                            loop_block_state.condition_updated = true;
+                        }
                     }
 
                     Expr::LessThan { lhs, rhs, .. } | Expr::LessThanEq { lhs, rhs, .. } => {
