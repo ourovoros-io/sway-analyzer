@@ -237,7 +237,7 @@ impl AstVisitor for PotentialInfiniteLoopsVisitor {
                                 }
                             }
 
-                            ReassignmentOpVariant::AddEquals => {
+                            ReassignmentOpVariant::AddEquals | ReassignmentOpVariant::MulEquals => {
                                 let assignable_idents = utils::fold_assignable_idents(assignable);
                                 let condition_idents = utils::fold_expr_idents(lhs);
                                 if assignable_idents.iter().zip(condition_idents).any(|(a, b)| a.as_str() != b.as_str()) {
@@ -246,7 +246,7 @@ impl AstVisitor for PotentialInfiniteLoopsVisitor {
                                 loop_block_state.condition_updated = true;
                             }
 
-                            ReassignmentOpVariant::SubEquals => {
+                            ReassignmentOpVariant::SubEquals | ReassignmentOpVariant::DivEquals => {
                                 let assignable_idents = utils::fold_assignable_idents(assignable);
                                 let condition_idents = utils::fold_expr_idents(rhs);
                                 if assignable_idents.iter().zip(condition_idents).any(|(a, b)| a.as_str() != b.as_str()) {
@@ -278,7 +278,7 @@ impl AstVisitor for PotentialInfiniteLoopsVisitor {
                                 }
                             }
 
-                            ReassignmentOpVariant::AddEquals => {
+                            ReassignmentOpVariant::AddEquals | ReassignmentOpVariant::MulEquals => {
                                 let assignable_idents = utils::fold_assignable_idents(assignable);
                                 let condition_idents = utils::fold_expr_idents(rhs);
                                 if assignable_idents.iter().zip(condition_idents).any(|(a, b)| a.as_str() != b.as_str()) {
@@ -287,7 +287,7 @@ impl AstVisitor for PotentialInfiniteLoopsVisitor {
                                 loop_block_state.condition_updated = true;
                             }
 
-                            ReassignmentOpVariant::SubEquals => {
+                            ReassignmentOpVariant::SubEquals | ReassignmentOpVariant::DivEquals => {
                                 let assignable_idents = utils::fold_assignable_idents(assignable);
                                 let condition_idents = utils::fold_expr_idents(lhs);
                                 if assignable_idents.iter().zip(condition_idents).any(|(a, b)| a.as_str() != b.as_str()) {
