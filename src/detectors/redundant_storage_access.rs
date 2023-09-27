@@ -175,6 +175,6 @@ impl AstVisitor for RedundantStorageAccessVisitor {
 mod tests {
     #[test]
     fn test_redundant_storage_access() {
-        crate::tests::test_detector("redundant_storage_access")
+        crate::tests::test_detector("redundant_storage_access", 5);
     }
 }

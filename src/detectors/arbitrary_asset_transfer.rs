@@ -184,6 +184,6 @@ impl AstVisitor for ArbitraryAssetTransferVisitor {
 mod tests {
     #[test]
     fn test_arbitrary_asset_transfer() {
-        crate::tests::test_detector("arbitrary_asset_transfer")
+        crate::tests::test_detector("arbitrary_asset_transfer", 10);
     }
 }

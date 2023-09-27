@@ -350,6 +350,6 @@ impl AstVisitor for UncheckedCallPayloadVisitor {
 mod tests {
     #[test]
     fn test_unchecked_call_payload() {
-        crate::tests::test_detector("unchecked_call_payload");
+        crate::tests::test_detector("unchecked_call_payload", 2);
     }
 }

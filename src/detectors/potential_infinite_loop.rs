@@ -315,6 +315,6 @@ impl AstVisitor for PotentialInfiniteLoopVisitor {
 mod tests {
     #[test]
     fn test_potential_infinite_loop() {
-        crate::tests::test_detector("potential_infinite_loop")
+        crate::tests::test_detector("potential_infinite_loop", 3);
     }
 }

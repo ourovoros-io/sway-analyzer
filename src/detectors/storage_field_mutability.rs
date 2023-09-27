@@ -190,6 +190,6 @@ impl AstVisitor for StorageFieldMutabilityVisitor {
 mod tests {
     #[test]
     fn test_storage_field_mutability() {
-        crate::tests::test_detector("storage_field_mutability")
+        crate::tests::test_detector("storage_field_mutability", 3);
     }
 }

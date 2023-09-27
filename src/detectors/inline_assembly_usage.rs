@@ -30,6 +30,6 @@ impl AstVisitor for InlineAssemblyUsageVisitor {
 mod tests {
     #[test]
     fn test_inline_assembly_usage() {
-        crate::tests::test_detector("inline_assembly_usage")
+        crate::tests::test_detector("inline_assembly_usage", 2);
     }
 }

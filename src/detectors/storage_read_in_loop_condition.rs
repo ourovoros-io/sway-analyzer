@@ -77,6 +77,6 @@ impl AstVisitor for StorageReadInLoopConditionVisitor {
 mod tests {
     #[test]
     fn test_storage_read_in_loop_condition() {
-        crate::tests::test_detector("storage_read_in_loop_condition");
+        crate::tests::test_detector("storage_read_in_loop_condition", 2);
     }
 }

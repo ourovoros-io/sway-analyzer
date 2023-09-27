@@ -365,6 +365,6 @@ impl AstVisitor for ArbitraryCodeExecutionVisitor {
 mod tests {
     #[test]
     fn test_arbitrary_code_execution() {
-        crate::tests::test_detector("arbitrary_code_execution");
+        crate::tests::test_detector("arbitrary_code_execution", 1);
     }
 }

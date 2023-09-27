@@ -198,6 +198,6 @@ impl AstVisitor for MsgAmountInLoopVisitor {
 mod tests {
     #[test]
     fn test_msg_amount_in_loop() {
-        crate::tests::test_detector("msg_amount_in_loop")
+        crate::tests::test_detector("msg_amount_in_loop", 4);
     }
 }

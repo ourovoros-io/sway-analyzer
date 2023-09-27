@@ -63,17 +63,31 @@ fn main() -> Result<(), Error> {
 pub mod tests {
     use super::*;
 
-    pub fn test_detector(name: &str) {
+    pub fn test_detector(name: &str, entry_count: usize) {
         let options = Options {
             directory: Some(format!("test/{name}").into()),
             detectors: vec![name.to_string()],
             ..Default::default()
         };
-
+    
         let mut project = Project::try_from(&options).unwrap();
         project.analyze_modules().unwrap();
-
+    
         println!("{project}");
+    
+        let mut actual_entry_count = 0;
+    
+        for (_, entries) in project.report.borrow().entries.iter() {
+            actual_entry_count += entries.len();
+        }
+    
+        if entry_count != actual_entry_count {
+            panic!(
+                "Expected {entry_count} {}, found {actual_entry_count} {}",
+                if entry_count == 1 { "entry" } else { "entries" },
+                if actual_entry_count == 1 { "entry" } else { "entries" },
+            );
+        }
     }
 
     #[test]

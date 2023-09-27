@@ -152,6 +152,6 @@ impl AstVisitor for DivisionBeforeMultiplicationVisitor {
 mod tests {
     #[test]
     fn test_division_before_multiplication() {
-        crate::tests::test_detector("division_before_multiplication")
+        crate::tests::test_detector("division_before_multiplication", 18);
     }
 }

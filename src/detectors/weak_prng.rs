@@ -239,6 +239,6 @@ impl AstVisitor for WeakPrngVisitor {
 mod tests {
     #[test]
     fn test_weak_prng() {
-        crate::tests::test_detector("weak_prng")
+        crate::tests::test_detector("weak_prng", 18);
     }
 }

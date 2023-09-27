@@ -469,6 +469,6 @@ impl AstVisitor for UnprotectedStorageVariableVisitor {
 mod tests {
     #[test]
     fn test_unprotected_storage_variable() {
-        crate::tests::test_detector("unprotected_storage_variable")
+        crate::tests::test_detector("unprotected_storage_variable", 3);
     }
 }

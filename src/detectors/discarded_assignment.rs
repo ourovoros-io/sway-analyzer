@@ -320,6 +320,6 @@ impl AstVisitor for DiscardedAssignmentVisitor {
 mod tests {
     #[test]
     fn test_discarded_assignment() {
-        crate::tests::test_detector("discarded_assignment")
+        crate::tests::test_detector("discarded_assignment", 5);
     }
 }

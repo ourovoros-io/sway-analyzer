@@ -53,6 +53,6 @@ fn add_report_entry(project: &mut Project, path: &Path, expr: &Expr, item: &Item
 mod tests {
     #[test]
     fn test_boolean_comparison() {
-        crate::tests::test_detector("boolean_comparison")
+        crate::tests::test_detector("boolean_comparison", 10);
     }
 }

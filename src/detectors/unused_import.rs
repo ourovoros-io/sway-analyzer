@@ -170,6 +170,6 @@ impl AstVisitor for UnusedImportVisitor {
 mod tests {
     #[test]
     fn test_unused_import() {
-        crate::tests::test_detector("unused_import")
+        crate::tests::test_detector("unused_import", 2);
     }
 }

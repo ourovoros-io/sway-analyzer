@@ -84,6 +84,6 @@ impl AstVisitor for MagicNumberVisitor {
 mod tests {
     #[test]
     fn test_magic_number() {
-        crate::tests::test_detector("magic_number");
+        crate::tests::test_detector("magic_number", 5);
     }
 }

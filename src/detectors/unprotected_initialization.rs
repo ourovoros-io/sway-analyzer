@@ -100,6 +100,6 @@ impl AstVisitor for UnprotectedInitializationVisitor {
 mod tests {
     #[test]
     fn test_unprotected_initialization() {
-        crate::tests::test_detector("unprotected_initialization");
+        crate::tests::test_detector("unprotected_initialization", 1);
     }
 }

@@ -772,6 +772,6 @@ impl AstVisitor for NonZeroIdentityValidationVisitor {
 mod tests {
     #[test]
     fn test_non_zero_identity_validation() {
-        crate::tests::test_detector("non_zero_identity_validation")
+        crate::tests::test_detector("non_zero_identity_validation", 3);
     }
 }

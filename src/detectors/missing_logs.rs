@@ -201,6 +201,6 @@ impl AstVisitor for MissingLogsVisitor {
 mod tests {
     #[test]
     fn test_missing_logs() {
-        crate::tests::test_detector("missing_logs")
+        crate::tests::test_detector("missing_logs", 2);
     }
 }

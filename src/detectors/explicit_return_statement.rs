@@ -60,6 +60,6 @@ impl AstVisitor for ExplicitReturnStatementVisitor {
 mod tests {
     #[test]
     fn test_explicit_return_statement() {
-        crate::tests::test_detector("explicit_return_statement");
+        crate::tests::test_detector("explicit_return_statement", 4);
     }
 }

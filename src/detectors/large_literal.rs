@@ -51,6 +51,6 @@ impl AstVisitor for LargeLiteralVisitor {
 mod tests {
     #[test]
     fn test_large_literal() {
-        crate::tests::test_detector("large_literal")
+        crate::tests::test_detector("large_literal", 7);
     }
 }

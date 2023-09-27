@@ -191,6 +191,6 @@ impl AstVisitor for ExternalCallInLoopVisitor {
 mod tests {
     #[test]
     fn test_external_call_in_loop() {
-        crate::tests::test_detector("external_call_in_loop")
+        crate::tests::test_detector("external_call_in_loop", 2);
     }
 }

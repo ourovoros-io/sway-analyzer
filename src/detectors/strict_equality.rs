@@ -98,6 +98,6 @@ impl AstVisitor for StrictEqualityVisitor {
 mod tests {
     #[test]
     fn test_strict_equality() {
-        crate::tests::test_detector("strict_equality");
+        crate::tests::test_detector("strict_equality", 2);
     }
 }

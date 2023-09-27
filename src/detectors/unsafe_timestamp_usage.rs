@@ -90,6 +90,6 @@ impl AstVisitor for UnsafeTimestampUsageVisitor {
 mod tests {
     #[test]
     fn test_unsafe_timestamp_usage() {
-        crate::tests::test_detector("unsafe_timestamp_usage")
+        crate::tests::test_detector("unsafe_timestamp_usage", 6);
     }
 }
