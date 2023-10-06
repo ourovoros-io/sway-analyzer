@@ -351,6 +351,15 @@ pub struct TypeAliasContext<'a> {
     pub item_type_alias: &'a ItemTypeAlias,
 }
 
+#[derive(Clone)]
+pub struct TraitTypeContext<'a> {
+    pub path: &'a Path,
+    pub module: &'a Module,
+    pub item: &'a ItemKind,
+    pub attributes: &'a [AttributeDecl],
+    pub item_type: &'a TraitType,
+}
+
 #[allow(unused_variables)]
 pub trait AstVisitor {
     fn visit_module(&mut self, context: &ModuleContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
@@ -439,6 +448,9 @@ pub trait AstVisitor {
 
     fn visit_type_alias(&mut self, context: &TypeAliasContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
     fn leave_type_alias(&mut self, context: &TypeAliasContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
+
+    fn visit_trait_type(&mut self, context: &TraitTypeContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
+    fn leave_trait_type(&mut self, context: &TraitTypeContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
 }
 
 #[derive(Default)]
@@ -502,6 +514,8 @@ pub struct AstVisitorRecursive<'a> {
     pub leave_configurable_field_hooks: Vec<Box<dyn FnMut(&ConfigurableFieldContext, &mut Project) -> Result<(), Error> + 'a>>,
     pub visit_type_alias_hooks: Vec<Box<dyn FnMut(&TypeAliasContext, &mut Project) -> Result<(), Error> + 'a>>,
     pub leave_type_alias_hooks: Vec<Box<dyn FnMut(&TypeAliasContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub visit_trait_type_hooks: Vec<Box<dyn FnMut(&TraitTypeContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub leave_trait_type_hooks: Vec<Box<dyn FnMut(&TraitTypeContext, &mut Project) -> Result<(), Error> + 'a>>,
 }
 
 impl AstVisitor for AstVisitorRecursive<'_> {
@@ -2818,6 +2832,19 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     self.visit_const(&context, project)?;
                     self.leave_const(&context, project)?;
                 }
+
+                sway_ast::ItemImplItem::Type(item_type) => {
+                    let context = TraitTypeContext {
+                        path: context.path,
+                        module: context.module,
+                        item: context.item,
+                        attributes: context.attributes,
+                        item_type,
+                    };
+
+                    self.visit_trait_type(&context, project)?;
+                    self.leave_trait_type(&context, project)?;
+                }
             }
         }
 
@@ -3078,6 +3105,30 @@ impl AstVisitor for AstVisitorRecursive<'_> {
         }
         
         for hook in self.leave_type_alias_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
+        Ok(())
+    }
+
+    fn visit_trait_type(&mut self, context: &TraitTypeContext, project: &mut Project) -> Result<(), Error> {
+        for visitor in self.visitors.iter_mut() {
+            visitor.visit_trait_type(context, project)?;
+        }
+        
+        for hook in self.visit_trait_type_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
+        Ok(())
+    }
+
+    fn leave_trait_type(&mut self, context: &TraitTypeContext, project: &mut Project) -> Result<(), Error> {
+        for visitor in self.visitors.iter_mut() {
+            visitor.leave_trait_type(context, project)?;
+        }
+        
+        for hook in self.leave_trait_type_hooks.iter_mut() {
             hook(context, project)?;
         }
 

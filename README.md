@@ -13,8 +13,7 @@ See the [Rust Install](https://www.rust-lang.org/tools/install) page for install
 The `sway-analyzer` binary can be installed using the following commands:
 
 ```bash
-cd /path/to/sway-analyzer/
-cargo install --path .
+cargo install sway-analyzer
 ```
 
 The `sway-analyzer` binary can be uninstalled using the following command:
