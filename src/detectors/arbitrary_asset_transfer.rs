@@ -6,7 +6,7 @@ use crate::{
     visitor::{AstVisitor, AstVisitorRecursive, ExprContext, FnContext, ModuleContext, UseContext},
 };
 use std::{collections::HashMap, path::PathBuf};
-use sway_ast::{Expr, IfCondition, PathType, Ty};
+use sway_ast::{Expr, FnArgs, IfCondition, PathType, Ty};
 use sway_types::{Span, Spanned};
 
 #[derive(Default)]
@@ -105,14 +105,18 @@ impl AstVisitor for ArbitraryAssetTransferVisitor {
         let fn_state = module_state.fn_states.entry(fn_signature.clone()).or_insert_with(FnState::default);
 
         // Check to see if the function contains `amount` or `identity` arguments
-        if let sway_ast::FnArgs::Static(args) = &context.item_fn.fn_signature.arguments.inner {
-            for arg in args {
-                if let Ty::Path(PathType { prefix, .. }) = &arg.ty {
-                    match prefix.span().as_str() {
-                        "u64" => fn_state.has_amount = true,
-                        "Identity" => fn_state.has_identity = true,
-                        _ => {}
-                    }
+        let args = match &context.item_fn.fn_signature.arguments.inner {
+            FnArgs::Static(args) => args,
+            FnArgs::NonStatic { args_opt: Some(args), .. } => &args.1,
+            _ => return Ok(()),
+        };
+
+        for arg in args {
+            if let Ty::Path(PathType { prefix, .. }) = &arg.ty {
+                match prefix.span().as_str() {
+                    "u64" => fn_state.has_amount = true,
+                    "Identity" => fn_state.has_identity = true,
+                    _ => {}
                 }
             }
         }

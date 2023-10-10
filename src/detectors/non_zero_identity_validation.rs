@@ -129,20 +129,14 @@ impl AstVisitor for NonZeroIdentityValidationVisitor {
             }
         };
 
-        match &context.item_fn.fn_signature.arguments.inner {
-            FnArgs::Static(args) => {
-                for arg in args {
-                    check_for_identity_argument(arg);
-                }
-            }
-            
-            FnArgs::NonStatic { args_opt: Some(args), .. } => {
-                for arg in &args.1 {
-                    check_for_identity_argument(arg);
-                }
-            }
-
-            _ => {}
+        let args = match &context.item_fn.fn_signature.arguments.inner {
+            FnArgs::Static(args) => args,
+            FnArgs::NonStatic { args_opt: Some(args), .. } => &args.1,
+            _ => return Ok(()),
+        };
+        
+        for arg in args {
+            check_for_identity_argument(arg);
         }
 
         Ok(())

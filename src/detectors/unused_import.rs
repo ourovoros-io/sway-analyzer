@@ -2,13 +2,16 @@ use crate::{
     error::Error,
     project::Project,
     report::Severity,
+    utils,
     visitor::{
-        AstVisitor, ConfigurableContext, ExprContext, ModuleContext, StatementContext, UseContext,
+        AstVisitor, ConfigurableFieldContext, ExprContext, FnContext, ModuleContext,
+        StatementContext, UseContext,
     },
 };
 use std::{collections::HashMap, path::PathBuf};
 use sway_ast::{
-    attribute::Annotated, Expr, ItemConst, ItemKind, PathExpr, Statement, StatementLet, UseTree,
+    attribute::Annotated, Expr, FnArgs, ItemConst, ItemKind, PathExpr, Pattern, Statement,
+    StatementLet, UseTree,
 };
 use sway_types::{Span, Spanned};
 
@@ -22,6 +25,33 @@ struct ModuleState {
     imports: Vec<String>,
     usage_states: HashMap<String, u32>,
     span_usage_states: HashMap<String, Span>,
+}
+
+impl ModuleState {
+    fn check_span_usage(&mut self, span: &Span) {
+        let Some(matched) = self.span_usage_states.get_mut(span.as_str()) else { return };
+
+        self.usage_states
+            .entry(matched.as_str().to_owned())
+            .and_modify(|counter| *counter += 1)
+            .or_insert(1);
+    }
+
+    fn check_expr_usage(&mut self, expr: &Expr) {
+        utils::map_expr(expr, &mut |expr| {
+            if let Expr::Path(PathExpr { prefix, .. }) = expr {
+                self.check_span_usage(&prefix.span());
+            }
+        });
+    }
+
+    fn check_pattern_usage(&mut self, pattern: &Pattern) {
+        utils::map_pattern(pattern, &mut |pattern| {
+            if let Pattern::Constructor { path, .. } | Pattern::Struct { path, .. } = pattern {
+                self.check_span_usage(&path.span());
+            }
+        });
+    }
 }
 
 impl AstVisitor for UnusedImportVisitor {
@@ -59,53 +89,49 @@ impl AstVisitor for UnusedImportVisitor {
         Ok(())
     }
 
+    fn visit_fn(&mut self, context: &FnContext, _project: &mut Project) -> Result<(), Error> {
+        // Get the module state
+        let module_state = self.module_states.get_mut(context.path).unwrap();
+
+        let args = match &context.item_fn.fn_signature.arguments.inner {
+            FnArgs::Static(args) => args,
+            FnArgs::NonStatic { args_opt: Some(args), .. } => &args.1,
+            _ => return Ok(()),
+        };
+
+        for arg in args {
+            module_state.check_pattern_usage(&arg.pattern);
+            module_state.check_span_usage(&arg.ty.span());
+        }
+
+        Ok(())
+    }
+
     fn visit_statement(&mut self, context: &StatementContext, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let module_state = self.module_states.get_mut(context.path).unwrap();
 
         match context.statement {
-            Statement::Let(StatementLet { expr, .. }) => {
-                let Some(matched) = module_state.span_usage_states.get(expr.span().as_str()) else { return Ok(()) };
+            Statement::Let(StatementLet { pattern, ty_opt, expr, .. }) => {
+                module_state.check_pattern_usage(pattern);
 
-                module_state
-                    .usage_states
-                    .entry(matched.as_str().to_owned())
-                    .and_modify(|counter| *counter += 1)
-                    .or_insert(0);
+                if let Some((_, ty)) = ty_opt.as_ref() {
+                    module_state.check_span_usage(&ty.span());
+                }
+
+                module_state.check_expr_usage(expr);
             }
             
             Statement::Item(Annotated {
-                value: ItemKind::Const(ItemConst { expr_opt, .. }),
+                value: ItemKind::Const(ItemConst { ty_opt, expr_opt, .. }),
                 ..
             }) => {
-                let Some(matched) = module_state.span_usage_states.get(expr_opt.as_ref().unwrap().span().as_str()) else { return Ok(()) };
-
-                module_state
-                    .usage_states
-                    .entry(matched.as_str().to_owned())
-                    .and_modify(|counter| *counter += 1)
-                    .or_insert(0);
-            }
-
-            Statement::Expr { expr, .. } => {
-                let Expr::FuncApp { func, args } = expr else { return Ok(()) };
-
-                if let Some(matched) = module_state.span_usage_states.get(func.span().as_str()) {
-                    module_state
-                        .usage_states
-                        .entry(matched.as_str().to_owned())
-                        .and_modify(|counter| *counter += 1)
-                        .or_insert(0);
+                if let Some((_, ty)) = ty_opt.as_ref() {
+                    module_state.check_span_usage(&ty.span());
                 }
-                
-                for arg in &args.inner {
-                    if let Some(matched) = module_state.span_usage_states.get(arg.span().as_str()) {
-                        module_state
-                            .usage_states
-                            .entry(matched.as_str().to_owned())
-                            .and_modify(|counter| *counter += 1)
-                            .or_insert(0);
-                    }
+
+                if let Some(expr) = expr_opt.as_ref() {
+                    module_state.check_expr_usage(expr);
                 }
             }
 
@@ -116,35 +142,15 @@ impl AstVisitor for UnusedImportVisitor {
     }
 
     fn visit_expr(&mut self, context: &ExprContext, _project: &mut Project) -> Result<(), Error> {
-        // Get the module state
         let module_state = self.module_states.get_mut(context.path).unwrap();
-
-        let Expr::Path(PathExpr{ prefix, ..  }) = context.expr else { return Ok(()) };
-        let Some(matched) = module_state.span_usage_states.get(&prefix.span().str()) else { return Ok(()) };
-
-        module_state
-            .usage_states
-            .entry(matched.as_str().to_owned())
-            .and_modify(|counter| *counter += 1)
-            .or_insert(0);
-
+        module_state.check_expr_usage(context.expr);
         Ok(())
     }
 
-    fn visit_configurable(&mut self, context: &ConfigurableContext, _project: &mut Project) -> Result<(), Error> {
-        // Get the module state
+    fn visit_configurable_field(&mut self, context: &ConfigurableFieldContext, _project: &mut Project) -> Result<(), Error> {
         let module_state = self.module_states.get_mut(context.path).unwrap();
-
-        for a in &context.item_configurable.fields.inner {
-            let Some(matched) = module_state.span_usage_states.get(&a.value.initializer.span().str()) else { return Ok(()) };
-            
-            module_state
-                .usage_states
-                .entry(matched.as_str().to_owned())
-                .and_modify(|counter| *counter += 1)
-                .or_insert(0);
-        }
-
+        module_state.check_span_usage(&context.field.ty.span());
+        module_state.check_expr_usage(&context.field.initializer);
         Ok(())
     }
 

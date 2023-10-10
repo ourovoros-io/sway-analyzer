@@ -377,6 +377,169 @@ pub fn fold_pattern_idents(pattern: &Pattern) -> Vec<BaseIdent> {
     result
 }
 
+pub fn map_expr<F: FnMut(&Expr)>(expr: &Expr, f: &mut F) {
+    f(expr);
+
+    match expr {
+        Expr::Struct { fields, .. } => {
+            for field in &fields.inner {
+                if let Some((_, expr)) = field.expr_opt.as_ref() {
+                    map_expr(expr.as_ref(), f);
+                }
+            }
+        }
+
+        Expr::Tuple(tuple) => {
+            match &tuple.inner {
+                ExprTupleDescriptor::Nil => {}
+                ExprTupleDescriptor::Cons { head, tail, .. } => {
+                    map_expr(head.as_ref(), f);
+
+                    for expr in tail {
+                        map_expr(expr, f);
+                    }
+                }
+            }
+        }
+        
+        Expr::Array(array) => {
+            match &array.inner {
+                ExprArrayDescriptor::Sequence(sequence) => {
+                    for expr in sequence {
+                        map_expr(expr, f);
+                    }
+                }
+                ExprArrayDescriptor::Repeat { value, length, .. } => {
+                    map_expr(value.as_ref(), f);
+                    map_expr(length.as_ref(), f);
+                }
+            }
+        }
+
+        Expr::If(if_expr) => {
+            match &if_expr.condition {
+                IfCondition::Expr(expr) => map_expr(expr.as_ref(), f),
+                IfCondition::Let { rhs, .. } => map_expr(rhs.as_ref(), f),
+            }
+        }
+
+        Expr::FuncApp { func, args } => {
+            map_expr(func.as_ref(), f);
+
+            for arg in &args.inner {
+                map_expr(arg, f);
+            }
+        }
+
+        Expr::Index { target, arg } => {
+            map_expr(target.as_ref(), f);
+            map_expr(arg.inner.as_ref(), f);
+        }
+
+        Expr::MethodCall { target, contract_args_opt, args, .. } => {
+            map_expr(target.as_ref(), f);
+
+            if let Some(contract_args) = contract_args_opt.as_ref() {
+                for arg in &contract_args.inner {
+                    if let Some((_, expr)) = arg.expr_opt.as_ref() {
+                        map_expr(expr.as_ref(), f);
+                    }
+                }
+            }
+
+            for arg in &args.inner {
+                map_expr(arg, f);
+            }
+        }
+        
+        Expr::AbiCast { args: Parens { inner: AbiCastArgs { address: expr, .. }, .. }, .. } |
+        Expr::Parens(Parens { inner: expr, .. }) |
+        Expr::Return { expr_opt: Some(expr), .. } |
+        Expr::Match { value: expr, .. } |
+        Expr::While { condition: expr, .. } |
+        Expr::FieldProjection { target: expr, .. } |
+        Expr::TupleFieldProjection { target: expr, .. } |
+        Expr::Ref { expr, .. } |
+        Expr::Deref { expr, .. } |
+        Expr::Not { expr, .. } => {
+            map_expr(expr.as_ref(), f);
+        }
+
+        Expr::Mul { lhs, rhs, .. } |
+        Expr::Div { lhs, rhs, .. } |
+        Expr::Pow { lhs, rhs, .. } |
+        Expr::Modulo { lhs, rhs, .. } |
+        Expr::Add { lhs, rhs, .. } |
+        Expr::Sub { lhs, rhs, .. } |
+        Expr::Shl { lhs, rhs, .. } |
+        Expr::Shr { lhs, rhs, .. } |
+        Expr::BitAnd { lhs, rhs, .. } |
+        Expr::BitXor { lhs, rhs, .. } |
+        Expr::BitOr { lhs, rhs, .. } |
+        Expr::Equal { lhs, rhs, .. } |
+        Expr::NotEqual { lhs, rhs, .. } |
+        Expr::LessThan { lhs, rhs, .. } |
+        Expr::GreaterThan { lhs, rhs, .. } |
+        Expr::LessThanEq { lhs, rhs, .. } |
+        Expr::GreaterThanEq { lhs, rhs, .. } |
+        Expr::LogicalAnd { lhs, rhs, .. } |
+        Expr::LogicalOr { lhs, rhs, .. } => {
+            map_expr(lhs.as_ref(), f);
+            map_expr(rhs.as_ref(), f);
+        }
+
+        Expr::Reassignment { assignable, expr, .. } => {
+            match assignable {
+                Assignable::Index { arg, .. } => map_expr(arg.inner.as_ref(), f),
+                _ => {}
+            }
+
+            map_expr(expr.as_ref(), f);
+        }
+
+        _ => {}
+    }
+}
+
+pub fn map_pattern<F: FnMut(&Pattern)>(pattern: &Pattern, f: &mut F) {
+    f(pattern);
+
+    match pattern {
+        Pattern::Or { lhs, rhs, .. } => {
+            map_pattern(lhs.as_ref(), f);
+            map_pattern(rhs.as_ref(), f);
+        }
+
+        Pattern::Wildcard { .. } => {}
+        Pattern::AmbiguousSingleIdent(_) => {}
+        Pattern::Var { .. } => {}
+        Pattern::Literal(_) => {}
+        Pattern::Constant(_) => {}
+        
+        Pattern::Constructor { args, .. } => {
+            for arg in &args.inner {
+                map_pattern(arg, f);
+            }
+        }
+
+        Pattern::Struct { fields, .. } => {
+            for field in &fields.inner {
+                if let PatternStructField::Field { pattern_opt: Some((_, pattern)), .. } = field {
+                    map_pattern(pattern.as_ref(), f);
+                }
+            }
+        }
+
+        Pattern::Tuple(tuple) => {
+            for pattern in &tuple.inner {
+                map_pattern(pattern, f);
+            }
+        }
+
+        Pattern::Error(_, _) => {}
+    }
+}
+
 pub fn check_attribute_decls(
     attribute_decls: &[AttributeDecl],
     attribute_name: &str,

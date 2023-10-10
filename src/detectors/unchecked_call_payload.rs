@@ -91,10 +91,15 @@ impl AstVisitor for UncheckedCallPayloadVisitor {
         // Create the function state
         let fn_signature = context.item_fn.fn_signature.span();
         let fn_state = module_state.fn_states.entry(fn_signature).or_insert_with(FnState::default);
-        let FnArgs::Static(fn_args) = &context.item_fn.fn_signature.arguments.inner else { return Ok(()) };
 
+        let args = match &context.item_fn.fn_signature.arguments.inner {
+            FnArgs::Static(args) => args,
+            FnArgs::NonStatic { args_opt: Some(args), .. } => &args.1,
+            _ => return Ok(()),
+        };
+        
         // Check for arguments that are of type `raw_ptr` or `Bytes`
-        for arg in fn_args {
+        for arg in args {
             let Pattern::AmbiguousSingleIdent(ident) = &arg.pattern else { continue };
 
             match arg.ty.span().as_str() {
