@@ -4,14 +4,14 @@ use crate::{
     report::Severity,
     utils,
     visitor::{
-        AstVisitor, ConfigurableFieldContext, ExprContext, FnContext, ModuleContext,
-        StatementContext, UseContext,
+        AstVisitor, ConfigurableFieldContext, ConstContext, EnumFieldContext, ExprContext,
+        FnContext, ModuleContext, StatementLetContext, StorageFieldContext, StructFieldContext,
+        TraitContext, TraitTypeContext, TypeAliasContext, UseContext,
     },
 };
 use std::{collections::HashMap, path::PathBuf};
 use sway_ast::{
-    attribute::Annotated, Expr, FnArgs, ItemConst, ItemKind, PathExpr, Pattern, Statement,
-    StatementLet, UseTree,
+    ty::TyTupleDescriptor, Expr, FnArgs, PathExpr, PathType, Pattern, Traits, Ty, UseTree,
 };
 use sway_types::{Span, Spanned};
 
@@ -22,19 +22,39 @@ pub struct UnusedImportVisitor {
 
 #[derive(Default)]
 struct ModuleState {
-    imports: Vec<String>,
-    usage_states: HashMap<String, u32>,
-    span_usage_states: HashMap<String, Span>,
+    usage_states: HashMap<Span, u32>,
 }
 
 impl ModuleState {
-    fn check_span_usage(&mut self, span: &Span) {
-        let Some(matched) = self.span_usage_states.get_mut(span.as_str()) else { return };
+    fn import_use_tree(&mut self, use_tree: &UseTree) {
+        match use_tree {
+            UseTree::Group { imports } => {
+                for use_tree in &imports.inner {
+                    self.import_use_tree(use_tree);
+                }
+            }
 
-        self.usage_states
-            .entry(matched.as_str().to_owned())
-            .and_modify(|counter| *counter += 1)
-            .or_insert(1);
+            UseTree::Name { name } => {
+                self.usage_states.insert(name.span(), 0);
+            }
+
+            UseTree::Rename { alias, .. } => {
+                self.usage_states.insert(alias.span(), 0);
+            }
+            
+            UseTree::Glob { .. } => {}
+
+            UseTree::Path { suffix, .. } => {
+                self.import_use_tree(suffix.as_ref());
+            }
+
+            UseTree::Error { .. } => {}
+        }
+    }
+
+    fn check_span_usage(&mut self, span: &Span) {
+        let Some((_, usage_state)) = self.usage_states.iter_mut().find(|(s, _)| s.as_str() == span.as_str()) else { return };
+        *usage_state += 1;
     }
 
     fn check_expr_usage(&mut self, expr: &Expr) {
@@ -52,11 +72,62 @@ impl ModuleState {
             }
         });
     }
+
+    fn check_path_type_usage(&mut self, path: &PathType) {
+        self.check_span_usage(&path.prefix.name.span());
+                
+        if let Some(generics) = path.prefix.generics_opt.as_ref() {
+            for ty in &generics.1.parameters.inner {
+                self.check_ty_usage(ty);
+            }
+        }
+
+        if let Some(root) = path.root_opt.as_ref() {
+            if let Some(root) = root.0.as_ref() {
+                self.check_ty_usage(root.inner.ty.as_ref());
+                
+                if let Some(as_trait) = root.inner.as_trait.as_ref() {
+                    self.check_path_type_usage(as_trait.1.as_ref());
+                }
+            }
+        }
+    }
+
+    fn check_ty_usage(&mut self, ty: &Ty) {
+        match ty {
+            Ty::Path(path) => {
+                self.check_path_type_usage(path);
+            }
+
+            Ty::Tuple(tuple) => {
+                if let TyTupleDescriptor::Cons { head, tail, .. } = &tuple.inner {
+                    self.check_ty_usage(head.as_ref());
+                    
+                    for ty in tail {
+                        self.check_ty_usage(ty);
+                    }
+                }
+            }
+
+            Ty::Array(array) => {
+                self.check_ty_usage(&array.inner.ty);
+                self.check_expr_usage(array.inner.length.as_ref());
+            }
+            
+            Ty::StringSlice(_) => {}
+            Ty::StringArray { .. } => {}
+            Ty::Infer { .. } => {}
+            
+            Ty::Ptr { ty, .. } |
+            Ty::Slice { ty, .. } => {
+                self.check_ty_usage(ty.inner.as_ref());
+            }
+        }
+    }
 }
 
 impl AstVisitor for UnusedImportVisitor {
     fn visit_module(&mut self, context: &ModuleContext, _project: &mut Project) -> Result<(), Error> {
-        // Create the module state
         if !self.module_states.contains_key(context.path) {
             self.module_states.insert(context.path.into(), ModuleState::default());
         }
@@ -64,34 +135,62 @@ impl AstVisitor for UnusedImportVisitor {
         Ok(())
     }
 
-    fn visit_use(&mut self, context: &UseContext, _project: &mut Project) -> Result<(), Error> {
-        // Get the module state
+    fn leave_module(&mut self, context: &ModuleContext, project: &mut Project) -> Result<(), Error> {
         let module_state = self.module_states.get_mut(context.path).unwrap();
 
-        // Destructure the use tree
-        let UseTree::Path { suffix, .. } = &context.item_use.tree else { return Ok(()) };
-        let UseTree::Path { suffix, .. } = suffix.as_ref() else { return Ok(()) };
-        
-        if let UseTree::Group { imports } = suffix.as_ref() {
-            for import in &imports.inner {
-                let UseTree::Name { name } = import else { return Ok(()) };
-                module_state.usage_states.insert(name.span().str(), 0);
-                module_state.span_usage_states.insert(name.span().str(), name.span());
-                module_state.imports.push(name.span().str());
+        for (span, count) in &module_state.usage_states {
+            if *count == 0 {
+                project.report.borrow_mut().add_entry(
+                    context.path,
+                    project.span_to_line(context.path, span)?,
+                    Severity::Low,
+                    format!(
+                        "Found unused import: `{}`. Consider removing any unused imports.",
+                        span.as_str(),
+                    ),
+                );
             }
-        } else {
-            let UseTree::Name { name } = *suffix.to_owned() else { return Ok(()) };
-            module_state.usage_states.insert(name.span().str(), 0);
-            module_state.imports.push(name.span().str());
-            module_state.span_usage_states.insert(name.span().str(), name.span());
         }
 
         Ok(())
     }
 
-    fn visit_fn(&mut self, context: &FnContext, _project: &mut Project) -> Result<(), Error> {
-        // Get the module state
+    fn visit_use(&mut self, context: &UseContext, _project: &mut Project) -> Result<(), Error> {
         let module_state = self.module_states.get_mut(context.path).unwrap();
+        
+        module_state.import_use_tree(&context.item_use.tree);
+        
+        Ok(())
+    }
+
+    fn visit_struct_field(&mut self, context: &StructFieldContext, _project: &mut Project) -> Result<(), Error> {
+        let module_state = self.module_states.get_mut(context.path).unwrap();
+        
+        module_state.check_ty_usage(&context.field.ty);
+
+        Ok(())
+    }
+
+    fn visit_enum_field(&mut self, context: &EnumFieldContext, _project: &mut Project) -> Result<(), Error> {
+        let module_state = self.module_states.get_mut(context.path).unwrap();
+        
+        module_state.check_ty_usage(&context.field.ty);
+
+        Ok(())
+    }
+
+    fn visit_fn(&mut self, context: &FnContext, _project: &mut Project) -> Result<(), Error> {
+        let module_state = self.module_states.get_mut(context.path).unwrap();
+
+        if let Some(where_clause) = context.item_fn.fn_signature.where_clause_opt.as_ref() {
+            for bound in &where_clause.bounds {
+                module_state.check_path_type_usage(&bound.bounds.prefix);
+    
+                for (_, path_type) in bound.bounds.suffixes.iter() {
+                    module_state.check_path_type_usage(path_type);
+                }
+            }
+        }
 
         let args = match &context.item_fn.fn_signature.arguments.inner {
             FnArgs::Static(args) => args,
@@ -101,73 +200,105 @@ impl AstVisitor for UnusedImportVisitor {
 
         for arg in args {
             module_state.check_pattern_usage(&arg.pattern);
-            module_state.check_span_usage(&arg.ty.span());
+            module_state.check_ty_usage(&arg.ty);
         }
 
         Ok(())
     }
 
-    fn visit_statement(&mut self, context: &StatementContext, _project: &mut Project) -> Result<(), Error> {
-        // Get the module state
+    fn visit_statement_let(&mut self, context: &StatementLetContext, _project: &mut Project) -> Result<(), Error> {
         let module_state = self.module_states.get_mut(context.path).unwrap();
 
-        match context.statement {
-            Statement::Let(StatementLet { pattern, ty_opt, expr, .. }) => {
-                module_state.check_pattern_usage(pattern);
+        module_state.check_pattern_usage(&context.statement_let.pattern);
 
-                if let Some((_, ty)) = ty_opt.as_ref() {
-                    module_state.check_span_usage(&ty.span());
-                }
-
-                module_state.check_expr_usage(expr);
-            }
-            
-            Statement::Item(Annotated {
-                value: ItemKind::Const(ItemConst { ty_opt, expr_opt, .. }),
-                ..
-            }) => {
-                if let Some((_, ty)) = ty_opt.as_ref() {
-                    module_state.check_span_usage(&ty.span());
-                }
-
-                if let Some(expr) = expr_opt.as_ref() {
-                    module_state.check_expr_usage(expr);
-                }
-            }
-
-            _ => {}
+        if let Some((_, ty)) = context.statement_let.ty_opt.as_ref() {
+            module_state.check_ty_usage(ty);
         }
+
+        module_state.check_expr_usage(&context.statement_let.expr);
 
         Ok(())
     }
 
     fn visit_expr(&mut self, context: &ExprContext, _project: &mut Project) -> Result<(), Error> {
         let module_state = self.module_states.get_mut(context.path).unwrap();
+        
         module_state.check_expr_usage(context.expr);
+
+        Ok(())
+    }
+
+    fn visit_trait(&mut self, context: &TraitContext, _project: &mut Project) -> Result<(), Error> {
+        let module_state = self.module_states.get_mut(context.path).unwrap();
+
+        let mut check_traits = |traits: &Traits| {
+            module_state.check_path_type_usage(&traits.prefix);
+
+            for (_, path_type) in traits.suffixes.iter() {
+                module_state.check_path_type_usage(path_type);
+            }
+        };
+
+        if let Some((_, super_traits)) = context.item_trait.super_traits.as_ref() {
+            check_traits(super_traits);
+        }
+
+        if let Some(where_clause) = context.item_trait.where_clause_opt.as_ref() {
+            for bound in &where_clause.bounds {
+                check_traits(&bound.bounds);
+            }
+        }
+
+        Ok(())
+    }
+
+    fn visit_const(&mut self, context: &ConstContext, _project: &mut Project) -> Result<(), Error> {
+        let module_state = self.module_states.get_mut(context.path).unwrap();
+
+        if let Some((_, ty)) = context.item_const.ty_opt.as_ref() {
+            module_state.check_ty_usage(ty);
+        }
+
+        if let Some(expr) = context.item_const.expr_opt.as_ref() {
+            module_state.check_expr_usage(expr);
+        }
+
+        Ok(())
+    }
+
+    fn visit_storage_field(&mut self, context: &StorageFieldContext, _project: &mut Project) -> Result<(), Error> {
+        let module_state = self.module_states.get_mut(context.path).unwrap();
+
+        module_state.check_ty_usage(&context.field.ty);
+        module_state.check_expr_usage(&context.field.initializer);
+        
         Ok(())
     }
 
     fn visit_configurable_field(&mut self, context: &ConfigurableFieldContext, _project: &mut Project) -> Result<(), Error> {
         let module_state = self.module_states.get_mut(context.path).unwrap();
-        module_state.check_span_usage(&context.field.ty.span());
+        
+        module_state.check_ty_usage(&context.field.ty);
         module_state.check_expr_usage(&context.field.initializer);
+
         Ok(())
     }
 
-    fn leave_module(&mut self, context: &ModuleContext, project: &mut Project) -> Result<(), Error> {
-        // Get the module state
+    fn visit_type_alias(&mut self, context: &TypeAliasContext, _project: &mut Project) -> Result<(), Error> {
         let module_state = self.module_states.get_mut(context.path).unwrap();
+        
+        module_state.check_ty_usage(&context.item_type_alias.ty);
+        
+        Ok(())
+    }
 
-        for (name, count) in &module_state.usage_states {
-            if *count == 0 {
-                project.report.borrow_mut().add_entry(
-                    context.path,
-                    project.span_to_line(context.path, &module_state.span_usage_states.get(name).unwrap())?,
-                    Severity::Low,
-                    format!("Found unused import: `{name}`. Consider removing any unused imports."),
-                );
-            }
+    fn visit_trait_type(&mut self, context: &TraitTypeContext, _project: &mut Project) -> Result<(), Error> {
+        let module_state = self.module_states.get_mut(context.path).unwrap();
+        
+        if let Some(ty) = context.item_type.ty_opt.as_ref() {
+            module_state.check_ty_usage(ty);
         }
+
         Ok(())
     }
 }
