@@ -63,6 +63,7 @@ cargo uninstall sway-analyzer
 | 🟡 | `msg_amount_in_loop` | Checks for calls to `std::context::msg_amount()` or `std::registers::balance()` inside a while loop. In most cases, the result of the call should be stored in a local variable and decremented over each loop iteration. |
 | 🟢 | `non_zero_identity_validation` | Checks to see if functions containing `Identity`, `Address` and `ContractId` parameters are checked for a zero value. |
 | 🔴 | `potential_infinite_loop` | Checks for potentially infinite loops. |
+| 🟡 | `redundant_comparison` | Checks for functions that make redundant comparisons. |
 | 🟡 | `redundant_storage_access` | Checks for redundant calls to `storage.x.read()` and `storage.x.write(x)`. |
 | 🟢 | `storage_field_mutability` | Checks for any storage fields that can be refactored into constants or configurable fields. |
 | 🔴 | `storage_not_updated` | Checks for local variables that are read from storage, then modified without being written back to storage. |
