@@ -245,6 +245,6 @@ impl AstVisitor for StorageNotUpdatedVisitor {
 mod tests {
     #[test]
     fn test_storage_not_updated() {
-        crate::tests::test_detector("storage_not_updated", 1);
+        crate::tests::test_detector("storage_not_updated", 6);
     }
 }
