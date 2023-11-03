@@ -1,0 +1,7 @@
+[project]
+authors = ["Camden Smallwood"]
+entry = "main.sw"
+license = "Apache-2.0"
+name = "locked_native_asset"
+
+[dependencies]
