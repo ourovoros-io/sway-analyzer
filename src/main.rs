@@ -6,12 +6,13 @@ pub mod utils;
 pub mod visitor;
 
 use error::Error;
-use project::{Project, DisplayFormat};
+use project::{DisplayFormat, Project};
 use report::Sorting;
 use std::path::PathBuf;
-use structopt::StructOpt;
+use structopt::{clap::AppSettings, StructOpt};
 
 #[derive(Default, StructOpt)]
+#[structopt(global_settings = &[AppSettings::ColoredHelp, AppSettings::ArgRequiredElseHelp])]
 struct Options {
     /// The display format of the report. Can be "Text" or "Json". (Default = Text)
     #[structopt(long)]
