@@ -4,14 +4,16 @@ use crate::{
     report::Severity,
     utils,
     visitor::{
-        AstVisitor, ConfigurableFieldContext, ConstContext, EnumFieldContext, ExprContext,
-        FnContext, ModuleContext, StatementLetContext, StorageFieldContext, StructFieldContext,
-        TraitContext, TraitTypeContext, TypeAliasContext, UseContext,
+        AstVisitor, ConfigurableFieldContext, ConstContext, EnumContext, EnumFieldContext,
+        ExprContext, FnContext, ModuleContext, StatementLetContext, StorageFieldContext,
+        StructContext, StructFieldContext, TraitContext, TraitTypeContext, TypeAliasContext,
+        UseContext,
     },
 };
 use std::{collections::HashMap, path::PathBuf};
 use sway_ast::{
-    ty::TyTupleDescriptor, Expr, FnArgs, PathExpr, PathType, Pattern, Traits, Ty, UseTree,
+    ty::TyTupleDescriptor, Expr, FnArgs, PathExpr, PathExprSegment, PathType, Pattern, Traits, Ty,
+    UseTree,
 };
 use sway_types::{Span, Spanned};
 
@@ -59,8 +61,8 @@ impl ModuleState {
 
     fn check_expr_usage(&mut self, expr: &Expr) {
         utils::map_expr(expr, &mut |expr| {
-            if let Expr::Path(PathExpr { prefix, .. }) = expr {
-                self.check_span_usage(&prefix.span());
+            if let Expr::Path(path_expr) = expr {
+                self.check_path_expr_usage(path_expr)
             }
         });
     }
@@ -68,9 +70,27 @@ impl ModuleState {
     fn check_pattern_usage(&mut self, pattern: &Pattern) {
         utils::map_pattern(pattern, &mut |pattern| {
             if let Pattern::Constructor { path, .. } | Pattern::Struct { path, .. } = pattern {
-                self.check_span_usage(&path.span());
+                self.check_path_expr_usage(path);
             }
         });
+    }
+
+    fn check_path_expr_usage(&mut self, path: &PathExpr) {
+        let mut check_segment_usage = |segment: &PathExprSegment| {
+            self.check_span_usage(&segment.name.span());
+
+            if let Some((_, generics)) = segment.generics_opt.as_ref() {
+                for ty in &generics.parameters.inner {
+                    self.check_ty_usage(ty);
+                }
+            }
+        };
+
+        check_segment_usage(&path.prefix);
+
+        for (_, suffix) in path.suffix.iter() {
+            check_segment_usage(suffix);
+        }
     }
 
     fn check_path_type_usage(&mut self, path: &PathType) {
@@ -163,10 +183,42 @@ impl AstVisitor for UnusedImportVisitor {
         Ok(())
     }
 
+    fn visit_struct(&mut self, context: &StructContext, _project: &mut Project) -> Result<(), Error> {
+        let module_state = self.module_states.get_mut(context.path).unwrap();
+
+        if let Some(where_clause) = context.item_struct.where_clause_opt.as_ref() {
+            for bound in &where_clause.bounds {
+                module_state.check_path_type_usage(&bound.bounds.prefix);
+    
+                for (_, path_type) in bound.bounds.suffixes.iter() {
+                    module_state.check_path_type_usage(path_type);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     fn visit_struct_field(&mut self, context: &StructFieldContext, _project: &mut Project) -> Result<(), Error> {
         let module_state = self.module_states.get_mut(context.path).unwrap();
         
         module_state.check_ty_usage(&context.field.ty);
+
+        Ok(())
+    }
+
+    fn visit_enum(&mut self, context: &EnumContext, _project: &mut Project) -> Result<(), Error> {
+        let module_state = self.module_states.get_mut(context.path).unwrap();
+
+        if let Some(where_clause) = context.item_enum.where_clause_opt.as_ref() {
+            for bound in &where_clause.bounds {
+                module_state.check_path_type_usage(&bound.bounds.prefix);
+    
+                for (_, path_type) in bound.bounds.suffixes.iter() {
+                    module_state.check_path_type_usage(path_type);
+                }
+            }
+        }
 
         Ok(())
     }
@@ -223,6 +275,10 @@ impl AstVisitor for UnusedImportVisitor {
     fn visit_expr(&mut self, context: &ExprContext, _project: &mut Project) -> Result<(), Error> {
         let module_state = self.module_states.get_mut(context.path).unwrap();
         
+        if let Expr::AbiCast { args, .. } = context.expr {
+            module_state.check_path_type_usage(&args.inner.name);
+        }
+
         module_state.check_expr_usage(context.expr);
 
         Ok(())

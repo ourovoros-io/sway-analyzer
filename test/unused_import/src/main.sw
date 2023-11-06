@@ -40,6 +40,5 @@ impl TestUnusedImport for Contract {
         log(asset);
         log(to);
         transfer(to, asset, 1);
-        
     }
 }
