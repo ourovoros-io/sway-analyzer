@@ -259,6 +259,23 @@ pub struct WhileExprContext<'a> {
 }
 
 #[derive(Clone)]
+pub struct ForExprContext<'a> {
+    pub path: &'a Path,
+    pub module: &'a Module,
+    pub item: &'a ItemKind,
+    pub impl_attributes: Option<&'a [AttributeDecl]>,
+    pub item_impl: Option<&'a ItemImpl>,
+    pub fn_attributes: &'a [AttributeDecl],
+    pub item_fn: &'a ItemFn,
+    pub blocks: Vec<Span>,
+    pub statement: Option<&'a Statement>,
+    pub expr: &'a Expr,
+    pub pattern: &'a Pattern,
+    pub iterator: &'a Expr,
+    pub body: &'a Braces<CodeBlockContents>,
+}
+
+#[derive(Clone)]
 pub struct TraitContext<'a> {
     pub path: &'a Path,
     pub module: &'a Module,
@@ -422,6 +439,9 @@ pub trait AstVisitor {
     fn visit_while_expr(&mut self, context: &WhileExprContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
     fn leave_while_expr(&mut self, context: &WhileExprContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
 
+    fn visit_for_expr(&mut self, context: &ForExprContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
+    fn leave_for_expr(&mut self, context: &ForExprContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
+
     fn visit_trait(&mut self, context: &TraitContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
     fn leave_trait(&mut self, context: &TraitContext, project: &mut Project) -> Result<(), Error> { Ok(()) }
 
@@ -496,6 +516,8 @@ pub struct AstVisitorRecursive<'a> {
     pub leave_match_branch_hooks: Vec<Box<dyn FnMut(&MatchBranchContext, &mut Project) -> Result<(), Error> + 'a>>,
     pub visit_while_expr_hooks: Vec<Box<dyn FnMut(&WhileExprContext, &mut Project) -> Result<(), Error> + 'a>>,
     pub leave_while_expr_hooks: Vec<Box<dyn FnMut(&WhileExprContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub visit_for_expr_hooks: Vec<Box<dyn FnMut(&ForExprContext, &mut Project) -> Result<(), Error> + 'a>>,
+    pub leave_for_expr_hooks: Vec<Box<dyn FnMut(&ForExprContext, &mut Project) -> Result<(), Error> + 'a>>,
     pub visit_trait_hooks: Vec<Box<dyn FnMut(&TraitContext, &mut Project) -> Result<(), Error> + 'a>>,
     pub leave_trait_hooks: Vec<Box<dyn FnMut(&TraitContext, &mut Project) -> Result<(), Error> + 'a>>,
     pub visit_impl_hooks: Vec<Box<dyn FnMut(&ImplContext, &mut Project) -> Result<(), Error> + 'a>>,
@@ -1378,6 +1400,27 @@ impl AstVisitor for AstVisitorRecursive<'_> {
 
                 self.visit_while_expr(&context, project)?;
                 self.leave_while_expr(&context, project)?;
+            }
+
+            Expr::For { value_pattern, iterator, block, .. } => {
+                let context = ForExprContext {
+                    path: context.path,
+                    module: context.module,
+                    item: context.item,
+                    impl_attributes: context.impl_attributes,
+                    item_impl: context.item_impl,
+                    fn_attributes: context.fn_attributes.unwrap(),
+                    item_fn: context.item_fn.unwrap(),
+                    blocks: context.blocks.clone(),
+                    statement: context.statement.clone(),
+                    expr: context.expr,
+                    pattern: value_pattern,
+                    iterator: iterator.as_ref(),
+                    body: block,
+                };
+
+                self.visit_for_expr(&context, project)?;
+                self.leave_for_expr(&context, project)?;
             }
             
             Expr::FuncApp { func, args } => {
@@ -2758,6 +2801,63 @@ impl AstVisitor for AstVisitorRecursive<'_> {
         }
         
         for hook in self.leave_while_expr_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
+        Ok(())
+    }
+
+    fn visit_for_expr(&mut self, context: &ForExprContext, project: &mut Project) -> Result<(), Error> {
+        for visitor in self.visitors.iter_mut() {
+            visitor.visit_for_expr(context, project)?;
+        }
+
+        for hook in self.visit_for_expr_hooks.iter_mut() {
+            hook(context, project)?;
+        }
+
+        let iterator_context = ExprContext {
+            path: context.path,
+            module: context.module,
+            item: context.item,
+            impl_attributes: context.impl_attributes,
+            item_impl: context.item_impl,
+            fn_attributes: Some(context.fn_attributes),
+            item_fn: Some(context.item_fn),
+            blocks: context.blocks.clone(),
+            statement: context.statement.clone(),
+            expr: context.iterator,
+        };
+
+        self.visit_expr(&iterator_context, project)?;
+        self.leave_expr(&iterator_context, project)?;
+
+        let body_context = BlockContext {
+            path: context.path,
+            module: context.module,
+            item: context.item,
+            impl_attributes: context.impl_attributes,
+            item_impl: context.item_impl,
+            fn_attributes: context.fn_attributes,
+            item_fn: context.item_fn,
+            blocks: context.blocks.clone(),
+            statement: context.statement.clone(),
+            expr: Some(context.expr),
+            block: context.body,
+        };
+
+        self.visit_block(&body_context, project)?;
+        self.leave_block(&body_context, project)?;
+
+        Ok(())
+    }
+
+    fn leave_for_expr(&mut self, context: &ForExprContext, project: &mut Project) -> Result<(), Error> {
+        for visitor in self.visitors.iter_mut() {
+            visitor.leave_for_expr(context, project)?;
+        }
+        
+        for hook in self.leave_for_expr_hooks.iter_mut() {
             hook(context, project)?;
         }
 

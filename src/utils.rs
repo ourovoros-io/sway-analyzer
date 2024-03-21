@@ -765,6 +765,13 @@ pub fn find_storage_access_in_expr(expr: &Expr) -> Option<&Expr> {
 
             find_storage_access_in_block(block)
         }
+        Expr::For { iterator, block, .. } => {
+            let result = find_storage_access_in_expr(iterator.as_ref());
+            if result.is_some() {
+                return result;
+            }
+            find_storage_access_in_block(block)
+        }
         Expr::FuncApp { func, args } => {
             let result = find_storage_access_in_expr(func.as_ref());
             if result.is_some() {

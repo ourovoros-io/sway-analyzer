@@ -23,9 +23,9 @@ impl Default for ModuleState {
     fn default() -> Self {
         Self {
             fn_calls_to_check: vec![
-                "std::token::transfer".into(),
-                "std::token::transfer_to_address".into(),
-                "std::token::force_transfer_to_contract".into(),
+                "std::asset::transfer".into(),
+                "std::asset::transfer_to_address".into(),
+                "std::asset::force_transfer_to_contract".into(),
                 "std::low_level_call::call_with_function_selector".into(),
             ],
             locking_functions: vec![],

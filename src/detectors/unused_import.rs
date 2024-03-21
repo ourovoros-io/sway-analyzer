@@ -142,6 +142,12 @@ impl ModuleState {
             Ty::Slice { ty, .. } => {
                 self.check_ty_usage(ty.inner.as_ref());
             }
+
+            Ty::Ref { ty, .. } => {
+                self.check_ty_usage(ty.as_ref());
+            }
+
+            Ty::Never { .. } => {}
         }
     }
 }

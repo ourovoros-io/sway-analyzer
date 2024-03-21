@@ -25,9 +25,9 @@ impl Default for ModuleState {
         Self {
             fn_states: HashMap::new(),
             fn_calls_to_check: vec![
-                "std::token::transfer".into(),
-                "std::token::transfer_to_address".into(),
-                "std::token::force_transfer_to_contract".into(),
+                "std::asset::transfer".into(),
+                "std::asset::transfer_to_address".into(),
+                "std::asset::force_transfer_to_contract".into(),
                 "std::low_level_call::call_with_function_selector".into(),
             ],
             storage_accounts: Vec::new(),
@@ -73,18 +73,18 @@ impl AstVisitor for ArbitraryAssetTransferVisitor {
         // Get the module state
         let module_state = self.module_states.get_mut(context.path).unwrap();
 
-        // Check the use tree for `std::token::transfer`
-        if let Some(name) = utils::use_tree_to_name(&context.item_use.tree, "std::token::transfer") {
+        // Check the use tree for `std::asset::transfer`
+        if let Some(name) = utils::use_tree_to_name(&context.item_use.tree, "std::asset::transfer") {
             module_state.fn_calls_to_check.push(name);
         }
         
-        // Check the use tree for `std::token::transfer_to_address`
-        if let Some(name) = utils::use_tree_to_name(&context.item_use.tree, "std::token::transfer_to_address") {
+        // Check the use tree for `std::asset::transfer_to_address`
+        if let Some(name) = utils::use_tree_to_name(&context.item_use.tree, "std::asset::transfer_to_address") {
             module_state.fn_calls_to_check.push(name);
         }
 
-        // Check the use tree for `std::token::force_transfer_to_contract`
-        if let Some(name) = utils::use_tree_to_name(&context.item_use.tree, "std::token::force_transfer_to_contract") {
+        // Check the use tree for `std::asset::force_transfer_to_contract`
+        if let Some(name) = utils::use_tree_to_name(&context.item_use.tree, "std::asset::force_transfer_to_contract") {
             module_state.fn_calls_to_check.push(name);
         }
 
