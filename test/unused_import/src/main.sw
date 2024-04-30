@@ -3,7 +3,7 @@ contract;
 use std::constants::{BASE_ASSET_ID, ZERO_B256};
 
 use std::logging::log;
-use std::token::transfer;
+use std::asset::transfer;
 
 // Report entry should be created:
 // L10: Found unused import: `msg_asset_id`. Consider removing any unused imports.

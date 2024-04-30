@@ -1,6 +1,6 @@
 contract;
 
-use std::token::{force_transfer_to_contract, transfer, transfer_to_address};
+use std::asset::{force_transfer_to_contract, transfer, transfer_to_address};
 use std::low_level_call::{call_with_function_selector, CallParams};
 use std::bytes::Bytes;
 
