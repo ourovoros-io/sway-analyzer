@@ -1,4 +1,4 @@
-use sway_ast::{attribute::{Attribute, Annotated}, *};
+use sway_ast::{assignable::ElementAccess, attribute::{Annotated, Attribute}, *};
 use sway_types::{BaseIdent, Span, Spanned};
 
 pub fn fold_punctuated<T, P>(punctuated: &Punctuated<T, P>) -> Vec<&T> {
@@ -277,25 +277,41 @@ pub fn fold_expr_idents(expr: &Expr) -> Vec<BaseIdent> {
     result
 }
 
+pub fn fold_element_access_idents(element_access: &ElementAccess) -> Vec<BaseIdent> {
+    let mut result = vec![];
+
+    match element_access {
+        ElementAccess::Var(ident) => {
+            result.push(ident.clone());
+        }
+
+        ElementAccess::Index { target, .. } => {
+            result.extend(fold_element_access_idents(target));
+        }
+
+        ElementAccess::FieldProjection { target, name, .. } => {
+            result.extend(fold_element_access_idents(target));
+            result.push(name.clone());
+        }
+
+        ElementAccess::TupleFieldProjection { target, .. } => {
+            result.extend(fold_element_access_idents(target));
+        }
+    }
+
+    result
+}
+
 pub fn fold_assignable_idents(assignable: &Assignable) -> Vec<BaseIdent> {
     let mut result = vec![];
 
     match assignable {
-        Assignable::Var(ident) => {
-            result.push(ident.clone());
+        Assignable::ElementAccess(element_access) => {
+            result.extend(fold_element_access_idents(element_access));
         }
 
-        Assignable::Index { target, .. } => {
-            result.extend(fold_assignable_idents(target));
-        }
-
-        Assignable::FieldProjection { target, name, .. } => {
-            result.extend(fold_assignable_idents(target));
-            result.push(name.clone());
-        }
-
-        Assignable::TupleFieldProjection { target, .. } => {
-            result.extend(fold_assignable_idents(target));
+        Assignable::Deref { expr, .. } => {
+            result.extend(fold_expr_idents(expr));
         }
     }
 
@@ -490,7 +506,7 @@ pub fn map_expr<F: FnMut(&Expr)>(expr: &Expr, f: &mut F) {
 
         Expr::Reassignment { assignable, expr, .. } => {
             match assignable {
-                Assignable::Index { arg, .. } => map_expr(arg.inner.as_ref(), f),
+                Assignable::ElementAccess(ElementAccess::Index { arg, .. }) => map_expr(arg.inner.as_ref(), f),
                 _ => {}
             }
 

@@ -7,7 +7,7 @@ use crate::{
     }, report::Severity, utils,
 };
 use std::{collections::HashMap, path::PathBuf};
-use sway_ast::{Assignable, Expr, Pattern, Statement};
+use sway_ast::{assignable::ElementAccess, Assignable, Expr, Pattern, Statement};
 use sway_types::{Span, Spanned};
 
 #[derive(Default)]
@@ -130,7 +130,7 @@ impl AstVisitor for WeakPrngVisitor {
         // Only check single variable reassignment expression statements
         let Statement::Expr {
             expr: Expr::Reassignment {
-                assignable: Assignable::Var(ident),
+                assignable: Assignable::ElementAccess(ElementAccess::Var(ident)),
                 expr,
                 ..
             },
