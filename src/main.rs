@@ -81,33 +81,31 @@ fn main() -> Result<(), Error> {
 /// Filter the entries based on the include or exclude options
 fn filter_entries(report: &crate::report::Report, options: &Options) -> Vec<(PathBuf, Vec<crate::report::Entry>)> {
     let mut out = vec![];
-    if !options.include.is_empty() {
-        let include = &options.include[0];
-        let filter_items: HashSet<_> = if include.contains(',') {
-            include.split(',').map(str::to_ascii_lowercase).collect()
-        } else {
-            options.include.iter().map(|x| x.to_ascii_lowercase()).collect()
-        };
-        for (path, entry) in &report.entries {
-            let filtered: Vec<_> = entry.iter().filter(|e| filter_items.contains(&e.severity.to_string().to_ascii_lowercase())).cloned().collect();
-            if !filtered.is_empty() {
-                out.push((path.clone(), filtered));
-            }
-        }
+
+    let (input, should_include) = if !options.include.is_empty() {
+        (options.include.as_slice(), true)
     } else if !options.exclude.is_empty() {
-        let exclude = &options.exclude[0];
-        let filter_items: HashSet<_> = if exclude.contains(',') {
-            exclude.split(',').map(str::to_ascii_lowercase).collect()
-        } else {
-            options.exclude.iter().map(|x| x.to_ascii_lowercase()).collect()
-        };
-        for (path, entry) in &report.entries {
-            let remaining: Vec<_> = entry.iter().filter(|e| !filter_items.contains(&e.severity.to_string().to_ascii_lowercase())).cloned().collect();
-            if !remaining.is_empty() {
-                out.push((path.clone(), remaining));
-            }
+        (options.exclude.as_slice(), false)
+    } else {
+        return report.entries.clone()
+    };
+
+    let first_input = &input[0];
+
+    let filter_items: HashSet<_> = if first_input.contains(',') {
+        first_input.split(',').map(str::to_ascii_lowercase).collect()
+    } else {
+        input.iter().map(|x| x.to_ascii_lowercase()).collect()
+    };
+
+    for (path, entry) in &report.entries {
+        let filtered: Vec<_> = entry.iter().filter(|e| should_include == filter_items.contains(&e.severity.to_string().to_ascii_lowercase())).cloned().collect();
+
+        if !filtered.is_empty() {
+            out.push((path.clone(), filtered));
         }
     }
+    
     out
 }
 
@@ -156,7 +154,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_include_detectors() {
+    fn test_include_severities() {
         // The arbitrary_asset_transfer directory contains 15 low severity entries
         // and 16 high severity entries. We should see all 31 entries
         let options = Options {
@@ -178,7 +176,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_include_single_detectors() {
+    fn test_include_single_severity() {
         // The arbitrary_asset_transfer directory contains 15 low severity entries
         // and 16 high severity entries. We should only see the low severity entries
         let options = Options {
@@ -200,7 +198,29 @@ pub mod tests {
     }
 
     #[test]
-    fn test_exclude_detectors() {
+    fn test_include_no_severities() {
+        // The arbitrary_asset_transfer directory contains 15 low severity entries
+        // and 16 high severity entries. We should only see the low severity entries
+        let options = Options {
+            directory: Some(PathBuf::from("test/arbitrary_asset_transfer")),
+            include: vec![],
+            ..Default::default()
+        };
+
+        let mut project = Project::try_from(&options).unwrap();
+        project.analyze_modules().unwrap();
+
+        // Filter the entries based on the include or exclude options
+        let entries  = filter_entries(&project.report.borrow(), &options);
+        project.report.borrow_mut().entries = entries.into_iter().collect();
+
+        assert_eq!(project.report.borrow().entries[0].1.len(), 31);
+
+        println!("{project}");
+    }
+
+    #[test]
+    fn test_exclude_severities() {
         // The arbitrary_asset_transfer directory contains 15 low severity entries
         // and 16 high severity entries. We should not see any entries
         let options = Options {
@@ -222,7 +242,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_exclude_single_detectors() {
+    fn test_exclude_single_severity() {
         // The arbitrary_asset_transfer directory contains 15 low severity entries
         // and 16 high severity entries. We should only see the high severity entries
         let options = Options {
@@ -239,6 +259,28 @@ pub mod tests {
         project.report.borrow_mut().entries = entries.into_iter().collect();
 
         assert_eq!(project.report.borrow().entries[0].1.len(), 16);
+
+        println!("{project}");
+    }
+
+    #[test]
+    fn test_exclude_no_severities() {
+        // The arbitrary_asset_transfer directory contains 15 low severity entries
+        // and 16 high severity entries. We should not see any entries
+        let options = Options {
+            directory: Some(PathBuf::from("test/arbitrary_asset_transfer")),
+            exclude: vec![],
+            ..Default::default()
+        };
+
+        let mut project = Project::try_from(&options).unwrap();
+        project.analyze_modules().unwrap();
+
+        // Filter the entries based on the include or exclude options
+        let entries  = filter_entries(&project.report.borrow(), &options);
+        project.report.borrow_mut().entries = entries;
+
+        assert_eq!(project.report.borrow().entries[0].1.len(), 31);
 
         println!("{project}");
     }
