@@ -106,6 +106,15 @@ impl TryFrom<&Options> for Project<'_> {
         for path in options.files.iter() {
             project.parse_file(path)?;
         }
+
+        // Check if detectors are valid and if not, return an error with the detector name that is not valid.
+        if !options.detectors.is_empty() {
+            for detector in &options.detectors {
+                if !DETECTOR_TYPES.iter().any(|(name, _)| detector == *name) {
+                    return Err(Error::Wrapped(format!("Detector not found in detectors collection : {detector}").into()));
+                }
+            }
+        }
     
         for &(detector_name, create_detector) in DETECTOR_TYPES {
             if options.detectors.is_empty() || options.detectors.iter().any(|v| v == detector_name) {
