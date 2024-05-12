@@ -102,7 +102,7 @@ impl AstVisitor for ArbitraryAssetTransferVisitor {
 
         // Create the function state
         let fn_signature = context.item_fn.fn_signature.span();
-        let fn_state = module_state.fn_states.entry(fn_signature.clone()).or_insert_with(FnState::default);
+        let fn_state = module_state.fn_states.entry(fn_signature.clone()).or_default();
 
         // Check to see if the function contains `amount` or `identity` arguments
         let args = match &context.item_fn.fn_signature.arguments.inner {
@@ -139,21 +139,21 @@ impl AstVisitor for ArbitraryAssetTransferVisitor {
     
         // Check for `require` and update the function state
         if utils::get_require_args(context.expr).is_some() {
-            if module_state.storage_accounts.iter().find(|&x| context.expr.span().as_str().contains(x)).is_some() {
+            if module_state.storage_accounts.iter().any(|x| context.expr.span().as_str().contains(x)) {
                 fn_state.has_requirement = true;
             }
         }
         // Check for `if/revert` and update the function state
         else if let Some(IfCondition::Expr(expr)) = utils::get_if_revert_condition(context.expr) {
-            if module_state.storage_accounts.iter().find(|&x| expr.span().as_str().contains(x)).is_some() {
+            if module_state.storage_accounts.iter().any(|x| expr.span().as_str().contains(x)) {
                 fn_state.has_requirement = true;
             }
         }
         // Check for calls to `transfer` functions
         else if let Expr::FuncApp { func, args } = context.expr {
-            let Some(_) = module_state.fn_calls_to_check.iter().find(|&x| x == &func.span().as_str()) else { return Ok(()) };
+            let Some(_) = module_state.fn_calls_to_check.iter().find(|&x| x == func.span().as_str()) else { return Ok(()) };
         
-            if fn_state.has_amount && fn_state.has_identity {
+            if fn_state.has_amount && fn_state.has_identity || module_state.storage_accounts.iter().any(|acc| args.span().as_str().contains(acc) && acc != "admin") {
                 project.report.borrow_mut().add_entry(
                     context.path,
                     project.span_to_line(context.path, &context.expr.span())?,
@@ -164,20 +164,7 @@ impl AstVisitor for ArbitraryAssetTransferVisitor {
                         context.expr.span().as_str(),
                     ),
                 );
-            } else {
-                if module_state.storage_accounts.iter().any(|acc| args.span().as_str().contains(acc) && acc != "admin") {
-                    project.report.borrow_mut().add_entry(
-                        context.path,
-                        project.span_to_line(context.path, &context.expr.span())?,
-                        Severity::High,
-                        format!(
-                            "{} contains an arbitrary native asset transfer: `{}`",
-                            utils::get_item_location(context.item, &context.item_impl, &context.item_fn),
-                            context.expr.span().as_str(),
-                        ),
-                    );
-                }
-            }
+            } 
         }
         
         Ok(())

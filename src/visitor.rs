@@ -681,7 +681,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     attributes: context.attributes,
                     item_impl,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                 };
                 
                 self.visit_impl(&context, project)?;
@@ -1138,7 +1138,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: args.inner.address.as_ref(),
                 };
 
@@ -1158,7 +1158,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                             fn_attributes: context.fn_attributes,
                             item_fn: context.item_fn,
                             blocks: context.blocks.clone(),
-                            statement: context.statement.clone(),
+                            statement: context.statement,
                             expr: field.1.as_ref(),
                         };
         
@@ -1182,7 +1182,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                             fn_attributes: context.fn_attributes,
                             item_fn: context.item_fn,
                             blocks: context.blocks.clone(),
-                            statement: context.statement.clone(),
+                            statement: context.statement,
                             expr: head.as_ref(),
                         };
         
@@ -1199,7 +1199,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                                 fn_attributes: context.fn_attributes,
                                 item_fn: context.item_fn,
                                 blocks: context.blocks.clone(),
-                                statement: context.statement.clone(),
+                                statement: context.statement,
                                 expr,
                             };
             
@@ -1219,7 +1219,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: parens.inner.as_ref(),
                 };
 
@@ -1238,7 +1238,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     item_fn: context.item_fn.unwrap(),
                     expr: Some(context.expr),
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     block,
                 };
 
@@ -1259,7 +1259,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                                 fn_attributes: context.fn_attributes,
                                 item_fn: context.item_fn,
                                 blocks: context.blocks.clone(),
-                                statement: context.statement.clone(),
+                                statement: context.statement,
                                 expr,
                             };
             
@@ -1278,7 +1278,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                             fn_attributes: context.fn_attributes,
                             item_fn: context.item_fn,
                             blocks: context.blocks.clone(),
-                            statement: context.statement.clone(),
+                            statement: context.statement,
                             expr: value.as_ref(),
                         };
         
@@ -1294,7 +1294,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                             fn_attributes: context.fn_attributes,
                             item_fn: context.item_fn,
                             blocks: context.blocks.clone(),
-                            statement: context.statement.clone(),
+                            statement: context.statement,
                             expr: length.as_ref(),
                         };
 
@@ -1314,7 +1314,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes.unwrap(),
                     item_fn: context.item_fn.unwrap(),
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: context.expr,
                     asm,
                 };
@@ -1334,7 +1334,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                         fn_attributes: context.fn_attributes,
                         item_fn: context.item_fn,
                         blocks: context.blocks.clone(),
-                        statement: context.statement.clone(),
+                        statement: context.statement,
                         expr: expr.as_ref(),
                     };
     
@@ -1353,7 +1353,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes.unwrap(),
                     item_fn: context.item_fn.unwrap(),
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: context.expr,
                     if_expr,
                 };
@@ -1372,7 +1372,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes.unwrap(),
                     item_fn: context.item_fn.unwrap(),
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: context.expr,
                     value: value.as_ref(),
                     branches,
@@ -1392,7 +1392,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes.unwrap(),
                     item_fn: context.item_fn.unwrap(),
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: context.expr,
                     condition: condition.as_ref(),
                     body: block,
@@ -1412,7 +1412,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes.unwrap(),
                     item_fn: context.item_fn.unwrap(),
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: context.expr,
                     pattern: value_pattern,
                     iterator: iterator.as_ref(),
@@ -1433,7 +1433,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: func.as_ref(),
                 };
 
@@ -1450,7 +1450,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                         fn_attributes: context.fn_attributes,
                         item_fn: context.item_fn,
                         blocks: context.blocks.clone(),
-                        statement: context.statement.clone(),
+                        statement: context.statement,
                         expr: arg,
                     };
     
@@ -1469,7 +1469,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: target.as_ref(),
                 };
 
@@ -1485,7 +1485,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: arg.inner.as_ref(),
                 };
 
@@ -1503,7 +1503,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: target.as_ref(),
                 };
 
@@ -1522,7 +1522,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                                 fn_attributes: context.fn_attributes,
                                 item_fn: context.item_fn,
                                 blocks: context.blocks.clone(),
-                                statement: context.statement.clone(),
+                                statement: context.statement,
                                 expr: expr.1.as_ref(),
                             };
             
@@ -1542,7 +1542,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                         fn_attributes: context.fn_attributes,
                         item_fn: context.item_fn,
                         blocks: context.blocks.clone(),
-                        statement: context.statement.clone(),
+                        statement: context.statement,
                         expr: arg,
                     };
     
@@ -1561,7 +1561,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: target.as_ref(),
                 };
 
@@ -1579,7 +1579,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: target.as_ref(),
                 };
 
@@ -1597,7 +1597,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: expr.as_ref(),
                 };
 
@@ -1615,7 +1615,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: expr.as_ref(),
                 };
 
@@ -1633,7 +1633,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: expr.as_ref(),
                 };
 
@@ -1651,7 +1651,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: lhs.as_ref(),
                 };
 
@@ -1667,7 +1667,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: rhs.as_ref(),
                 };
 
@@ -1685,7 +1685,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: lhs.as_ref(),
                 };
 
@@ -1701,7 +1701,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: rhs.as_ref(),
                 };
 
@@ -1719,7 +1719,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: lhs.as_ref(),
                 };
 
@@ -1735,7 +1735,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: rhs.as_ref(),
                 };
 
@@ -1753,7 +1753,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: lhs.as_ref(),
                 };
 
@@ -1769,7 +1769,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: rhs.as_ref(),
                 };
 
@@ -1787,7 +1787,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: lhs.as_ref(),
                 };
 
@@ -1803,7 +1803,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: rhs.as_ref(),
                 };
 
@@ -1821,7 +1821,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: lhs.as_ref(),
                 };
 
@@ -1837,7 +1837,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: rhs.as_ref(),
                 };
 
@@ -1855,7 +1855,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: lhs.as_ref(),
                 };
 
@@ -1871,7 +1871,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: rhs.as_ref(),
                 };
 
@@ -1889,7 +1889,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: lhs.as_ref(),
                 };
 
@@ -1905,7 +1905,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: rhs.as_ref(),
                 };
 
@@ -1923,7 +1923,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: lhs.as_ref(),
                 };
 
@@ -1939,7 +1939,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: rhs.as_ref(),
                 };
 
@@ -1957,7 +1957,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: lhs.as_ref(),
                 };
 
@@ -1973,7 +1973,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: rhs.as_ref(),
                 };
 
@@ -1991,7 +1991,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: lhs.as_ref(),
                 };
 
@@ -2007,7 +2007,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: rhs.as_ref(),
                 };
 
@@ -2025,7 +2025,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: lhs.as_ref(),
                 };
 
@@ -2041,7 +2041,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: rhs.as_ref(),
                 };
 
@@ -2059,7 +2059,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: lhs.as_ref(),
                 };
 
@@ -2075,7 +2075,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: rhs.as_ref(),
                 };
 
@@ -2093,7 +2093,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: lhs.as_ref(),
                 };
 
@@ -2109,7 +2109,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: rhs.as_ref(),
                 };
 
@@ -2127,7 +2127,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: lhs.as_ref(),
                 };
 
@@ -2143,7 +2143,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: rhs.as_ref(),
                 };
 
@@ -2161,7 +2161,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: lhs.as_ref(),
                 };
 
@@ -2177,7 +2177,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: rhs.as_ref(),
                 };
 
@@ -2195,7 +2195,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: lhs.as_ref(),
                 };
 
@@ -2211,7 +2211,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: rhs.as_ref(),
                 };
 
@@ -2229,7 +2229,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: lhs.as_ref(),
                 };
 
@@ -2245,7 +2245,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: rhs.as_ref(),
                 };
 
@@ -2263,7 +2263,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: lhs.as_ref(),
                 };
 
@@ -2279,7 +2279,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: rhs.as_ref(),
                 };
 
@@ -2297,7 +2297,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: context.fn_attributes,
                     item_fn: context.item_fn,
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: expr.as_ref(),
                 };
 
@@ -2363,7 +2363,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                 fn_attributes: Some(context.fn_attributes),
                 item_fn: Some(context.item_fn),
                 blocks: blocks.clone(),
-                statement: context.statement.clone(),
+                statement: context.statement,
                 expr: expr.as_ref(),
             };
 
@@ -2405,7 +2405,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                 fn_attributes: context.fn_attributes,
                 item_fn: context.item_fn,
                 blocks: context.blocks.clone(),
-                statement: context.statement.clone(),
+                statement: context.statement,
                 expr: context.expr,
                 asm: context.asm,
                 instruction: &instruction.0,
@@ -2425,7 +2425,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                 fn_attributes: context.fn_attributes,
                 item_fn: context.item_fn,
                 blocks: context.blocks.clone(),
-                statement: context.statement.clone(),
+                statement: context.statement,
                 expr: context.expr,
                 asm: context.asm,
                 final_expr,
@@ -2518,7 +2518,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: Some(context.fn_attributes),
                     item_fn: Some(context.item_fn),
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: expr.as_ref(),
                 };
 
@@ -2540,7 +2540,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: Some(context.fn_attributes),
                     item_fn: Some(context.item_fn),
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr: rhs.as_ref(),
                 };
 
@@ -2558,7 +2558,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
             fn_attributes: context.fn_attributes,
             item_fn: context.item_fn,
             blocks: context.blocks.clone(),
-            statement: context.statement.clone(),
+            statement: context.statement,
             expr: Some(context.expr),
             block: &context.if_expr.then_block,
         };
@@ -2578,7 +2578,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                         fn_attributes: context.fn_attributes,
                         item_fn: context.item_fn,
                         blocks: context.blocks.clone(),
-                        statement: context.statement.clone(),
+                        statement: context.statement,
                         expr: context.expr,
                         if_expr: if_expr.as_ref(),
                     };
@@ -2597,7 +2597,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                         fn_attributes: context.fn_attributes,
                         item_fn: context.item_fn,
                         blocks: context.blocks.clone(),
-                        statement: context.statement.clone(),
+                        statement: context.statement,
                         expr: Some(context.expr),
                         block: else_block,
                     };
@@ -2641,7 +2641,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
             fn_attributes: Some(context.fn_attributes),
             item_fn: Some(context.item_fn),
             blocks: context.blocks.clone(),
-            statement: context.statement.clone(),
+            statement: context.statement,
             expr: context.value,
         };
 
@@ -2658,7 +2658,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                 fn_attributes: context.fn_attributes,
                 item_fn: context.item_fn,
                 blocks: context.blocks.clone(),
-                statement: context.statement.clone(),
+                statement: context.statement,
                 expr: context.expr,
                 value: context.value,
                 branch,
@@ -2708,7 +2708,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     item_fn: context.item_fn,
                     expr: Some(context.expr),
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     block,
                 };
 
@@ -2726,7 +2726,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     fn_attributes: Some(context.fn_attributes),
                     item_fn: Some(context.item_fn),
                     blocks: context.blocks.clone(),
-                    statement: context.statement.clone(),
+                    statement: context.statement,
                     expr,
                 };
 
@@ -2768,7 +2768,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
             fn_attributes: Some(context.fn_attributes),
             item_fn: Some(context.item_fn),
             blocks: context.blocks.clone(),
-            statement: context.statement.clone(),
+            statement: context.statement,
             expr: context.condition,
         };
 
@@ -2784,7 +2784,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
             fn_attributes: context.fn_attributes,
             item_fn: context.item_fn,
             blocks: context.blocks.clone(),
-            statement: context.statement.clone(),
+            statement: context.statement,
             expr: Some(context.expr),
             block: context.body,
         };
@@ -2825,7 +2825,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
             fn_attributes: Some(context.fn_attributes),
             item_fn: Some(context.item_fn),
             blocks: context.blocks.clone(),
-            statement: context.statement.clone(),
+            statement: context.statement,
             expr: context.iterator,
         };
 
@@ -2841,7 +2841,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
             fn_attributes: context.fn_attributes,
             item_fn: context.item_fn,
             blocks: context.blocks.clone(),
-            statement: context.statement.clone(),
+            statement: context.statement,
             expr: Some(context.expr),
             block: context.body,
         };
@@ -2926,7 +2926,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                         const_attributes: item.attribute_list.as_slice(),
                         item_const,
                         blocks: context.blocks.clone(),
-                        statement: context.statement.clone(),
+                        statement: context.statement,
                     };
                     
                     self.visit_const(&context, project)?;
@@ -3006,7 +3006,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                 fn_attributes: context.fn_attributes,
                 item_fn: context.item_fn,
                 blocks: vec![],
-                statement: context.statement.clone(),
+                statement: context.statement,
                 expr,
             };
 

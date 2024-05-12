@@ -48,7 +48,7 @@ impl Display for Project<'_> {
 
             DisplayFormat::Json => {
                 let value = serde_json::to_value(self.report.borrow().clone()).unwrap();
-                write!(f, "{}", value.to_string())?;
+                write!(f, "{}", value)?;
             }
         }
 
@@ -150,19 +150,19 @@ impl Project<'_> {
         for (i, c) in source.chars().enumerate() {
             if c == '\n' {
                 line_range.1 = i;
-                self.line_ranges.entry(path.clone()).or_insert(vec![]).push(line_range);
+                self.line_ranges.entry(path.clone()).or_default().push(line_range);
                 line_range = (i + 1, 0);
             }
         }
 
         if line_range.1 > line_range.0 {
-            self.line_ranges.entry(path.clone()).or_insert(vec![]).push(line_range);
+            self.line_ranges.entry(path.clone()).or_default().push(line_range);
         }
     }
 
     /// Attempts to get the line number in the supplied file `path` for the provided `span`.
     pub fn span_to_line(&self, path: &Path, span: &Span) -> Result<Option<usize>, Error> {
-        let line_ranges = self.line_ranges.get(path.into()).ok_or_else(|| Error::FileNotFound(path.into()))?;
+        let line_ranges = self.line_ranges.get(path).ok_or_else(|| Error::FileNotFound(path.into()))?;
         let offset = span.start();
 
         if line_ranges.is_empty() {

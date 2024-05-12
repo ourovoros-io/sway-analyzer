@@ -108,7 +108,7 @@ impl AstVisitor for NonZeroIdentityValidationVisitor {
 
         // Create the function state
         let fn_signature = context.item_fn.fn_signature.span();
-        let fn_state = module_state.fn_states.entry(fn_signature).or_insert_with(FnState::default);
+        let fn_state = module_state.fn_states.entry(fn_signature).or_default();
 
         // Check function arguments for `Address`, `ContractId` or `Identity` types and queue them to be checked
         let mut check_for_identity_argument = |arg: &FnArg| {
@@ -200,9 +200,7 @@ impl AstVisitor for NonZeroIdentityValidationVisitor {
         // Create the block state
         let block_span = context.block.span();
 
-        if !fn_state.block_states.contains_key(&block_span) {
-            fn_state.block_states.insert(block_span, BlockState::default());
-        }
+        fn_state.block_states.entry(block_span).or_default();
 
         Ok(())
     }
@@ -220,7 +218,7 @@ impl AstVisitor for NonZeroIdentityValidationVisitor {
 
         // Create the block state for the `if let` ahead of time
         let block_span = context.if_expr.then_block.span();
-        let block_state = fn_state.block_states.entry(block_span).or_insert_with(BlockState::default);
+        let block_state = fn_state.block_states.entry(block_span).or_default();
 
         // Declare variable bindings from `lhs` inside the body block state of the `if let`
         for ident in utils::fold_pattern_idents(lhs.as_ref()) {

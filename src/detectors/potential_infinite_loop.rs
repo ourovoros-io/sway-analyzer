@@ -49,9 +49,7 @@ impl AstVisitor for PotentialInfiniteLoopVisitor {
         // Create the function state
         let fn_signature = context.item_fn.fn_signature.span();
         
-        if !module_state.fn_states.contains_key(&fn_signature) {
-            module_state.fn_states.insert(fn_signature, FnState::default());
-        }
+        module_state.fn_states.entry(fn_signature).or_default();
         
         Ok(())
     }
@@ -67,9 +65,7 @@ impl AstVisitor for PotentialInfiniteLoopVisitor {
         // Create the block state
         let block_span = context.block.span();
 
-        if !fn_state.block_states.contains_key(&block_span) {
-            fn_state.block_states.insert(block_span, BlockState::default());
-        }
+        fn_state.block_states.entry(block_span).or_default();
         
         Ok(())
     }
@@ -112,7 +108,7 @@ impl AstVisitor for PotentialInfiniteLoopVisitor {
 
         // Create the while expression's body block ahead of time
         let block_span = context.body.span();
-        let block_state = fn_state.block_states.entry(block_span).or_insert_with(BlockState::default);
+        let block_state = fn_state.block_states.entry(block_span).or_default();
 
         // Mark the block as a loop and store its condition
         block_state.is_while_loop = true;
@@ -211,11 +207,9 @@ impl AstVisitor for PotentialInfiniteLoopVisitor {
                         let lhs_idents = utils::fold_expr_idents(lhs.as_ref());
                         let rhs_idents = utils::fold_expr_idents(rhs.as_ref());
 
-                        if assignable_idents.iter().zip(lhs_idents).all(|(a, b)| a.as_str() == b.as_str()) {
+                        if assignable_idents.iter().zip(lhs_idents).all(|(a, b)| a.as_str() == b.as_str()) || assignable_idents.iter().zip(rhs_idents).all(|(a, b)| a.as_str() == b.as_str()) {
                             loop_block_state.condition_updated = true;
-                        } else if assignable_idents.iter().zip(rhs_idents).all(|(a, b)| a.as_str() == b.as_str()) {
-                            loop_block_state.condition_updated = true;
-                        }
+                        } 
                     }
 
                     Expr::LessThan { lhs, rhs, .. } | Expr::LessThanEq { lhs, rhs, .. } => {
@@ -230,10 +224,8 @@ impl AstVisitor for PotentialInfiniteLoopVisitor {
                                     if matches!(value.as_ref(), Expr::Add { .. }) {
                                         loop_block_state.condition_updated = true;
                                     }
-                                } else if assignable_idents.iter().zip(rhs_idents).all(|(a, b)| a.as_str() == b.as_str()) {
-                                    if matches!(value.as_ref(), Expr::Sub { .. }) {
-                                        loop_block_state.condition_updated = true;
-                                    }
+                                } else if assignable_idents.iter().zip(rhs_idents).all(|(a, b)| a.as_str() == b.as_str()) &&  matches!(value.as_ref(), Expr::Sub { .. }) {
+                                    loop_block_state.condition_updated = true;
                                 }
                             }
 
@@ -271,10 +263,8 @@ impl AstVisitor for PotentialInfiniteLoopVisitor {
                                     if matches!(value.as_ref(), Expr::Sub { .. }) {
                                         loop_block_state.condition_updated = true;
                                     }
-                                } else if assignable_idents.iter().zip(rhs_idents).all(|(a, b)| a.as_str() == b.as_str()) {
-                                    if matches!(value.as_ref(), Expr::Add { .. }) {
-                                        loop_block_state.condition_updated = true;
-                                    }
+                                } else if assignable_idents.iter().zip(rhs_idents).all(|(a, b)| a.as_str() == b.as_str()) && matches!(value.as_ref(), Expr::Add { .. }) {
+                                    loop_block_state.condition_updated = true;
                                 }
                             }
 

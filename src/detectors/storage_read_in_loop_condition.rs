@@ -66,7 +66,7 @@ impl AstVisitor for StorageReadInLoopConditionVisitor {
                 }
             }
 
-            return Ok(());
+            Ok(())
         }
 
         find_storage_read(context.condition, context, project)

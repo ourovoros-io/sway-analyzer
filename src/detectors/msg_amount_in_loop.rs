@@ -63,21 +63,19 @@ impl AstVisitor for MsgAmountInLoopVisitor {
 
     fn visit_fn(&mut self, context: &FnContext, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
-        let module_state = self.module_states.get_mut(context.path.into()).unwrap();
+        let module_state = self.module_states.get_mut(context.path).unwrap();
 
         // Create the function state
         let fn_signature = context.item_fn.fn_signature.span();
 
-        if !module_state.fn_states.contains_key(&fn_signature) {
-            module_state.fn_states.insert(fn_signature, FnState::default());
-        }
+        module_state.fn_states.entry(fn_signature).or_default();
 
         Ok(())
     }
 
     fn visit_block(&mut self, context: &BlockContext, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
-        let module_state = self.module_states.get_mut(context.path.into()).unwrap();
+        let module_state = self.module_states.get_mut(context.path).unwrap();
 
         // Get the function state
         let fn_signature = context.item_fn.fn_signature.span();
@@ -86,16 +84,14 @@ impl AstVisitor for MsgAmountInLoopVisitor {
         // Create the block state
         let block_span = context.block.span();
         
-        if !fn_state.block_states.contains_key(&block_span) {
-            fn_state.block_states.insert(block_span, BlockState::default());
-        }
+        fn_state.block_states.entry(block_span).or_default();
 
         Ok(())
     }
 
     fn leave_block(&mut self, context: &BlockContext, project: &mut Project) -> Result<(), Error> {
         // Get the module state
-        let module_state = self.module_states.get(context.path.into()).unwrap();
+        let module_state = self.module_states.get(context.path).unwrap();
 
         // Get the function state
         let fn_signature = context.item_fn.fn_signature.span();
@@ -139,7 +135,7 @@ impl AstVisitor for MsgAmountInLoopVisitor {
 
     fn visit_while_expr(&mut self, context: &WhileExprContext, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
-        let module_state = self.module_states.get_mut(context.path.into()).unwrap();
+        let module_state = self.module_states.get_mut(context.path).unwrap();
 
         // Get the function state
         let fn_signature = context.item_fn.fn_signature.span();
@@ -147,7 +143,7 @@ impl AstVisitor for MsgAmountInLoopVisitor {
 
         // Get or create the block state
         let block_span = context.body.span();
-        let block_state = fn_state.block_states.entry(block_span).or_insert_with(BlockState::default);
+        let block_state = fn_state.block_states.entry(block_span).or_default();
         
         // Mark the block as a loop
         block_state.is_loop = true;
@@ -157,7 +153,7 @@ impl AstVisitor for MsgAmountInLoopVisitor {
 
     fn visit_expr(&mut self, context: &ExprContext, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
-        let module_state = self.module_states.get_mut(context.path.into()).unwrap();
+        let module_state = self.module_states.get_mut(context.path).unwrap();
 
         // Get the function state
         let Some(item_fn) = context.item_fn.as_ref() else { return Ok(()) };

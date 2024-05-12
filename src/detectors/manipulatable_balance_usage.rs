@@ -115,7 +115,7 @@ impl AstVisitor for ManipulatableBalanceUsageVisitor {
             let sway_ast::Statement::Expr { expr, .. } = statement else { continue };
             let sway_ast::Expr::FuncApp { func, args } = expr else { continue };
 
-            if module_state.fn_calls_to_check.iter().any(|x| x.contains(&func.span().as_str())) {
+            if module_state.fn_calls_to_check.iter().any(|x| x.contains(func.span().as_str())) {
                 let final_arg = if let Some(final_arg) = args.inner.final_value_opt.as_ref() {
                     final_arg.as_ref()
                 } else if let Some(arg) = args.inner.value_separator_pairs.last() {

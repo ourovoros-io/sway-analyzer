@@ -1,3 +1,4 @@
+#![allow(clippy::type_complexity)]
 pub mod detectors;
 pub mod error;
 pub mod project;

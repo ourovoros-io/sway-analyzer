@@ -72,9 +72,7 @@ impl AstVisitor for MissingLogsVisitor {
         // Create the function state
         let fn_signature = context.item_fn.fn_signature.span();
         
-        if !module_state.fn_states.contains_key(&fn_signature) {
-            module_state.fn_states.insert(fn_signature, FnState::default());
-        }
+        module_state.fn_states.entry(fn_signature).or_default();
         
         Ok(())
     }
@@ -90,9 +88,7 @@ impl AstVisitor for MissingLogsVisitor {
         // Create the block state
         let block_span = context.block.span();
 
-        if !fn_state.block_states.contains_key(&block_span) {
-            fn_state.block_states.insert(block_span, BlockState::default());
-        }
+        fn_state.block_states.entry(block_span).or_default();
         
         Ok(())
     }
@@ -111,9 +107,9 @@ impl AstVisitor for MissingLogsVisitor {
 
         // Check each written storage variable to see if it has been logged
         for (storage_span, var_span) in block_state.written.iter() {
-            if block_state.logged.iter().find(|logged| {
+            if !block_state.logged.iter().any(|logged| {
                 logged.as_str() == var_span.as_str() || logged.as_str() == format!("storage.{}.read()", storage_span.as_str())
-            }).is_none() {
+            }) {
                 project.report.borrow_mut().add_entry(
                     context.path,
                     project.span_to_line(context.path, storage_span)?,
@@ -152,7 +148,7 @@ impl AstVisitor for MissingLogsVisitor {
 
     fn visit_expr(&mut self, context: &ExprContext, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
-        let module_state = self.module_states.get_mut(context.path.into()).unwrap();
+        let module_state = self.module_states.get_mut(context.path).unwrap();
 
         // Get the function state
         let Some(item_fn) = context.item_fn.as_ref() else { return Ok(()) };
