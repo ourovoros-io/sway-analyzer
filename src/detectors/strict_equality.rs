@@ -42,9 +42,7 @@ impl AstVisitor for StrictEqualityVisitor {
         // Create the function state
         let fn_signature = context.item_fn.fn_signature.span();
         
-        if !module_state.fn_states.contains_key(&fn_signature) {
-            module_state.fn_states.insert(fn_signature, FnState::default());
-        }
+        module_state.fn_states.entry(fn_signature).or_default();
 
         Ok(())
     }
@@ -73,7 +71,7 @@ impl AstVisitor for StrictEqualityVisitor {
         let fn_signature = item_fn.fn_signature.span();
         let fn_state = module_state.fn_states.get_mut(&fn_signature).unwrap();
 
-        if !context.expr.span().as_str().contains("balance") && fn_state.balance_vars.iter().find(|&x| context.expr.span().as_str().contains(x)).is_none() {
+        if !context.expr.span().as_str().contains("balance") && !fn_state.balance_vars.iter().any(|x| context.expr.span().as_str().contains(x)) {
             return Ok(());
         }
 

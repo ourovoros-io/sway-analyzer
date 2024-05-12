@@ -505,11 +505,7 @@ pub fn map_expr<F: FnMut(&Expr)>(expr: &Expr, f: &mut F) {
         }
 
         Expr::Reassignment { assignable, expr, .. } => {
-            match assignable {
-                Assignable::ElementAccess(ElementAccess::Index { arg, .. }) => map_expr(arg.inner.as_ref(), f),
-                _ => {}
-            }
-
+            if let Assignable::ElementAccess(ElementAccess::Index { arg, .. }) = assignable { map_expr(arg.inner.as_ref(), f) }
             map_expr(expr.as_ref(), f);
         }
 
@@ -603,7 +599,7 @@ fn check_attribute(
         }
     }
 
-    results.iter().all(|x| *x == true)
+    results.iter().all(|x| *x)
 }
 
 pub fn statement_to_variable_binding_ident(statement: &Statement) -> Option<BaseIdent> {
@@ -813,10 +809,8 @@ pub fn find_storage_access_in_expr(expr: &Expr) -> Option<&Expr> {
         }
         Expr::MethodCall { target, contract_args_opt, args, .. } => {
             let idents = fold_expr_idents(expr);
-            if idents.len() >= 3 {
-                if idents.first().unwrap().as_str() == "storage" {
-                    return Some(expr);
-                }
+            if idents.len() >= 3 && idents.first().unwrap().as_str() == "storage" {
+                return Some(expr);
             }
 
             let result = find_storage_access_in_expr(target.as_ref());
@@ -1130,7 +1124,7 @@ pub fn statement_to_storage_write_idents(statement: &Statement) -> Option<(BaseI
     }
 
     let args = fold_punctuated(&args.inner);
-    let Some(arg) = args.last() else { return None };
+    let arg = args.last()?;
     let variable_idents = fold_expr_idents(arg);
 
     // TODO: need to support paths with multiple idents
@@ -1197,7 +1191,7 @@ pub fn get_if_revert_condition(expr: &Expr) -> Option<&IfCondition> {
 pub fn pattern_to_constructor_suffix_and_value(name: &str, pattern: &Pattern) -> Option<(BaseIdent, BaseIdent)> {
     let Pattern::Constructor { path, args } = pattern else { return None };
     if path.prefix.name.as_str() != name { return None; }
-    let Some(suffix) = path.suffix.last() else { return None };
+    let suffix = path.suffix.last()?;    
     let args = fold_punctuated(&args.inner);
     let Some(Pattern::AmbiguousSingleIdent(ident)) = args.first() else { return None };
     Some((suffix.1.name.clone(), ident.clone()))
@@ -1266,8 +1260,8 @@ pub fn get_item_location(item: &ItemKind, item_impl: &Option<&ItemImpl>, item_fn
             ),
         },
 
-        ItemKind::Storage(_) => format!("Storage"),
-        ItemKind::Configurable(_) => format!("Configurable"),
+        ItemKind::Storage(_) => "Storage".to_string(),
+        ItemKind::Configurable(_) => "Configurable".to_string(),
         
         _ => panic!("Unhandled item location: {:#?}", item),
     }
@@ -1310,7 +1304,7 @@ pub fn use_tree_to_name(mut use_tree: &UseTree, path: &str) -> Option<String> {
         }
     }
 
-    let Some(import_name) = tokens.last() else { return None };
+    let import_name = tokens.last()?;
 
     match use_tree {
         UseTree::Name { name } if name.as_str() == *import_name => {

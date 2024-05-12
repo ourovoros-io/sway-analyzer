@@ -180,9 +180,7 @@ impl AstVisitor for ArbitraryCodeExecutionVisitor {
         // Create the function state
         let fn_signature = context.item_fn.fn_signature.span();
         
-        if !module_state.fn_states.contains_key(&fn_signature) {
-            module_state.fn_states.insert(fn_signature, FnState::default());
-        }
+        module_state.fn_states.entry(fn_signature).or_default();
         
         Ok(())
     }
@@ -198,9 +196,7 @@ impl AstVisitor for ArbitraryCodeExecutionVisitor {
         // Create the block state
         let block_span = context.block.span();
 
-        if !fn_state.block_states.contains_key(&block_span) {
-            fn_state.block_states.insert(block_span, BlockState::default());
-        }
+        fn_state.block_states.entry(block_span).or_default();
         
         Ok(())
     }
@@ -268,7 +264,7 @@ impl AstVisitor for ArbitraryCodeExecutionVisitor {
         
         // Get or create the if expression's body block state
         let block_span = context.if_expr.then_block.span();
-        let block_state = fn_state.block_states.entry(block_span).or_insert_with(BlockState::default);
+        let block_state = fn_state.block_states.entry(block_span).or_default();
         
         // Add the variable state(s) to the if expression's body block state
         match lhs.as_ref() {

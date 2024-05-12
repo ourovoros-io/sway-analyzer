@@ -90,7 +90,7 @@ impl AstVisitor for UncheckedCallPayloadVisitor {
 
         // Create the function state
         let fn_signature = context.item_fn.fn_signature.span();
-        let fn_state = module_state.fn_states.entry(fn_signature).or_insert_with(FnState::default);
+        let fn_state = module_state.fn_states.entry(fn_signature).or_default();
 
         let args = match &context.item_fn.fn_signature.arguments.inner {
             FnArgs::Static(args) => args,
@@ -135,9 +135,7 @@ impl AstVisitor for UncheckedCallPayloadVisitor {
         // Create the block state
         let block_span = context.block.span();
 
-        if !fn_state.block_states.contains_key(&block_span) {
-            fn_state.block_states.insert(block_span, BlockState::default());
-        }
+        fn_state.block_states.entry(block_span).or_default();
         
         Ok(())
     }
@@ -172,7 +170,7 @@ impl AstVisitor for UncheckedCallPayloadVisitor {
 
         // Get or create the `if` expression's body block state
         let block_span = context.if_expr.then_block.span();
-        let block_state = fn_state.block_states.entry(block_span).or_insert_with(BlockState::default);
+        let block_state = fn_state.block_states.entry(block_span).or_default();
 
         // Only check `if let` expressions
         let IfCondition::Let { lhs, .. } = &context.if_expr.condition else { return Ok(()) };
@@ -272,7 +270,7 @@ impl AstVisitor for UncheckedCallPayloadVisitor {
 
                 // Get or create the `asm` block state
                 let asm_block_span = context.asm.span();
-                let asm_block_state = block_state.asm_block_states.entry(asm_block_span).or_insert_with(AsmBlockState::default);
+                let asm_block_state = block_state.asm_block_states.entry(asm_block_span).or_default();
 
                 // Track the argument's register association
                 if is_raw_ptr {
@@ -300,14 +298,14 @@ impl AstVisitor for UncheckedCallPayloadVisitor {
 
         // Get or create the `asm` block state
         let asm_block_span = context.asm.span();
-        let asm_block_state = block_state.asm_block_states.entry(asm_block_span).or_insert_with(AsmBlockState::default);
+        let asm_block_state = block_state.asm_block_states.entry(asm_block_span).or_default();
 
         // Only check `CALL` instructions
         let "call" = context.instruction.op_code_ident().as_str() else { return Ok(()) };
         let call_span = context.instruction.span();
         let call_register_arg_idents = context.instruction.register_arg_idents();
 
-        if call_register_arg_idents.len() == 0 {
+        if call_register_arg_idents.is_empty() {
             return Ok(());
         }
 

@@ -47,9 +47,7 @@ impl AstVisitor for ExternalCallInLoopVisitor {
         // Create the function state
         let fn_signature = context.item_fn.fn_signature.span();
         
-        if !module_state.fn_states.contains_key(&fn_signature) {
-            module_state.fn_states.insert(fn_signature, FnState::default());
-        }
+        module_state.fn_states.entry(fn_signature).or_default();
         
         Ok(())
     }
@@ -65,9 +63,7 @@ impl AstVisitor for ExternalCallInLoopVisitor {
         // Create the block state
         let block_span = context.block.span();
 
-        if !fn_state.block_states.contains_key(&block_span) {
-            fn_state.block_states.insert(block_span, BlockState::default());
-        }
+        fn_state.block_states.entry(block_span).or_default();
         
         Ok(())
     }
@@ -82,7 +78,7 @@ impl AstVisitor for ExternalCallInLoopVisitor {
 
         // Get or create the while expression's body block state
         let block_span = context.body.span();
-        let block_state = fn_state.block_states.entry(block_span).or_insert_with(BlockState::default);
+        let block_state = fn_state.block_states.entry(block_span).or_default();
 
         // Mark the while expression's body block as a loop
         block_state.is_loop = true;
@@ -132,7 +128,7 @@ impl AstVisitor for ExternalCallInLoopVisitor {
         let fn_state = module_state.fn_states.get_mut(&fn_signature).unwrap();
 
         // Check to see if we are in a loop
-        if !context.blocks.iter().rev().any(|block_span| fn_state.block_states.get(&block_span).unwrap().is_loop) {
+        if !context.blocks.iter().rev().any(|block_span| fn_state.block_states.get(block_span).unwrap().is_loop) {
             return Ok(());
         }
 

@@ -70,7 +70,7 @@ impl AstVisitor for LockedNativeAssetVisitor {
         // Only check function applications
         let sway_ast::Expr::FuncApp { func, .. } = &context.expr else { return Ok(()) };
 
-        if module_state.fn_calls_to_check.iter().any(|x| x.contains(&func.span().as_str())) {
+        if module_state.fn_calls_to_check.iter().any(|x| x.contains(func.span().as_str())) {
             module_state.has_withdraw = true;
         }
 
@@ -98,7 +98,7 @@ impl AstVisitor for LockedNativeAssetVisitor {
             for (function_span, function_name) in module_state.locking_functions.iter() {
                 project.report.borrow_mut().add_entry(
                     context.path,
-                    project.span_to_line(context.path, &function_span)?,
+                    project.span_to_line(context.path, function_span)?,
                     Severity::High,
                     format!(
                         "{} will lock native assets. Consider adding a withdraw function.",

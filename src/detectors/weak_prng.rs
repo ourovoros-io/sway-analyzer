@@ -101,9 +101,7 @@ impl AstVisitor for WeakPrngVisitor {
         // Create the function state
         let fn_signature = context.item_fn.fn_signature.span();
         
-        if !module_state.fn_states.contains_key(&fn_signature) {
-            module_state.fn_states.insert(fn_signature, FnState::default());
-        }
+        module_state.fn_states.entry(fn_signature).or_default();
         
         Ok(())
     }
@@ -119,9 +117,7 @@ impl AstVisitor for WeakPrngVisitor {
         // Create the block state
         let block_span = context.block.span();
 
-        if !fn_state.block_states.contains_key(&block_span) {
-            fn_state.block_states.insert(block_span, BlockState::default());
-        }
+        fn_state.block_states.entry(block_span).or_default();
         
         Ok(())
     }

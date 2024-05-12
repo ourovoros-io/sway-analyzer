@@ -41,12 +41,10 @@ impl AstVisitor for UnprotectedInitializationVisitor {
         // Create the function state
         let fn_signature = context.item_fn.fn_signature.span();
 
-        if !module_state.fn_states.contains_key(&fn_signature) {
-            module_state.fn_states.insert(fn_signature, FnState {
-                is_init_fn: context.item_fn.fn_signature.name.as_str().contains("init"),
-                ..Default::default()
-            });
-        }
+        module_state.fn_states.entry(fn_signature).or_insert_with(|| FnState {
+            is_init_fn: context.item_fn.fn_signature.name.as_str().contains("init"),
+            ..Default::default()
+        });
 
         Ok(())
     }
@@ -84,11 +82,7 @@ impl AstVisitor for UnprotectedInitializationVisitor {
         let fn_state = module_state.fn_states.get_mut(&fn_signature).unwrap();
 
         // Check for `require` and update the function state
-        if utils::get_require_args(context.expr).is_some() {
-            fn_state.has_requirement = true;
-        }
-        // Check for `if/revert` and update the function state
-        else if utils::get_if_revert_condition(context.expr).is_some() {
+        if utils::get_require_args(context.expr).is_some() || utils::get_if_revert_condition(context.expr).is_some() {
             fn_state.has_requirement = true;
         }
 

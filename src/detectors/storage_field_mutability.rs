@@ -43,7 +43,7 @@ struct StorageBinding {
 impl AstVisitor for StorageFieldMutabilityVisitor {
     fn visit_module(&mut self, context: &ModuleContext, _project: &mut Project) -> Result<(), Error> {
         // Create the module state
-        let module_state = self.module_states.entry(context.path.into()).or_insert_with(ModuleState::default);
+        let module_state = self.module_states.entry(context.path.into()).or_default();
 
         // Create storage field states ahead of time
         for storage_field in utils::collect_storage_fields(context.module) {
@@ -82,9 +82,7 @@ impl AstVisitor for StorageFieldMutabilityVisitor {
         // Create the function state
         let fn_signature = context.item_fn.fn_signature.span();
         
-        if !module_state.fn_states.contains_key(&fn_signature) {
-            module_state.fn_states.insert(fn_signature, FnState::default());
-        }
+        module_state.fn_states.entry(fn_signature).or_default();
         
         Ok(())
     }
@@ -100,9 +98,7 @@ impl AstVisitor for StorageFieldMutabilityVisitor {
         // Create the block state
         let block_span = context.block.span();
 
-        if !fn_state.block_states.contains_key(&block_span) {
-            fn_state.block_states.insert(block_span, BlockState::default());
-        }
+        fn_state.block_states.entry(block_span).or_default();
         
         Ok(())
     }
