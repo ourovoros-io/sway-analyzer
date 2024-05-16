@@ -1,12 +1,15 @@
 use crate::{
     error::Error,
     project::Project,
+    scope::AstScope,
     utils,
     visitor::{AstVisitor, ExprContext, ModuleContext},
 };
 use std::{
+    cell::RefCell,
     collections::{HashMap, HashSet},
     path::PathBuf,
+    rc::Rc,
 };
 use sway_ast::{Expr, ItemKind, Literal};
 use sway_types::{Span, Spanned};
@@ -22,7 +25,7 @@ struct ModuleState {
 }
 
 impl AstVisitor for MagicNumberVisitor {
-    fn visit_module(&mut self, context: &ModuleContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_module(&mut self, context: &ModuleContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         // Create the module state
         if !self.module_states.contains_key(context.path) {
             self.module_states.insert(context.path.into(), ModuleState::default());
@@ -31,7 +34,7 @@ impl AstVisitor for MagicNumberVisitor {
         Ok(())
     }
 
-    fn visit_expr(&mut self, context: &ExprContext, project: &mut Project) -> Result<(), Error> {
+    fn visit_expr(&mut self, context: &ExprContext, _scope: Rc<RefCell<AstScope>>, project: &mut Project) -> Result<(), Error> {
         // Don't check constants
         if matches!(context.item, ItemKind::Const(_)) {
             return Ok(());

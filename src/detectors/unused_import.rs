@@ -2,6 +2,7 @@ use crate::{
     error::Error,
     project::Project,
     report::Severity,
+    scope::AstScope,
     utils,
     visitor::{
         AstVisitor, ConfigurableFieldContext, ConstContext, EnumContext, EnumFieldContext,
@@ -10,7 +11,7 @@ use crate::{
         UseContext,
     },
 };
-use std::{collections::HashMap, path::PathBuf};
+use std::{cell::RefCell, collections::HashMap, path::PathBuf, rc::Rc};
 use sway_ast::{
     ty::TyTupleDescriptor, Expr, FnArgs, PathExpr, PathExprSegment, PathType, Pattern, Traits, Ty,
     UseTree,
@@ -153,7 +154,7 @@ impl ModuleState {
 }
 
 impl AstVisitor for UnusedImportVisitor {
-    fn visit_module(&mut self, context: &ModuleContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_module(&mut self, context: &ModuleContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         if !self.module_states.contains_key(context.path) {
             self.module_states.insert(context.path.into(), ModuleState::default());
         }
@@ -161,7 +162,7 @@ impl AstVisitor for UnusedImportVisitor {
         Ok(())
     }
 
-    fn leave_module(&mut self, context: &ModuleContext, project: &mut Project) -> Result<(), Error> {
+    fn leave_module(&mut self, context: &ModuleContext, _scope: Rc<RefCell<AstScope>>, project: &mut Project) -> Result<(), Error> {
         let module_state = self.module_states.get_mut(context.path).unwrap();
 
         for (span, count) in &module_state.usage_states {
@@ -181,7 +182,7 @@ impl AstVisitor for UnusedImportVisitor {
         Ok(())
     }
 
-    fn visit_use(&mut self, context: &UseContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_use(&mut self, context: &UseContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         let module_state = self.module_states.get_mut(context.path).unwrap();
         
         module_state.import_use_tree(&context.item_use.tree);
@@ -189,7 +190,7 @@ impl AstVisitor for UnusedImportVisitor {
         Ok(())
     }
 
-    fn visit_struct(&mut self, context: &StructContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_struct(&mut self, context: &StructContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         let module_state = self.module_states.get_mut(context.path).unwrap();
 
         if let Some(where_clause) = context.item_struct.where_clause_opt.as_ref() {
@@ -205,7 +206,7 @@ impl AstVisitor for UnusedImportVisitor {
         Ok(())
     }
 
-    fn visit_struct_field(&mut self, context: &StructFieldContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_struct_field(&mut self, context: &StructFieldContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         let module_state = self.module_states.get_mut(context.path).unwrap();
         
         module_state.check_ty_usage(&context.field.ty);
@@ -213,7 +214,7 @@ impl AstVisitor for UnusedImportVisitor {
         Ok(())
     }
 
-    fn visit_enum(&mut self, context: &EnumContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_enum(&mut self, context: &EnumContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         let module_state = self.module_states.get_mut(context.path).unwrap();
 
         if let Some(where_clause) = context.item_enum.where_clause_opt.as_ref() {
@@ -229,7 +230,7 @@ impl AstVisitor for UnusedImportVisitor {
         Ok(())
     }
 
-    fn visit_enum_field(&mut self, context: &EnumFieldContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_enum_field(&mut self, context: &EnumFieldContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         let module_state = self.module_states.get_mut(context.path).unwrap();
         
         module_state.check_ty_usage(&context.field.ty);
@@ -237,7 +238,7 @@ impl AstVisitor for UnusedImportVisitor {
         Ok(())
     }
 
-    fn visit_fn(&mut self, context: &FnContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_fn(&mut self, context: &FnContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         let module_state = self.module_states.get_mut(context.path).unwrap();
 
         if let Some(where_clause) = context.item_fn.fn_signature.where_clause_opt.as_ref() {
@@ -264,7 +265,7 @@ impl AstVisitor for UnusedImportVisitor {
         Ok(())
     }
 
-    fn visit_statement_let(&mut self, context: &StatementLetContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_statement_let(&mut self, context: &StatementLetContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         let module_state = self.module_states.get_mut(context.path).unwrap();
 
         module_state.check_pattern_usage(&context.statement_let.pattern);
@@ -278,11 +279,22 @@ impl AstVisitor for UnusedImportVisitor {
         Ok(())
     }
 
-    fn visit_expr(&mut self, context: &ExprContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_expr(&mut self, context: &ExprContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         let module_state = self.module_states.get_mut(context.path).unwrap();
         
-        if let Expr::AbiCast { args, .. } = context.expr {
-            module_state.check_path_type_usage(&args.inner.name);
+        match context.expr {
+            Expr::MethodCall { target, path_seg, contract_args_opt, args, .. } => {
+                // Loop through all imported traits:
+                //   if type of `target` implements the imported trait:
+                //     if the `path_seq` is a function in the imported trait:
+                //       Imported trait gets marked as used
+            }
+
+            Expr::AbiCast { args, .. } => {
+                module_state.check_path_type_usage(&args.inner.name);
+            }
+
+            _ => {}
         }
 
         module_state.check_expr_usage(context.expr);
@@ -290,7 +302,7 @@ impl AstVisitor for UnusedImportVisitor {
         Ok(())
     }
 
-    fn visit_trait(&mut self, context: &TraitContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_trait(&mut self, context: &TraitContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         let module_state = self.module_states.get_mut(context.path).unwrap();
 
         let mut check_traits = |traits: &Traits| {
@@ -314,7 +326,7 @@ impl AstVisitor for UnusedImportVisitor {
         Ok(())
     }
 
-    fn visit_const(&mut self, context: &ConstContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_const(&mut self, context: &ConstContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         let module_state = self.module_states.get_mut(context.path).unwrap();
 
         if let Some((_, ty)) = context.item_const.ty_opt.as_ref() {
@@ -328,7 +340,7 @@ impl AstVisitor for UnusedImportVisitor {
         Ok(())
     }
 
-    fn visit_storage_field(&mut self, context: &StorageFieldContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_storage_field(&mut self, context: &StorageFieldContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         let module_state = self.module_states.get_mut(context.path).unwrap();
 
         module_state.check_ty_usage(&context.field.ty);
@@ -337,7 +349,7 @@ impl AstVisitor for UnusedImportVisitor {
         Ok(())
     }
 
-    fn visit_configurable_field(&mut self, context: &ConfigurableFieldContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_configurable_field(&mut self, context: &ConfigurableFieldContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         let module_state = self.module_states.get_mut(context.path).unwrap();
         
         module_state.check_ty_usage(&context.field.ty);
@@ -346,7 +358,7 @@ impl AstVisitor for UnusedImportVisitor {
         Ok(())
     }
 
-    fn visit_type_alias(&mut self, context: &TypeAliasContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_type_alias(&mut self, context: &TypeAliasContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         let module_state = self.module_states.get_mut(context.path).unwrap();
         
         module_state.check_ty_usage(&context.item_type_alias.ty);
@@ -354,7 +366,7 @@ impl AstVisitor for UnusedImportVisitor {
         Ok(())
     }
 
-    fn visit_trait_type(&mut self, context: &TraitTypeContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_trait_type(&mut self, context: &TraitTypeContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         let module_state = self.module_states.get_mut(context.path).unwrap();
         
         if let Some(ty) = context.item_type.ty_opt.as_ref() {

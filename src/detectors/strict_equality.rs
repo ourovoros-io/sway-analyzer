@@ -2,10 +2,11 @@ use crate::{
     error::Error,
     project::Project,
     report::Severity,
+    scope::AstScope,
     utils,
     visitor::{AstVisitor, ExprContext, FnContext, ModuleContext, StatementLetContext},
 };
-use std::{collections::HashMap, path::PathBuf};
+use std::{cell::RefCell, collections::HashMap, path::PathBuf, rc::Rc};
 use sway_ast::Expr;
 use sway_types::{Span, Spanned};
 
@@ -25,7 +26,7 @@ struct FnState {
 }
 
 impl AstVisitor for StrictEqualityVisitor {
-    fn visit_module(&mut self, context: &ModuleContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_module(&mut self, context: &ModuleContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         // Create the module state
         if !self.module_states.contains_key(context.path) {
             self.module_states
@@ -35,7 +36,7 @@ impl AstVisitor for StrictEqualityVisitor {
         Ok(())
     }
 
-    fn visit_fn(&mut self, context: &FnContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_fn(&mut self, context: &FnContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let module_state = self.module_states.get_mut(context.path).unwrap();
 
@@ -47,7 +48,7 @@ impl AstVisitor for StrictEqualityVisitor {
         Ok(())
     }
 
-    fn visit_statement_let(&mut self, context: &StatementLetContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_statement_let(&mut self, context: &StatementLetContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         //  Get the module state
         let module_state = self.module_states.get_mut(context.path).unwrap();
 
@@ -62,7 +63,7 @@ impl AstVisitor for StrictEqualityVisitor {
         Ok(())
     }
 
-    fn visit_expr(&mut self, context: &ExprContext, project: &mut Project) -> Result<(), Error> {
+    fn visit_expr(&mut self, context: &ExprContext, _scope: Rc<RefCell<AstScope>>, project: &mut Project) -> Result<(), Error> {
         //  Get the module state
         let module_state = self.module_states.get_mut(context.path).unwrap();
 

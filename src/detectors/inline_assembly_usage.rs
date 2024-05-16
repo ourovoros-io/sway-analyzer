@@ -2,16 +2,18 @@ use crate::{
     error::Error,
     project::Project,
     report::Severity,
+    scope::AstScope,
     utils,
     visitor::{AsmBlockContext, AstVisitor},
 };
+use std::{cell::RefCell, rc::Rc};
 use sway_types::Spanned;
 
 #[derive(Default)]
 pub struct InlineAssemblyUsageVisitor;
 
 impl AstVisitor for InlineAssemblyUsageVisitor {
-    fn visit_asm_block(&mut self, context: &AsmBlockContext, project: &mut Project) -> Result<(), Error> {
+    fn visit_asm_block(&mut self, context: &AsmBlockContext, _scope: Rc<RefCell<AstScope>>, project: &mut Project) -> Result<(), Error> {
         project.report.borrow_mut().add_entry(
             context.path,
             project.span_to_line(context.path, &context.asm.span())?,

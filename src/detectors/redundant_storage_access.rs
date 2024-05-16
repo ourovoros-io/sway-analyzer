@@ -2,12 +2,13 @@ use crate::{
     error::Error,
     project::Project,
     report::Severity,
+    scope::AstScope,
     utils,
     visitor::{
         AstVisitor, BlockContext, FnContext, ModuleContext, StatementContext, WhileExprContext,
     },
 };
-use std::{collections::HashMap, path::PathBuf};
+use std::{cell::RefCell, collections::HashMap, path::PathBuf, rc::Rc};
 use sway_ast::Statement;
 use sway_types::{Span, Spanned};
 
@@ -33,7 +34,7 @@ struct BlockState {
 }
 
 impl AstVisitor for RedundantStorageAccessVisitor {
-    fn visit_module(&mut self, context: &ModuleContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_module(&mut self, context: &ModuleContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         // Create the module state
         if !self.module_states.contains_key(context.path) {
             self.module_states.insert(context.path.into(), ModuleState::default());
@@ -42,7 +43,7 @@ impl AstVisitor for RedundantStorageAccessVisitor {
         Ok(())
     }
 
-    fn visit_fn(&mut self, context: &FnContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_fn(&mut self, context: &FnContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let module_state = self.module_states.get_mut(context.path).unwrap();
         
@@ -54,7 +55,7 @@ impl AstVisitor for RedundantStorageAccessVisitor {
         Ok(())
     }
 
-    fn visit_block(&mut self, context: &BlockContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_block(&mut self, context: &BlockContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let module_state = self.module_states.get_mut(context.path).unwrap();
         
@@ -70,7 +71,7 @@ impl AstVisitor for RedundantStorageAccessVisitor {
         Ok(())
     }
 
-    fn visit_while_expr(&mut self, context: &WhileExprContext, project: &mut Project) -> Result<(), Error> {
+    fn visit_while_expr(&mut self, context: &WhileExprContext, _scope: Rc<RefCell<AstScope>>, project: &mut Project) -> Result<(), Error> {
         // Check if the loop's condition contains redundant storage access
         if let Some(expr) = utils::find_storage_access_in_expr(context.condition) {
             project.report.borrow_mut().add_entry(
@@ -88,7 +89,7 @@ impl AstVisitor for RedundantStorageAccessVisitor {
         Ok(())
     }
 
-    fn visit_statement(&mut self, context: &StatementContext, project: &mut Project) -> Result<(), Error> {
+    fn visit_statement(&mut self, context: &StatementContext, _scope: Rc<RefCell<AstScope>>, project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let module_state = self.module_states.get_mut(context.path).unwrap();
         

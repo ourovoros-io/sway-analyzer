@@ -2,9 +2,11 @@ use crate::{
     error::Error,
     project::Project,
     report::Severity,
+    scope::AstScope,
     utils,
     visitor::{AstVisitor, ExprContext},
 };
+use std::{cell::RefCell, rc::Rc};
 use sway_ast::{Expr, Literal};
 use sway_types::Spanned;
 
@@ -12,7 +14,7 @@ use sway_types::Spanned;
 pub struct LargeLiteralVisitor;
 
 impl AstVisitor for LargeLiteralVisitor {
-    fn visit_expr(&mut self, context: &ExprContext, project: &mut Project) -> Result<(), Error> {
+    fn visit_expr(&mut self, context: &ExprContext, _scope: Rc<RefCell<AstScope>>, project: &mut Project) -> Result<(), Error> {
         let Expr::Literal(Literal::Int(i)) = context.expr else { return Ok(()) };
 
         let value = i.span.as_str();

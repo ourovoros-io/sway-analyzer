@@ -2,6 +2,7 @@ use crate::{
     error::Error,
     project::Project,
     report::Severity,
+    scope::AstScope,
     utils,
     visitor::{
         AstVisitor, BlockContext, FnContext, IfExprContext, ModuleContext, StatementContext,
@@ -93,7 +94,7 @@ struct BlockState {
 }
 
 impl AstVisitor for NonZeroIdentityValidationVisitor {
-    fn visit_module(&mut self, context: &ModuleContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_module(&mut self, context: &ModuleContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         // Create the module state
         if !self.module_states.contains_key(context.path) {
             self.module_states.insert(context.path.into(), ModuleState::default());
@@ -102,7 +103,7 @@ impl AstVisitor for NonZeroIdentityValidationVisitor {
         Ok(())
     }
 
-    fn visit_fn(&mut self, context: &FnContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_fn(&mut self, context: &FnContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let module_state = self.module_states.get_mut(context.path).unwrap();
 
@@ -142,7 +143,7 @@ impl AstVisitor for NonZeroIdentityValidationVisitor {
         Ok(())
     }
 
-    fn leave_fn(&mut self, context: &FnContext, project: &mut Project) -> Result<(), Error> {
+    fn leave_fn(&mut self, context: &FnContext, _scope: Rc<RefCell<AstScope>>, project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let module_state = self.module_states.get(context.path).unwrap();
 
@@ -189,7 +190,7 @@ impl AstVisitor for NonZeroIdentityValidationVisitor {
         Ok(())
     }
 
-    fn visit_block(&mut self, context: &BlockContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_block(&mut self, context: &BlockContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let module_state = self.module_states.get_mut(context.path).unwrap();
 
@@ -205,7 +206,7 @@ impl AstVisitor for NonZeroIdentityValidationVisitor {
         Ok(())
     }
 
-    fn visit_if_expr(&mut self, context: &IfExprContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_if_expr(&mut self, context: &IfExprContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let module_state = self.module_states.get_mut(context.path).unwrap();
 
@@ -228,7 +229,7 @@ impl AstVisitor for NonZeroIdentityValidationVisitor {
         Ok(())
     }
 
-    fn visit_statement(&mut self, context: &StatementContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_statement(&mut self, context: &StatementContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let module_state = self.module_states.get_mut(context.path).unwrap();
 

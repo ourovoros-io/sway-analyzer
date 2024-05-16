@@ -3,6 +3,7 @@ pub mod detectors;
 pub mod error;
 pub mod project;
 pub mod report;
+pub mod scope;
 pub mod utils;
 pub mod visitor;
 

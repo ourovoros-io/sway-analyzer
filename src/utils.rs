@@ -552,6 +552,73 @@ pub fn map_pattern<F: FnMut(&Pattern)>(pattern: &Pattern, f: &mut F) {
     }
 }
 
+pub fn map_pattern_and_ty<F: FnMut(&Pattern, &Ty)>(pattern: &Pattern, ty: &Ty, f: &mut F) {
+    f(pattern, ty);
+
+    match pattern {
+        Pattern::Or { lhs, rhs, .. } => {
+            map_pattern_and_ty(lhs.as_ref(), ty, f);
+            map_pattern_and_ty(rhs.as_ref(), ty, f);
+        }
+
+        Pattern::Wildcard { .. } => {}
+        Pattern::AmbiguousSingleIdent(_) => {}
+        Pattern::Var { .. } => {}
+        Pattern::Literal(_) => {}
+        Pattern::Constant(_) => {}
+        
+        Pattern::Constructor { args, .. } => {
+            // TODO: We need to find the type declaration to resolve the arg types
+            // for arg in &args.inner {
+            //     map_pattern_and_ty(arg, arg.ty, f);
+            // }
+        }
+
+        Pattern::Struct { fields, .. } => {
+            // TODO: We need to find the type declaration to resolve the field types
+            // for field in &fields.inner {
+            //     if let PatternStructField::Field { pattern_opt: Some((_, pattern)), .. } = field {
+            //         map_pattern_and_ty(pattern.as_ref(), f);
+            //     }
+            // }
+        }
+
+        Pattern::Tuple(tuple) => {
+            let mut types: Vec<&Ty> = vec![];
+
+            match ty {
+                Ty::Tuple(ty) => {
+                    match &ty.inner {
+                        ty::TyTupleDescriptor::Nil => {}
+
+                        ty::TyTupleDescriptor::Cons { head, tail, .. } => {
+                            types.push(head.as_ref());
+                            
+                            for ty in tail {
+                                types.push(ty);
+                            }
+                        }
+                    }
+                }
+
+                _ => todo!(),
+            }
+
+            let mut patterns: Vec<&Pattern> = vec![];
+            
+            for pattern in &tuple.inner {
+                patterns.push(pattern);
+            }
+
+            for (pattern, ty) in patterns.iter().zip(types.iter()) {
+                map_pattern_and_ty(pattern, ty, f);
+            }
+        }
+
+        Pattern::Error(_, _) => {}
+    }
+}
+
 pub fn check_attribute_decls(
     attribute_decls: &[AttributeDecl],
     attribute_name: &str,

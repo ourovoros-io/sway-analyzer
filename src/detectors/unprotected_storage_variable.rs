@@ -2,11 +2,12 @@ use crate::{
     error::Error,
     project::Project,
     report::Severity,
+    scope::AstScope,
     utils,
     visitor::{
         AstVisitor, AstVisitorRecursive, BlockContext, ExprContext, FnContext, IfExprContext,
         ModuleContext, StatementContext, StatementLetContext, UseContext,
-    },
+    }
 };
 use std::{cell::RefCell, collections::HashMap, path::PathBuf, rc::Rc};
 use sway_ast::{Expr, IfCondition, ItemImplItem, ItemKind, Pattern};
@@ -141,7 +142,7 @@ pub struct VarState {
 }
 
 impl AstVisitor for UnprotectedStorageVariableVisitor {
-    fn visit_module(&mut self, context: &ModuleContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_module(&mut self, context: &ModuleContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         // Create the module state
         let mut module_states = self.module_states.borrow_mut();
         
@@ -152,7 +153,7 @@ impl AstVisitor for UnprotectedStorageVariableVisitor {
         Ok(())
     }
 
-    fn visit_use(&mut self, context: &UseContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_use(&mut self, context: &UseContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let mut module_states = self.module_states.borrow_mut();
         let module_state = module_states.get_mut(context.path).unwrap();
@@ -165,7 +166,7 @@ impl AstVisitor for UnprotectedStorageVariableVisitor {
         Ok(())
     }
 
-    fn visit_fn(&mut self, context: &FnContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_fn(&mut self, context: &FnContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let mut module_states = self.module_states.borrow_mut();
         let module_state = module_states.get_mut(context.path).unwrap();
@@ -178,7 +179,7 @@ impl AstVisitor for UnprotectedStorageVariableVisitor {
         Ok(())
     }
 
-    fn visit_block(&mut self, context: &BlockContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_block(&mut self, context: &BlockContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let mut module_states = self.module_states.borrow_mut();
         let module_state = module_states.get_mut(context.path).unwrap();
@@ -195,7 +196,7 @@ impl AstVisitor for UnprotectedStorageVariableVisitor {
         Ok(())
     }
 
-    fn visit_statement(&mut self, context: &StatementContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_statement(&mut self, context: &StatementContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let mut module_states = self.module_states.borrow_mut();
         let module_state = module_states.get_mut(context.path).unwrap();
@@ -216,7 +217,7 @@ impl AstVisitor for UnprotectedStorageVariableVisitor {
         Ok(())
     }
 
-    fn visit_statement_let(&mut self, context: &StatementLetContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_statement_let(&mut self, context: &StatementLetContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let mut module_states = self.module_states.borrow_mut();
         let module_state = module_states.get_mut(context.path).unwrap();
@@ -259,7 +260,7 @@ impl AstVisitor for UnprotectedStorageVariableVisitor {
         Ok(())
     }
 
-    fn visit_if_expr(&mut self, context: &IfExprContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_if_expr(&mut self, context: &IfExprContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let mut module_states = self.module_states.borrow_mut();
         let module_state = module_states.get_mut(context.path).unwrap();
@@ -331,7 +332,7 @@ impl AstVisitor for UnprotectedStorageVariableVisitor {
         Ok(())
     }
 
-    fn visit_expr(&mut self, context: &ExprContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_expr(&mut self, context: &ExprContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let mut module_states = self.module_states.borrow_mut();
         let module_state = module_states.get_mut(context.path).unwrap();
@@ -362,11 +363,11 @@ impl AstVisitor for UnprotectedStorageVariableVisitor {
         Ok(())
     }
 
-    fn leave_module(&mut self, context: &ModuleContext, project: &mut Project) -> Result<(), Error> {
+    fn leave_module(&mut self, context: &ModuleContext, scope: Rc<RefCell<AstScope>>, project: &mut Project) -> Result<(), Error> {
         let mut postprocess_visitor = AstVisitorRecursive::default();
 
         // Propogate function states for called functions to the function calling them
-        postprocess_visitor.visit_expr_hooks.push(Box::new(|context, _project| {
+        postprocess_visitor.visit_expr_hooks.push(Box::new(|context, _scope, _project| {
             // Only check function calls
             let Expr::FuncApp { func, .. } = context.expr else { return Ok(()) };
     
@@ -427,7 +428,7 @@ impl AstVisitor for UnprotectedStorageVariableVisitor {
         }));
 
         // Check functions for missing access restriction
-        postprocess_visitor.leave_fn_hooks.push(Box::new(|context, project| {
+        postprocess_visitor.leave_fn_hooks.push(Box::new(|context, _scope, project| {
             // Get the module state
             let mut module_states = self.module_states.borrow_mut();
             let module_state = module_states.get_mut(context.path).unwrap();
@@ -454,8 +455,8 @@ impl AstVisitor for UnprotectedStorageVariableVisitor {
         }));
 
         // Perform postprocessing steps
-        postprocess_visitor.visit_module(context, project)?;
-        postprocess_visitor.leave_module(context, project)?;
+        postprocess_visitor.visit_module(context, scope.clone(), project)?;
+        postprocess_visitor.leave_module(context, scope.clone(), project)?;
 
         Ok(())
     }

@@ -1,12 +1,15 @@
 use crate::{
     error::Error,
     project::Project,
+    report::Severity,
+    scope::AstScope,
+    utils,
     visitor::{
         AstVisitor, BlockContext, ExprContext, FnContext, ModuleContext, StatementContext,
         StatementLetContext, UseContext,
-    }, report::Severity, utils,
+    },
 };
-use std::{collections::HashMap, path::PathBuf};
+use std::{cell::RefCell, collections::HashMap, path::PathBuf, rc::Rc};
 use sway_ast::{assignable::ElementAccess, Assignable, Expr, Pattern, Statement};
 use sway_types::{Span, Spanned};
 
@@ -68,7 +71,7 @@ struct VarState {
 }
 
 impl AstVisitor for WeakPrngVisitor {
-    fn visit_module(&mut self, context: &ModuleContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_module(&mut self, context: &ModuleContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         // Create the module state
         if !self.module_states.contains_key(context.path) {
             self.module_states.insert(context.path.into(), ModuleState::default());
@@ -77,7 +80,7 @@ impl AstVisitor for WeakPrngVisitor {
         Ok(())
     }
 
-    fn visit_use(&mut self, context: &UseContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_use(&mut self, context: &UseContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let module_state = self.module_states.get_mut(context.path).unwrap();
 
@@ -94,7 +97,7 @@ impl AstVisitor for WeakPrngVisitor {
         Ok(())
     }
 
-    fn visit_fn(&mut self, context: &FnContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_fn(&mut self, context: &FnContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let module_state = self.module_states.get_mut(context.path).unwrap();
 
@@ -106,7 +109,7 @@ impl AstVisitor for WeakPrngVisitor {
         Ok(())
     }
 
-    fn visit_block(&mut self, context: &BlockContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_block(&mut self, context: &BlockContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let module_state = self.module_states.get_mut(context.path).unwrap();
 
@@ -122,7 +125,7 @@ impl AstVisitor for WeakPrngVisitor {
         Ok(())
     }
 
-    fn visit_statement(&mut self, context: &StatementContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_statement(&mut self, context: &StatementContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         // Only check single variable reassignment expression statements
         let Statement::Expr {
             expr: Expr::Reassignment {
@@ -161,7 +164,7 @@ impl AstVisitor for WeakPrngVisitor {
         Ok(())
     }
 
-    fn visit_statement_let(&mut self, context: &StatementLetContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_statement_let(&mut self, context: &StatementLetContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         // Only check single variable patterns
         let Pattern::AmbiguousSingleIdent(ident) = &context.statement_let.pattern else { return Ok(()) };
 
@@ -193,7 +196,7 @@ impl AstVisitor for WeakPrngVisitor {
         Ok(())
     }
 
-    fn visit_expr(&mut self, context: &ExprContext, project: &mut Project) -> Result<(), Error> {
+    fn visit_expr(&mut self, context: &ExprContext, _scope: Rc<RefCell<AstScope>>, project: &mut Project) -> Result<(), Error> {
         // Only check modulo expressions
         let Expr::Modulo { lhs, .. } = context.expr else { return Ok(()) };
 

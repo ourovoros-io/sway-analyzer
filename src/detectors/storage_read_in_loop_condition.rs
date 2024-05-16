@@ -2,9 +2,11 @@ use crate::{
     error::Error,
     project::Project,
     report::Severity,
+    scope::AstScope,
     utils,
     visitor::{AstVisitor, WhileExprContext},
 };
+use std::{cell::RefCell, rc::Rc};
 use sway_ast::Expr;
 use sway_types::Spanned;
 
@@ -12,8 +14,8 @@ use sway_types::Spanned;
 pub struct StorageReadInLoopConditionVisitor;
 
 impl AstVisitor for StorageReadInLoopConditionVisitor {
-    fn visit_while_expr(&mut self, context: &WhileExprContext, project: &mut Project) -> Result<(), Error> {
-        fn find_storage_read(expr: &Expr, context: &WhileExprContext, project: &mut Project) -> Result<(), Error> {
+    fn visit_while_expr(&mut self, context: &WhileExprContext, scope: Rc<RefCell<AstScope>>, project: &mut Project) -> Result<(), Error> {
+        fn find_storage_read(expr: &Expr, context: &WhileExprContext, scope: Rc<RefCell<AstScope>>, project: &mut Project) -> Result<(), Error> {
             match expr {
                 Expr::Mul { lhs, rhs, .. } |
                 Expr::Div { lhs, rhs, .. } |
@@ -34,8 +36,8 @@ impl AstVisitor for StorageReadInLoopConditionVisitor {
                 Expr::GreaterThanEq { lhs, rhs, .. } |
                 Expr::LogicalAnd { lhs, rhs, .. } |
                 Expr::LogicalOr { lhs, rhs, .. } => {
-                    find_storage_read(lhs.as_ref(), context, project)?;
-                    find_storage_read(rhs.as_ref(), context, project)?;
+                    find_storage_read(lhs.as_ref(), context, scope.clone(), project)?;
+                    find_storage_read(rhs.as_ref(), context, scope.clone(), project)?;
                 }
                 
                 _ => {
@@ -69,7 +71,7 @@ impl AstVisitor for StorageReadInLoopConditionVisitor {
             Ok(())
         }
 
-        find_storage_read(context.condition, context, project)
+        find_storage_read(context.condition, context, scope.clone(), project)
     }
 }
 

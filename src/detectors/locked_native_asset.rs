@@ -2,9 +2,11 @@ use crate::{
     error::Error,
     project::Project,
     report::Severity,
-    visitor::{AstVisitor, ModuleContext, FnContext, ExprContext, AsmBlockContext}, utils,
+    scope::AstScope,
+    utils,
+    visitor::{AsmBlockContext, AstVisitor, ExprContext, FnContext, ModuleContext},
 };
-use std::{collections::HashMap, path::PathBuf};
+use std::{cell::RefCell, collections::HashMap, path::PathBuf, rc::Rc};
 use sway_types::{Span, Spanned};
 
 #[derive(Default)]
@@ -36,7 +38,7 @@ impl Default for ModuleState {
 }
 
 impl AstVisitor for LockedNativeAssetVisitor {
-    fn visit_module(&mut self, context: &ModuleContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_module(&mut self, context: &ModuleContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         // Create the module state
         if !self.module_states.contains_key(context.path) {
             self.module_states.insert(context.path.into(), ModuleState::default());
@@ -45,7 +47,7 @@ impl AstVisitor for LockedNativeAssetVisitor {
         Ok(())
     }
 
-    fn visit_fn(&mut self, context: &FnContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_fn(&mut self, context: &FnContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let module_state = self.module_states.get_mut(context.path).unwrap();
 
@@ -63,7 +65,7 @@ impl AstVisitor for LockedNativeAssetVisitor {
         Ok(())
     }
 
-    fn visit_expr(&mut self, context: &ExprContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_expr(&mut self, context: &ExprContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let module_state = self.module_states.get_mut(context.path).unwrap();
         
@@ -77,7 +79,7 @@ impl AstVisitor for LockedNativeAssetVisitor {
         Ok(())
     }
 
-    fn visit_asm_block(&mut self, context: &AsmBlockContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_asm_block(&mut self, context: &AsmBlockContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let module_state = self.module_states.get_mut(context.path).unwrap();
         
@@ -90,7 +92,7 @@ impl AstVisitor for LockedNativeAssetVisitor {
         Ok(())
     }
 
-    fn leave_module(&mut self, context: &ModuleContext, project: &mut Project) -> Result<(), Error> {
+    fn leave_module(&mut self, context: &ModuleContext, _scope: Rc<RefCell<AstScope>>, project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let module_state = self.module_states.get_mut(context.path).unwrap();
         

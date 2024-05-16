@@ -2,10 +2,11 @@ use crate::{
     error::Error,
     project::Project,
     report::Severity,
+    scope::AstScope,
     utils,
     visitor::{AstVisitor, ExprContext, IfExprContext},
 };
-use std::path::Path;
+use std::{cell::RefCell, path::Path, rc::Rc};
 use sway_ast::{Expr, IfCondition, ItemFn, ItemImpl, ItemKind};
 use sway_types::Spanned;
 
@@ -13,7 +14,7 @@ use sway_types::Spanned;
 pub struct BooleanComparisonVisitor;
 
 impl AstVisitor for BooleanComparisonVisitor {
-    fn visit_if_expr(&mut self, context: &IfExprContext, project: &mut Project) -> Result<(), Error> {
+    fn visit_if_expr(&mut self, context: &IfExprContext, _scope: Rc<RefCell<AstScope>>, project: &mut Project) -> Result<(), Error> {
         let IfCondition::Expr(expr) = &context.if_expr.condition else { return Ok(()) };
 
         if utils::is_boolean_literal_or_negation(expr.as_ref()) {
@@ -23,7 +24,7 @@ impl AstVisitor for BooleanComparisonVisitor {
         Ok(())
     }
 
-    fn visit_expr(&mut self, context: &ExprContext, project: &mut Project) -> Result<(), Error> {
+    fn visit_expr(&mut self, context: &ExprContext, _scope: Rc<RefCell<AstScope>>, project: &mut Project) -> Result<(), Error> {
         let (Expr::Equal { lhs, rhs, .. } | Expr::NotEqual { lhs, rhs, .. }) = context.expr else { return Ok(()) };
         
         if !utils::is_boolean_literal_or_negation(lhs.as_ref()) && !utils::is_boolean_literal_or_negation(rhs.as_ref()) {

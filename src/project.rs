@@ -1,4 +1,4 @@
-use crate::{detectors::*, error::Error, report::Report, visitor::*, Options};
+use crate::{detectors::*, error::Error, report::Report, scope::AstScope, visitor::*, Options};
 use std::{
     cell::RefCell,
     collections::HashMap,
@@ -189,8 +189,10 @@ impl Project<'_> {
                 module,
             };
 
-            detectors.borrow_mut().visit_module(&context, self)?;
-            detectors.borrow_mut().leave_module(&context, self)?;
+            let scope = Rc::new(RefCell::new(AstScope::default()));
+
+            detectors.borrow_mut().visit_module(&context, scope.clone(), self)?;
+            detectors.borrow_mut().leave_module(&context, scope.clone(), self)?;
         }
 
         Ok(())

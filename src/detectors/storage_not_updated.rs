@@ -2,10 +2,11 @@ use crate::{
     error::Error,
     project::Project,
     report::Severity,
+    scope::AstScope,
     utils,
     visitor::{AstVisitor, BlockContext, FnContext, ModuleContext, StatementContext},
 };
-use std::{collections::HashMap, path::PathBuf};
+use std::{cell::RefCell, collections::HashMap, path::PathBuf, rc::Rc};
 use sway_ast::Ty;
 use sway_types::{BaseIdent, Span, Spanned};
 
@@ -54,7 +55,7 @@ struct StorageValueBinding {
 }
 
 impl AstVisitor for StorageNotUpdatedVisitor {
-    fn visit_module(&mut self, context: &ModuleContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_module(&mut self, context: &ModuleContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         // Get or create the module state
         let module_state = self.module_states.entry(context.path.into()).or_default();
 
@@ -69,7 +70,7 @@ impl AstVisitor for StorageNotUpdatedVisitor {
         Ok(())
     }
 
-    fn visit_fn(&mut self, context: &FnContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_fn(&mut self, context: &FnContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let module_state = self.module_states.get_mut(context.path).unwrap();
         
@@ -81,7 +82,7 @@ impl AstVisitor for StorageNotUpdatedVisitor {
         Ok(())
     }
 
-    fn visit_block(&mut self, context: &BlockContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_block(&mut self, context: &BlockContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let module_state = self.module_states.get_mut(context.path).unwrap();
         
@@ -97,7 +98,7 @@ impl AstVisitor for StorageNotUpdatedVisitor {
         Ok(())
     }
 
-    fn leave_block(&mut self, context: &BlockContext, project: &mut Project) -> Result<(), Error> {
+    fn leave_block(&mut self, context: &BlockContext, _scope: Rc<RefCell<AstScope>>, project: &mut Project) -> Result<(), Error> {
         // Check for `#[storage(write)]` attribute
         if !utils::check_attribute_decls(context.fn_attributes, "storage", &["write"]) {
             return Ok(());
@@ -160,7 +161,7 @@ impl AstVisitor for StorageNotUpdatedVisitor {
         Ok(())
     }
 
-    fn visit_statement(&mut self, context: &StatementContext, _project: &mut Project) -> Result<(), Error> {
+    fn visit_statement(&mut self, context: &StatementContext, _scope: Rc<RefCell<AstScope>>, _project: &mut Project) -> Result<(), Error> {
         // Get the module state
         let module_state = self.module_states.get_mut(context.path).unwrap();
         

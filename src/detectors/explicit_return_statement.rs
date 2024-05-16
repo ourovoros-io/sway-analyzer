@@ -1,12 +1,20 @@
-use crate::{visitor::{AstVisitor, FnContext}, project::Project, error::Error, report::Severity, utils};
-use sway_ast::{Statement, Expr};
+use crate::{
+    error::Error,
+    project::Project,
+    report::Severity,
+    scope::AstScope,
+    utils,
+    visitor::{AstVisitor, FnContext},
+};
+use std::{cell::RefCell, rc::Rc};
+use sway_ast::{Expr, Statement};
 use sway_types::Spanned;
 
 #[derive(Default)]
 pub struct ExplicitReturnStatementVisitor;
 
 impl AstVisitor for ExplicitReturnStatementVisitor {
-    fn visit_fn(&mut self, context: &FnContext, project: &mut Project) -> Result<(), Error> {
+    fn visit_fn(&mut self, context: &FnContext, _scope: Rc<RefCell<AstScope>>, project: &mut Project) -> Result<(), Error> {
         if let Some(expr) = context.item_fn.body.inner.final_expr_opt.as_ref().map(Box::as_ref) {
             let Expr::Return { expr_opt, .. } = expr else { return Ok(()) };
             
