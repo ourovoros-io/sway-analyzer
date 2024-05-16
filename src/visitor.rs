@@ -952,6 +952,8 @@ impl AstVisitor for AstVisitorRecursive<'_> {
     }
 
     fn visit_fn(&mut self, context: &FnContext, scope: Rc<RefCell<AstScope>>, project: &mut Project) -> Result<(), Error> {
+        scope.borrow_mut().functions.push(Rc::new(RefCell::new(context.item_fn.fn_signature.clone())));
+        
         let args = match &context.item_fn.fn_signature.arguments.inner {
             FnArgs::Static(args) => Some(args),
 
@@ -1116,7 +1118,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
             &context.statement_let.pattern,
             &context.statement_let.ty_opt.as_ref()
                 .map(|(_, ty)| ty.clone())
-                .unwrap_or_else(|| scope.borrow().get_expr_ty(&context.statement_let.expr)),
+                .unwrap_or_else(|| scope.borrow().get_expr_ty(&context.statement_let.expr, project)),
             &mut |pattern, ty| {
                 match pattern {
                     Pattern::Var { name, .. } => {
@@ -2601,7 +2603,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
 
                     crate::utils::map_pattern_and_ty(
                         lhs.as_ref(),
-                        &scope.borrow().get_expr_ty(rhs),
+                        &scope.borrow().get_expr_ty(rhs, project),
                         &mut |pattern, ty| {
                             match pattern {
                                 Pattern::Var { name, .. } => {
@@ -3077,7 +3079,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
     fn visit_const(&mut self, context: &ConstContext, scope: Rc<RefCell<AstScope>>, project: &mut Project) -> Result<(), Error> {
         let ty = context.item_const.ty_opt.as_ref()
             .map(|(_, ty)| ty.clone())
-            .unwrap_or_else(|| scope.borrow().get_expr_ty(context.item_const.expr_opt.as_ref().unwrap()));
+            .unwrap_or_else(|| scope.borrow().get_expr_ty(context.item_const.expr_opt.as_ref().unwrap(), project));
         
         scope.borrow_mut().variables.push(Rc::new(RefCell::new(AstVariable {
             kind: AstVariableKind::Constant,

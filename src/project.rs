@@ -9,6 +9,7 @@ use std::{
     sync::Arc,
 };
 use sway_ast::Module;
+use sway_ast_stubs::AstResolver;
 use sway_types::Span;
 
 #[derive(Clone, Copy, Default)]
@@ -37,6 +38,7 @@ pub struct Project<'a> {
     modules: Rc<RefCell<HashMap<PathBuf, Module>>>,
     detectors: Rc<RefCell<AstVisitorRecursive<'a>>>,
     pub report: Rc<RefCell<Report>>,
+    pub resolver: Rc<RefCell<AstResolver>>,
 }
 
 impl Display for Project<'_> {
@@ -183,9 +185,17 @@ impl Project<'_> {
         let modules = self.modules.clone();
         let detectors = self.detectors.clone();
 
-        for (path, module) in modules.borrow().iter() {
+        let mut module_paths = modules.borrow().keys().cloned().collect::<Vec<_>>();
+        module_paths.sort();
+
+        for path in module_paths {
+            println!("{}", path.to_string_lossy());
+            
+            let modules = modules.borrow();
+            let module = modules.get(&path).unwrap();
+
             let context = ModuleContext {
-                path,
+                path: &path,
                 module,
             };
 

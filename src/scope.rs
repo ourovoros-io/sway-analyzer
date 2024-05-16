@@ -4,6 +4,8 @@ use sway_ast::{
 };
 use sway_types::{BaseIdent, Span};
 
+use crate::project::Project;
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum AstVariableKind {
     Constant,
@@ -48,13 +50,14 @@ impl AstScope {
         None
     }
 
-    pub fn get_expr_ty(&self, expr: &Expr) -> Ty {
+    pub fn get_expr_ty(&self, expr: &Expr, project: &mut Project) -> Ty {
         match expr {
             Expr::Error(_, _) => todo!("{expr:#?}"),
 
             Expr::Path(path) => {
                 // Check if the path is a single identifier and look it up as a variable
                 if path.root_opt.is_none() && path.suffix.is_empty() {
+                    println!("variables: {:#?}", self.variables);
                     if let Some(variable) = self.get_variable(path.prefix.name.as_str(), false) {
                         return variable.borrow().ty.clone();
                     }
@@ -116,14 +119,14 @@ impl AstScope {
                         let mut value_separator_pairs = vec![];
     
                         for expr in tail {
-                            value_separator_pairs.push((self.get_expr_ty(expr), CommaToken::new(Span::dummy())));
+                            value_separator_pairs.push((self.get_expr_ty(expr, project), CommaToken::new(Span::dummy())));
                         }
     
                         let final_value_opt = value_separator_pairs.pop().map(|x| Box::new(x.0));
     
                         Ty::Tuple(Parens {
                             inner: TyTupleDescriptor::Cons {
-                                head: Box::new(self.get_expr_ty(head)),
+                                head: Box::new(self.get_expr_ty(head, project)),
                                 comma_token: CommaToken::new(Span::dummy()),
                                 tail: Punctuated {
                                     value_separator_pairs,
@@ -136,11 +139,11 @@ impl AstScope {
                 }
             }
 
-            Expr::Parens(parens) => self.get_expr_ty(parens.inner.as_ref()),
+            Expr::Parens(parens) => self.get_expr_ty(parens.inner.as_ref(), project),
 
             Expr::Block(block) => {
                 if let Some(expr) = block.inner.final_expr_opt.as_ref() {
-                    return self.get_expr_ty(expr);
+                    return self.get_expr_ty(expr, project);
                 }
 
                 Ty::Tuple(Parens {
@@ -153,9 +156,9 @@ impl AstScope {
                 match &array.inner {
                     ExprArrayDescriptor::Sequence(sequence) => {
                         if let Some((expr, _)) = sequence.value_separator_pairs.first() {
-                            self.get_expr_ty(expr)
+                            self.get_expr_ty(expr, project)
                         } else if let Some(expr) = sequence.final_value_opt.as_ref() {
-                            self.get_expr_ty(expr)
+                            self.get_expr_ty(expr, project)
                         } else {
                             Ty::Tuple(Parens {
                                 inner: TyTupleDescriptor::Nil,
@@ -164,7 +167,7 @@ impl AstScope {
                         }
                     }
 
-                    ExprArrayDescriptor::Repeat { value, .. } => self.get_expr_ty(value),
+                    ExprArrayDescriptor::Repeat { value, .. } => self.get_expr_ty(value, project),
                 }
             }
 
@@ -188,7 +191,7 @@ impl AstScope {
 
             Expr::If(if_expr) => {
                 if let Some(expr) = if_expr.then_block.inner.final_expr_opt.as_ref() {
-                    return self.get_expr_ty(expr);
+                    return self.get_expr_ty(expr, project);
                 }
 
                 Ty::Tuple(Parens {
@@ -202,7 +205,7 @@ impl AstScope {
                     match &branch.kind {
                         MatchBranchKind::Block { block, .. } => {
                             if let Some(expr) = block.inner.final_expr_opt.as_ref() {
-                                return self.get_expr_ty(expr);
+                                return self.get_expr_ty(expr, project);
                             }
             
                             return Ty::Tuple(Parens {
@@ -212,7 +215,7 @@ impl AstScope {
                         }
 
                         MatchBranchKind::Expr { expr, .. } => {
-                            return self.get_expr_ty(expr);
+                            return self.get_expr_ty(expr, project);
                         }
                     }
                 }
@@ -233,10 +236,13 @@ impl AstScope {
                 span: Span::dummy(),
             }),
 
-            Expr::FuncApp { func, args } => todo!("{expr:#?}"),
+            Expr::FuncApp { func, args } => {
+                let func_type = self.get_expr_ty(func, project);
+                todo!("{expr:#?}")
+            }
 
             Expr::Index { target, .. } => {
-                let target_type = self.get_expr_ty(target);
+                let target_type = self.get_expr_ty(target, project);
 
                 let Ty::Array(target_type) = target_type else {
                     panic!("Expected array type, got: {target_type:#?}");
@@ -246,12 +252,17 @@ impl AstScope {
             }
 
             Expr::MethodCall { target, path_seg, contract_args_opt, args, .. } => {
-                let target_type = self.get_expr_ty(target);
+                let target_type = self.get_expr_ty(target, project);
+
+                let resolver = project.resolver.borrow();
+                let resolved = resolver.resolve_ty(&target_type);
+                println!("{resolved:#?}");
+                
                 todo!("{expr:#?}")
             }
 
             Expr::FieldProjection { target, name, .. } => {
-                // Check if the field projection refers to a storage field and return a `StorageKey<T>` type
+                // Check if the field projection refers to a storage field and return a `core::storage::StorageKey<T>` type
                 if let Expr::Path(PathExpr { root_opt, prefix, suffix, .. }) = target.as_ref() {
                     if root_opt.is_none() && prefix.name.as_str() == "storage" && suffix.is_empty() {
                         let variable = self.get_variable(name.as_str(), true).unwrap();
@@ -259,28 +270,56 @@ impl AstScope {
                         return Ty::Path(PathType {
                             root_opt: None,
                             prefix: PathTypeSegment {
-                                name: BaseIdent::new_no_span("StorageKey".into()),
-                                generics_opt: Some((None, GenericArgs {
-                                    parameters: AngleBrackets {
-                                        open_angle_bracket_token: OpenAngleBracketToken::new(Span::dummy()),
-                                        inner: Punctuated {
-                                            value_separator_pairs: vec![],
-                                            final_value_opt: Some(Box::new(variable.borrow().ty.clone())),
-                                        },
-                                        close_angle_bracket_token: CloseAngleBracketToken::new(Span::dummy()),
-                                    },
-                                })),
+                                name: BaseIdent::new_no_span("core".into()),
+                                generics_opt: None,
                             },
-                            suffix: vec![],
+                            suffix: vec![
+                                (DoubleColonToken::new(Span::dummy()), PathTypeSegment {
+                                    name: BaseIdent::new_no_span("storage".into()),
+                                    generics_opt: None,
+                                }),
+                                (DoubleColonToken::new(Span::dummy()), PathTypeSegment {
+                                    name: BaseIdent::new_no_span("StorageKey".into()),
+                                    generics_opt: Some((None, GenericArgs {
+                                        parameters: AngleBrackets {
+                                            open_angle_bracket_token: OpenAngleBracketToken::new(Span::dummy()),
+                                            inner: Punctuated {
+                                                value_separator_pairs: vec![],
+                                                final_value_opt: Some(Box::new(variable.borrow().ty.clone())),
+                                            },
+                                            close_angle_bracket_token: CloseAngleBracketToken::new(Span::dummy()),
+                                        },
+                                    })),
+                                }),
+                            ],
                         });
                     }
                 }
 
-                todo!("{expr:#?}")
+                let target_type = self.get_expr_ty(target, project);
+                
+                let resolver = project.resolver.borrow();
+                let resolved = resolver.resolve_ty(&target_type);
+                
+                let Some(sway_ast::ItemKind::Struct(item_struct)) = resolved else {
+                    panic!("Expected struct, found: {resolved:#?}")
+                };
+
+                let mut fields = vec![];
+
+                for field in &item_struct.fields.inner {
+                    fields.push(field);
+                }
+
+                let Some(field) = fields.iter().find(|f| f.value.name == *name) else {
+                    todo!("{expr:#?}")
+                };
+
+                field.value.ty.clone()
             }
 
             Expr::TupleFieldProjection { target, field, .. } => {
-                let target_type = self.get_expr_ty(target);
+                let target_type = self.get_expr_ty(target, project);
 
                 let Ty::Tuple(target_type) = target_type else {
                     panic!("Expected tuple type, got: {target_type:#?}");
@@ -307,10 +346,10 @@ impl AstScope {
                 }
             }
 
-            Expr::Ref { expr, .. } => self.get_expr_ty(expr),
-            Expr::Deref { expr, .. } => self.get_expr_ty(expr),
+            Expr::Ref { expr, .. } => self.get_expr_ty(expr, project),
+            Expr::Deref { expr, .. } => self.get_expr_ty(expr, project),
             
-            Expr::Not { expr, .. } => self.get_expr_ty(expr),
+            Expr::Not { expr, .. } => self.get_expr_ty(expr, project),
 
             Expr::Mul { lhs, .. } |
             Expr::Div { lhs, .. } |
@@ -323,7 +362,7 @@ impl AstScope {
             Expr::BitAnd { lhs, .. } |
             Expr::BitXor { lhs, .. } |
             Expr::BitOr { lhs, .. } => {
-                self.get_expr_ty(lhs)
+                self.get_expr_ty(lhs, project)
             }
 
             Expr::Equal { .. } |
