@@ -1,10 +1,13 @@
+use crate::project::Project;
 use std::{cell::RefCell, rc::Rc};
 use sway_ast::{
-    keywords::{CloseAngleBracketToken, Keyword, OpenAngleBracketToken, StrToken, Token}, ty::TyTupleDescriptor, AngleBrackets, CommaToken, DoubleColonToken, Expr, ExprArrayDescriptor, ExprTupleDescriptor, FnSignature, GenericArgs, Literal, MatchBranchKind, Parens, PathExpr, PathType, PathTypeSegment, Punctuated, Ty
+    keywords::{CloseAngleBracketToken, Keyword, OpenAngleBracketToken, StrToken, Token},
+    ty::TyTupleDescriptor,
+    AngleBrackets, CommaToken, DoubleColonToken, Expr, ExprArrayDescriptor, ExprTupleDescriptor,
+    FnSignature, GenericArgs, Literal, MatchBranchKind, Parens, PathExpr, PathExprSegment,
+    PathType, PathTypeSegment, Punctuated, Ty,
 };
 use sway_types::{BaseIdent, Span};
-
-use crate::project::Project;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum AstVariableKind {
@@ -29,6 +32,14 @@ pub struct AstScope {
     pub functions: Vec<Rc<RefCell<FnSignature>>>,
 }
 
+#[inline]
+fn empty_tuple_ty() -> Ty {
+    Ty::Tuple(Parens {
+        inner: TyTupleDescriptor::Nil,
+        span: Span::dummy(),
+    })
+}
+
 impl AstScope {
     pub fn get_variable(&self, name: &str, is_storage: bool) -> Option<Rc<RefCell<AstVariable>>> {
         for variable in self.variables.iter().rev() {
@@ -48,6 +59,53 @@ impl AstScope {
         }
 
         None
+    }
+
+    pub fn get_fn_signature(
+        &self,
+        project: &mut Project,
+        fn_name: &PathExprSegment,
+        args: &Parens<Punctuated<Expr, CommaToken>>,
+    ) -> Option<&FnSignature> {
+        //
+        // TODO:
+        //
+        // We need to find the `fn` we are looking for.
+        // We need to ensure the argument types of the `fn` match the types of the supplied `args`.
+        //
+        // If the `fn` is not defined in the current module, we need to find a `use` statement that imports a valid `fn`:
+        // 1. Check `prelude` module of the `core` library
+        // 2. Check `prelude` module of the `std` library
+        // 3. Check all explicit `use` statements
+        //
+        // Once we find the `fn`, return the signature of the `fn`
+        //
+        
+        todo!()
+    }
+
+    pub fn get_impl_fn_signature(
+        &self,
+        project: &mut Project,
+        ty: &Ty,
+        fn_name: &PathExprSegment,
+        args: &Parens<Punctuated<Expr, CommaToken>>,
+    ) -> Option<&FnSignature> {
+        //
+        // TODO:
+        //
+        // We need to find a valid `impl` that contains the `fn` we are looking for.
+        // We need to ensure the argument types of the `fn` match the types of the supplied `args`.
+        //
+        // If the `impl` is not defined in the current module, we need to find a `use` statement that imports a valid `impl` containing the `fn`:
+        // 1. Check `prelude` module of the `core` library
+        // 2. Check `prelude` module of the `std` library
+        // 3. Check all explicit `use` statements
+        //
+        // Once we find the `impl` containing the `fn`, return the signature of the `fn`
+        //
+        
+        todo!()
     }
 
     pub fn get_expr_ty(&self, expr: &Expr, project: &mut Project) -> Ty {
@@ -108,12 +166,7 @@ impl AstScope {
 
             Expr::Tuple(tuple) => {
                 match &tuple.inner {
-                    ExprTupleDescriptor::Nil => {
-                        Ty::Tuple(Parens {
-                            inner: TyTupleDescriptor::Nil,
-                            span: Span::dummy(),
-                        })
-                    }
+                    ExprTupleDescriptor::Nil => empty_tuple_ty(),
 
                     ExprTupleDescriptor::Cons { head, tail, .. } => {
                         let mut value_separator_pairs = vec![];
@@ -142,14 +195,10 @@ impl AstScope {
             Expr::Parens(parens) => self.get_expr_ty(parens.inner.as_ref(), project),
 
             Expr::Block(block) => {
-                if let Some(expr) = block.inner.final_expr_opt.as_ref() {
-                    return self.get_expr_ty(expr, project);
+                match block.inner.final_expr_opt.as_ref() {
+                    Some(expr) => self.get_expr_ty(expr, project),
+                    None => empty_tuple_ty()
                 }
-
-                Ty::Tuple(Parens {
-                    inner: TyTupleDescriptor::Nil,
-                    span: Span::dummy(),
-                })
             }
 
             Expr::Array(array) => {
@@ -160,14 +209,13 @@ impl AstScope {
                         } else if let Some(expr) = sequence.final_value_opt.as_ref() {
                             self.get_expr_ty(expr, project)
                         } else {
-                            Ty::Tuple(Parens {
-                                inner: TyTupleDescriptor::Nil,
-                                span: Span::dummy(),
-                            })
+                            empty_tuple_ty()
                         }
                     }
 
-                    ExprArrayDescriptor::Repeat { value, .. } => self.get_expr_ty(value, project),
+                    ExprArrayDescriptor::Repeat { value, .. } => {
+                        self.get_expr_ty(value, project)
+                    }
                 }
             }
 
@@ -176,28 +224,17 @@ impl AstScope {
                 // TODO: Get the type of the return value from the asm block if any
                 //
 
-                Ty::Tuple(Parens {
-                    inner: TyTupleDescriptor::Nil,
-                    span: Span::dummy(),
-                })
+                empty_tuple_ty()
             }
 
-            Expr::Return { .. } => {
-                Ty::Tuple(Parens {
-                    inner: TyTupleDescriptor::Nil,
-                    span: Span::dummy(),
-                })
-            }
+            Expr::Return { .. } => empty_tuple_ty(),
 
             Expr::If(if_expr) => {
                 if let Some(expr) = if_expr.then_block.inner.final_expr_opt.as_ref() {
                     return self.get_expr_ty(expr, project);
                 }
 
-                Ty::Tuple(Parens {
-                    inner: TyTupleDescriptor::Nil,
-                    span: Span::dummy(),
-                })
+                empty_tuple_ty()
             }
 
             Expr::Match { branches, .. } => {
@@ -208,10 +245,7 @@ impl AstScope {
                                 return self.get_expr_ty(expr, project);
                             }
             
-                            return Ty::Tuple(Parens {
-                                inner: TyTupleDescriptor::Nil,
-                                span: Span::dummy(),
-                            });
+                            return empty_tuple_ty();
                         }
 
                         MatchBranchKind::Expr { expr, .. } => {
@@ -220,26 +254,12 @@ impl AstScope {
                     }
                 }
 
-                Ty::Tuple(Parens {
-                    inner: TyTupleDescriptor::Nil,
-                    span: Span::dummy(),
-                })
+                empty_tuple_ty()
             }
 
-            Expr::While { .. } => Ty::Tuple(Parens {
-                inner: TyTupleDescriptor::Nil,
-                span: Span::dummy(),
-            }),
+            Expr::While { .. } | Expr::For { .. } => empty_tuple_ty(),
 
-            Expr::For { .. } => Ty::Tuple(Parens {
-                inner: TyTupleDescriptor::Nil,
-                span: Span::dummy(),
-            }),
-
-            Expr::FuncApp { func, args } => {
-                let func_type = self.get_expr_ty(func, project);
-                todo!("{expr:#?}")
-            }
+            Expr::FuncApp { func, args } => todo!("{expr:#?}"),
 
             Expr::Index { target, .. } => {
                 let target_type = self.get_expr_ty(target, project);
@@ -251,14 +271,19 @@ impl AstScope {
                 target_type.inner.ty.as_ref().clone()
             }
 
-            Expr::MethodCall { target, path_seg, contract_args_opt, args, .. } => {
+            Expr::MethodCall { target, path_seg, args, .. } => {
                 let target_type = self.get_expr_ty(target, project);
-
-                let resolver = project.resolver.borrow();
-                let resolved = resolver.resolve_ty(&target_type);
-                println!("{resolved:#?}");
+                let fn_signature = self.get_impl_fn_signature(project, &target_type, path_seg, args).unwrap();
                 
-                todo!("{expr:#?}")
+                let ty = fn_signature.return_type_opt.as_ref()
+                    .map(|(_, ty)| ty.clone())
+                    .unwrap_or_else(empty_tuple_ty);
+
+                //
+                // TODO: Turn `ty` into full path type name, i.e: `StorageKey<T>` => `core::storage::StorageKey<T>`
+                //
+
+                ty
             }
 
             Expr::FieldProjection { target, name, .. } => {
@@ -383,20 +408,9 @@ impl AstScope {
                 })
             }
 
-            Expr::Reassignment { .. } => Ty::Tuple(Parens {
-                inner: TyTupleDescriptor::Nil,
-                span: Span::dummy(),
-            }),
+            Expr::Reassignment { .. } => empty_tuple_ty(),
 
-            Expr::Break { .. } => Ty::Tuple(Parens {
-                inner: TyTupleDescriptor::Nil,
-                span: Span::dummy(),
-            }),
-
-            Expr::Continue { .. } => Ty::Tuple(Parens {
-                inner: TyTupleDescriptor::Nil,
-                span: Span::dummy(),
-            }),
+            Expr::Break { .. } | Expr::Continue { .. } => empty_tuple_ty(),
         }
     }
 }
