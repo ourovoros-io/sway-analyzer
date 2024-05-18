@@ -1,11 +1,7 @@
 use crate::project::Project;
 use std::{cell::RefCell, rc::Rc};
 use sway_ast::{
-    keywords::{CloseAngleBracketToken, Keyword, OpenAngleBracketToken, StrToken, Token},
-    ty::TyTupleDescriptor,
-    AngleBrackets, CommaToken, DoubleColonToken, Expr, ExprArrayDescriptor, ExprTupleDescriptor,
-    FnSignature, GenericArgs, Literal, MatchBranchKind, Parens, PathExpr, PathExprSegment,
-    PathType, PathTypeSegment, Punctuated, Ty,
+    brackets::SquareBrackets, keywords::{CloseAngleBracketToken, Keyword, OpenAngleBracketToken, StrToken, Token}, ty::{TyArrayDescriptor, TyTupleDescriptor}, AngleBrackets, CommaToken, DoubleColonToken, Expr, ExprArrayDescriptor, ExprTupleDescriptor, FnSignature, GenericArgs, ItemUse, Literal, MatchBranchKind, Parens, PathExpr, PathExprSegment, PathType, PathTypeSegment, Punctuated, Ty
 };
 use sway_types::{BaseIdent, Span};
 
@@ -28,6 +24,7 @@ pub struct AstVariable {
 #[derive(Debug, Default)]
 pub struct AstScope {
     pub parent: Option<Rc<RefCell<AstScope>>>,
+    pub uses: Vec<ItemUse>,
     pub variables: Vec<Rc<RefCell<AstVariable>>>,
     pub functions: Vec<Rc<RefCell<FnSignature>>>,
 }
@@ -41,6 +38,13 @@ fn empty_tuple_ty() -> Ty {
 }
 
 impl AstScope {
+    fn dump_uses(&self) {
+        if let Some(parent) = self.parent.as_ref() {
+            parent.borrow().dump_uses();
+        }
+        println!("{:#?}", self.uses);
+    }
+
     pub fn get_variable(&self, name: &str, is_storage: bool) -> Option<Rc<RefCell<AstVariable>>> {
         for variable in self.variables.iter().rev() {
             if (variable.borrow().kind == AstVariableKind::Storage) != is_storage {
@@ -59,6 +63,79 @@ impl AstScope {
         }
 
         None
+    }
+
+    pub fn get_full_ty(&self, project: &mut Project, ty: &Ty) -> Ty {
+        if project.resolver.borrow().resolve_ty(ty).is_some() {
+            return ty.clone();
+        }
+
+        match ty {
+            Ty::Path(path_type) => {
+                //
+                // TODO:
+                // Turn relative path into full path, i.e: `StorageKey<Option<T>>` => `core::storage::StorageKey<std::option::Option<T>>`
+                // We should check the `core::prelude` and `std::prelude` modules first before checking the `use` statements in scope.
+                //
+
+                self.dump_uses();
+                todo!("{path_type:#?}")
+            }
+            
+            Ty::Tuple(tuple) => Ty::Tuple(Parens {
+                inner: match &tuple.inner {
+                    TyTupleDescriptor::Nil => TyTupleDescriptor::Nil,
+                    TyTupleDescriptor::Cons { head, comma_token, tail } => TyTupleDescriptor::Cons {
+                        head: Box::new(self.get_full_ty(project, head)),
+                        comma_token: comma_token.clone(),
+                        tail: Punctuated {
+                            value_separator_pairs: tail.value_separator_pairs.iter()
+                                .map(|(ty, comma)| (self.get_full_ty(project, ty), comma.clone()))
+                                .collect(),
+                            final_value_opt: tail.final_value_opt.as_ref()
+                                .map(|ty| Box::new(self.get_full_ty(project, ty))),
+                        },
+                    },
+                },
+                span: tuple.span.clone(),
+            }),
+
+            Ty::Array(array) => Ty::Array(SquareBrackets {
+                inner: TyArrayDescriptor {
+                    ty: Box::new(self.get_full_ty(project, &array.inner.ty)),
+                    semicolon_token: array.inner.semicolon_token.clone(),
+                    length: array.inner.length.clone(),
+                },
+                span: array.span.clone(),
+            }),
+            
+            Ty::Ptr { ptr_token, ty } => Ty::Ptr {
+                ptr_token: ptr_token.clone(),
+                ty: SquareBrackets {
+                    inner: Box::new(self.get_full_ty(project, &ty.inner)),
+                    span: ty.span.clone(),
+                },
+            },
+
+            Ty::Slice { slice_token, ty } => Ty::Slice {
+                slice_token: slice_token.clone(),
+                ty: SquareBrackets {
+                    inner: Box::new(self.get_full_ty(project, &ty.inner)),
+                    span: ty.span.clone(),
+                },
+            },
+
+            Ty::Ref { ampersand_token, mut_token, ty } => Ty::Ref {
+                ampersand_token: ampersand_token.clone(),
+                mut_token: mut_token.clone(),
+                ty: Box::new(self.get_full_ty(project, ty)),
+            },
+
+            Ty::StringSlice(_) |
+            Ty::StringArray { .. } |
+            Ty::Infer { .. } |
+            Ty::Never { .. } => ty.clone(),
+        }
     }
 
     pub fn get_fn_signature(
@@ -104,8 +181,10 @@ impl AstScope {
         //
         // Once we find the `impl` containing the `fn`, return the signature of the `fn`
         //
+
+        self.dump_uses();
         
-        todo!()
+        todo!("{:#?}", (ty, fn_name, args))
     }
 
     pub fn get_expr_ty(&self, expr: &Expr, project: &mut Project) -> Ty {
@@ -115,7 +194,6 @@ impl AstScope {
             Expr::Path(path) => {
                 // Check if the path is a single identifier and look it up as a variable
                 if path.root_opt.is_none() && path.suffix.is_empty() {
-                    println!("variables: {:#?}", self.variables);
                     if let Some(variable) = self.get_variable(path.prefix.name.as_str(), false) {
                         return variable.borrow().ty.clone();
                     }
@@ -279,11 +357,7 @@ impl AstScope {
                     .map(|(_, ty)| ty.clone())
                     .unwrap_or_else(empty_tuple_ty);
 
-                //
-                // TODO: Turn `ty` into full path type name, i.e: `StorageKey<T>` => `core::storage::StorageKey<T>`
-                //
-
-                ty
+                self.get_full_ty(project, &ty)
             }
 
             Expr::FieldProjection { target, name, .. } => {
@@ -291,6 +365,7 @@ impl AstScope {
                 if let Expr::Path(PathExpr { root_opt, prefix, suffix, .. }) = target.as_ref() {
                     if root_opt.is_none() && prefix.name.as_str() == "storage" && suffix.is_empty() {
                         let variable = self.get_variable(name.as_str(), true).unwrap();
+                        let ty = self.get_full_ty(project, &variable.borrow().ty);
 
                         return Ty::Path(PathType {
                             root_opt: None,
@@ -310,7 +385,7 @@ impl AstScope {
                                             open_angle_bracket_token: OpenAngleBracketToken::new(Span::dummy()),
                                             inner: Punctuated {
                                                 value_separator_pairs: vec![],
-                                                final_value_opt: Some(Box::new(variable.borrow().ty.clone())),
+                                                final_value_opt: Some(Box::new(ty)),
                                             },
                                             close_angle_bracket_token: CloseAngleBracketToken::new(Span::dummy()),
                                         },
