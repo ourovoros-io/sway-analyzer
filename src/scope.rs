@@ -1,7 +1,13 @@
 use crate::project::Project;
 use std::{cell::RefCell, rc::Rc};
 use sway_ast::{
-    brackets::SquareBrackets, keywords::{CloseAngleBracketToken, Keyword, OpenAngleBracketToken, StrToken, Token}, ty::{TyArrayDescriptor, TyTupleDescriptor}, AngleBrackets, CommaToken, DoubleColonToken, Expr, ExprArrayDescriptor, ExprTupleDescriptor, FnSignature, GenericArgs, ItemUse, Literal, MatchBranchKind, Parens, PathExpr, PathExprSegment, PathType, PathTypeSegment, Punctuated, Ty
+    brackets::SquareBrackets,
+    keywords::{CloseAngleBracketToken, Keyword, OpenAngleBracketToken, StrToken, Token},
+    ty::{TyArrayDescriptor, TyTupleDescriptor},
+    AngleBrackets, CommaToken, DoubleColonToken, Expr, ExprArrayDescriptor, ExprTupleDescriptor,
+    FnArg, FnArgs, FnSignature, GenericArgs, ItemUse, Literal, MatchBranchKind, Parens, PathExpr,
+    PathExprSegment, PathType, PathTypeSegment, Pattern, Punctuated, Traits, Ty, WhereBound,
+    WhereClause,
 };
 use sway_types::{BaseIdent, Span};
 
@@ -23,10 +29,10 @@ pub struct AstVariable {
 
 #[derive(Debug, Default)]
 pub struct AstScope {
-    pub parent: Option<Rc<RefCell<AstScope>>>,
-    pub uses: Vec<ItemUse>,
-    pub variables: Vec<Rc<RefCell<AstVariable>>>,
-    pub functions: Vec<Rc<RefCell<FnSignature>>>,
+    parent: Option<Rc<RefCell<AstScope>>>,
+    uses: Vec<ItemUse>,
+    variables: Vec<Rc<RefCell<AstVariable>>>,
+    functions: Vec<Rc<RefCell<FnSignature>>>,
 }
 
 #[inline]
@@ -38,11 +44,59 @@ fn empty_tuple_ty() -> Ty {
 }
 
 impl AstScope {
+    pub fn new(parent: Option<Rc<RefCell<AstScope>>>) -> Self {
+        Self {
+            parent,
+            ..Default::default()
+        }
+    }
+
     fn dump_uses(&self) {
         if let Some(parent) = self.parent.as_ref() {
             parent.borrow().dump_uses();
         }
         println!("{:#?}", self.uses);
+    }
+
+    #[inline]
+    pub fn parent(&self) -> Option<Rc<RefCell<AstScope>>> {
+        self.parent.clone()
+    }
+
+    #[inline]
+    pub fn uses(&self) -> impl Iterator<Item = &ItemUse> {
+        self.uses.iter()
+    }
+
+    pub fn add_use(&mut self, project: &mut Project, item_use: &ItemUse) {
+        //
+        // TODO:
+        // Resolve full use path before adding.
+        //
+        // Example:
+        // ```
+        // use sway_ast as sway;
+        // use sway::Ty;
+        // ```
+        //
+        // Here, `sway` is an alias for `sway_ast`.
+        // We need to turn `use sway::Ty` into `use sway_ast::Ty`.
+        //
+
+        todo!()
+    }
+
+    #[inline]
+    pub fn variables(&self) -> impl Iterator<Item = &Rc<RefCell<AstVariable>>> {
+        self.variables.iter()
+    }
+
+    pub fn add_variable(&mut self, project: &mut Project, kind: AstVariableKind, name: &BaseIdent, ty: &Ty) {
+        self.variables.push(Rc::new(RefCell::new(AstVariable {
+            kind,
+            name: name.to_string(),
+            ty: self.get_full_ty(project, ty),
+        })));
     }
 
     pub fn get_variable(&self, name: &str, is_storage: bool) -> Option<Rc<RefCell<AstVariable>>> {
@@ -65,22 +119,158 @@ impl AstScope {
         None
     }
 
+    #[inline]
+    pub fn functions(&self) -> impl Iterator<Item = &Rc<RefCell<FnSignature>>> {
+        self.functions.iter()
+    }
+
+    pub fn add_function(&mut self, project: &mut Project, fn_signature: &FnSignature) {
+        self.functions.push(Rc::new(RefCell::new(FnSignature {
+            visibility: fn_signature.visibility.clone(),
+            fn_token: fn_signature.fn_token.clone(),
+            name: fn_signature.name.clone(),
+            generics: fn_signature.generics.clone(),
+
+            arguments: Parens {
+                inner: match &fn_signature.arguments.inner {
+                    FnArgs::Static(args) => {
+                        let mut value_separator_pairs = vec![];
+
+                        for arg in args {
+                            value_separator_pairs.push(
+                                (
+                                    FnArg {
+                                        pattern: self.get_full_pattern(project, &arg.pattern),
+                                        colon_token: arg.colon_token.clone(),
+                                        ty: self.get_full_ty(project, &arg.ty),
+                                    },
+                                    CommaToken::new(Span::dummy())
+                                )
+                            );
+                        }
+
+                        let final_value_opt = value_separator_pairs.pop().map(|x| Box::new(x.0));
+
+                        FnArgs::Static(Punctuated {
+                            value_separator_pairs,
+                            final_value_opt,
+                        })
+                    }
+
+                    FnArgs::NonStatic { self_token, ref_self, mutable_self, args_opt } => FnArgs::NonStatic {
+                        self_token: self_token.clone(),
+                        ref_self: ref_self.clone(),
+                        mutable_self: mutable_self.clone(),
+                        args_opt: args_opt.as_ref().map(|(comma, args)| {
+                            let mut value_separator_pairs = vec![];
+
+                            for arg in args {
+                                value_separator_pairs.push(
+                                    (
+                                        FnArg {
+                                            pattern: self.get_full_pattern(project, &arg.pattern),
+                                            colon_token: arg.colon_token.clone(),
+                                            ty: self.get_full_ty(project, &arg.ty),
+                                        },
+                                        CommaToken::new(Span::dummy())
+                                    )
+                                );
+                            }
+
+                            let final_value_opt = value_separator_pairs.pop().map(|x| Box::new(x.0));
+
+                            (
+                                comma.clone(),
+                                Punctuated {
+                                    value_separator_pairs,
+                                    final_value_opt,
+                                }
+                            )
+                        }),
+                    },
+                },
+                
+                span: fn_signature.arguments.span.clone(),
+            },
+
+            return_type_opt: fn_signature.return_type_opt.as_ref().map(|(arrow, ty)| {
+                (
+                    arrow.clone(),
+                    self.get_full_ty(project, ty)
+                )
+            }),
+
+            where_clause_opt: fn_signature.where_clause_opt.as_ref().map(|where_clause| {
+                let mut value_separator_pairs = vec![];
+
+                for where_bound in &where_clause.bounds {
+                    value_separator_pairs.push(
+                        (
+                            WhereBound {
+                                ty_name: where_bound.ty_name.clone(),
+                                colon_token: where_bound.colon_token.clone(),
+                                bounds: Traits {
+                                    prefix: self.get_full_path_type(project, &where_bound.bounds.prefix),
+                                    suffixes: where_bound.bounds.suffixes.iter().map(|(add_token, path_type)| {
+                                        (
+                                            add_token.clone(),
+                                            self.get_full_path_type(project, path_type)
+                                        )
+                                    })
+                                    .collect(),
+                                },
+                            },
+                            CommaToken::new(Span::dummy())
+                        )
+                    );
+                }
+
+                let final_value_opt = value_separator_pairs.pop().map(|x| Box::new(x.0));
+
+                WhereClause {
+                    where_token: where_clause.where_token.clone(),
+                    bounds: Punctuated {
+                        value_separator_pairs,
+                        final_value_opt,
+                    },
+                }
+            }),
+        })));
+    }
+
+    pub fn get_full_pattern(&self, project: &mut Project, pattern: &Pattern) -> Pattern {
+        match pattern {
+            Pattern::Or { lhs, pipe_token, rhs } => todo!(),
+            Pattern::Wildcard { underscore_token } => todo!(),
+            Pattern::AmbiguousSingleIdent(_) => todo!(),
+            Pattern::Var { reference, mutable, name } => todo!(),
+            Pattern::Literal(_) => todo!(),
+            Pattern::Constant(_) => todo!(),
+            Pattern::Constructor { path, args } => todo!(),
+            Pattern::Struct { path, fields } => todo!(),
+            Pattern::Tuple(_) => todo!(),
+            Pattern::Error(_, _) => todo!(),
+        }
+    }
+
+    pub fn get_full_path_type(&self, project: &mut Project, path_type: &PathType) -> PathType {
+        //
+        // TODO:
+        // Turn relative path into full path, i.e: `StorageKey<Option<T>>` => `core::storage::StorageKey<std::option::Option<T>>`
+        // We should check the `core::prelude` and `std::prelude` modules first before checking the `use` statements in scope.
+        //
+
+        self.dump_uses();
+        todo!("{path_type:#?}")
+    }
+
     pub fn get_full_ty(&self, project: &mut Project, ty: &Ty) -> Ty {
         if project.resolver.borrow().resolve_ty(ty).is_some() {
             return ty.clone();
         }
 
         match ty {
-            Ty::Path(path_type) => {
-                //
-                // TODO:
-                // Turn relative path into full path, i.e: `StorageKey<Option<T>>` => `core::storage::StorageKey<std::option::Option<T>>`
-                // We should check the `core::prelude` and `std::prelude` modules first before checking the `use` statements in scope.
-                //
-
-                self.dump_uses();
-                todo!("{path_type:#?}")
-            }
+            Ty::Path(path_type) => Ty::Path(self.get_full_path_type(project, path_type)),
             
             Ty::Tuple(tuple) => Ty::Tuple(Parens {
                 inner: match &tuple.inner {

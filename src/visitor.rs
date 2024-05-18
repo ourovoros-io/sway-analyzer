@@ -1,7 +1,7 @@
-use crate::{error::Error, project::Project, scope::{AstScope, AstVariable, AstVariableKind}};
+use crate::{error::Error, project::Project, scope::{AstScope, AstVariableKind}};
 use std::{cell::RefCell, path::Path, rc::Rc};
 use sway_ast::{expr::asm::AsmFinalExpr, *};
-use sway_types::{Span, Spanned};
+use sway_types::{BaseIdent, Span, Spanned};
 
 #[derive(Clone)]
 pub struct ModuleContext<'a> {
@@ -802,7 +802,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
     }
 
     fn visit_use(&mut self, context: &UseContext, scope: Rc<RefCell<AstScope>>, project: &mut Project) -> Result<(), Error> {
-        scope.borrow_mut().uses.push(context.item_use.clone());
+        scope.borrow_mut().add_use(project, context.item_use);
         
         for visitor in self.visitors.iter_mut() {
             visitor.visit_use(context, scope.clone(), project)?;
@@ -954,17 +954,18 @@ impl AstVisitor for AstVisitorRecursive<'_> {
     }
 
     fn visit_fn(&mut self, context: &FnContext, scope: Rc<RefCell<AstScope>>, project: &mut Project) -> Result<(), Error> {
-        scope.borrow_mut().functions.push(Rc::new(RefCell::new(context.item_fn.fn_signature.clone())));
+        scope.borrow_mut().add_function(project, &context.item_fn.fn_signature);
         
         let args = match &context.item_fn.fn_signature.arguments.inner {
             FnArgs::Static(args) => Some(args),
 
             FnArgs::NonStatic { args_opt, .. } => {
-                scope.borrow_mut().variables.push(Rc::new(RefCell::new(AstVariable {
-                    kind: AstVariableKind::Parameter,
-                    name: "self".into(),
-                    ty: context.item_impl.as_ref().unwrap().ty.clone(),
-                })));
+                scope.borrow_mut().add_variable(
+                    project,
+                    AstVariableKind::Parameter,
+                    &BaseIdent::new_no_span("self".into()),
+                    &context.item_impl.as_ref().unwrap().ty,
+                );
 
                 args_opt.as_ref().map(|(_, args)| args)
             }
@@ -975,11 +976,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                 crate::utils::map_pattern_and_ty(&arg.pattern, &arg.ty, &mut |pattern, ty| {
                     match pattern {
                         Pattern::Var { name, .. } => {
-                            scope.borrow_mut().variables.push(Rc::new(RefCell::new(AstVariable {
-                                kind: AstVariableKind::Parameter,
-                                name: name.to_string(),
-                                ty: ty.clone(),
-                            })));
+                            scope.borrow_mut().add_variable(project, AstVariableKind::Parameter, name, ty);
                         }
 
                         _ => {}
@@ -1010,10 +1007,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
             block: &context.item_fn.body,
         };
 
-        let scope = Rc::new(RefCell::new(AstScope {
-            parent: Some(scope.clone()),
-            ..Default::default()
-        }));
+        let scope = Rc::new(RefCell::new(AstScope::new(Some(scope.clone()))));
         
         self.visit_block(&body_context, scope.clone(), project)?;
         self.leave_block(&body_context, scope.clone(), project)?;
@@ -1124,11 +1118,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
             &mut |pattern, ty| {
                 match pattern {
                     Pattern::Var { name, .. } => {
-                        scope.borrow_mut().variables.push(Rc::new(RefCell::new(AstVariable {
-                            kind: AstVariableKind::Local,
-                            name: name.to_string(),
-                            ty: ty.clone(),
-                        })));
+                        scope.borrow_mut().add_variable(project, AstVariableKind::Local, name, ty);
                     }
 
                     _ => {}
@@ -1303,10 +1293,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                     block,
                 };
 
-                let scope = Rc::new(RefCell::new(AstScope {
-                    parent: Some(scope.clone()),
-                    ..Default::default()
-                }));
+                let scope = Rc::new(RefCell::new(AstScope::new(Some(scope.clone()))));
                 
                 self.visit_block(&context, scope.clone(), project)?;
                 self.leave_block(&context, scope.clone(), project)?;
@@ -2574,10 +2561,8 @@ impl AstVisitor for AstVisitorRecursive<'_> {
         }
 
         {
-            let scope = Rc::new(RefCell::new(AstScope {
-                parent: Some(scope.clone()),
-                ..Default::default()
-            }));
+            let parent_scope = scope.clone();
+            let scope = Rc::new(RefCell::new(AstScope::new(Some(scope.clone()))));
             
             match &context.if_expr.condition {
                 IfCondition::Expr(expr) => {
@@ -2594,8 +2579,8 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                         expr: expr.as_ref(),
                     };
 
-                    self.visit_expr(&context, scope.borrow().parent.as_ref().unwrap().clone(), project)?;
-                    self.leave_expr(&context, scope.borrow().parent.as_ref().unwrap().clone(), project)?;
+                    self.visit_expr(&context, parent_scope.clone(), project)?;
+                    self.leave_expr(&context, parent_scope.clone(), project)?;
                 }
                 
                 IfCondition::Let { lhs, rhs, .. } => {
@@ -2609,11 +2594,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                         &mut |pattern, ty| {
                             match pattern {
                                 Pattern::Var { name, .. } => {
-                                    scope.borrow_mut().variables.push(Rc::new(RefCell::new(AstVariable {
-                                        kind: AstVariableKind::Local,
-                                        name: name.to_string(),
-                                        ty: ty.clone(),
-                                    })));
+                                    scope.borrow_mut().add_variable(project, AstVariableKind::Local, name, ty);
                                 }
 
                                 _ => {}
@@ -2634,8 +2615,8 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                         expr: rhs.as_ref(),
                     };
  
-                    self.visit_expr(&rhs_context, scope.borrow().parent.as_ref().unwrap().clone(), project)?;
-                    self.leave_expr(&rhs_context, scope.borrow().parent.as_ref().unwrap().clone(), project)?;
+                    self.visit_expr(&rhs_context, parent_scope.clone(), project)?;
+                    self.leave_expr(&rhs_context, parent_scope.clone(), project)?;
                 }
             }
 
@@ -3083,11 +3064,12 @@ impl AstVisitor for AstVisitorRecursive<'_> {
             .map(|(_, ty)| ty.clone())
             .unwrap_or_else(|| scope.borrow().get_expr_ty(context.item_const.expr_opt.as_ref().unwrap(), project));
         
-        scope.borrow_mut().variables.push(Rc::new(RefCell::new(AstVariable {
-            kind: AstVariableKind::Constant,
-            name: context.item_const.name.to_string(),
-            ty,
-        })));
+        scope.borrow_mut().add_variable(
+            project,
+            AstVariableKind::Constant,
+            &context.item_const.name,
+            &ty,
+        );
 
         for visitor in self.visitors.iter_mut() {
             visitor.visit_const(context, scope.clone(), project)?;
@@ -3170,11 +3152,12 @@ impl AstVisitor for AstVisitorRecursive<'_> {
     }
 
     fn visit_storage_field(&mut self, context: &StorageFieldContext, scope: Rc<RefCell<AstScope>>, project: &mut Project) -> Result<(), Error> {
-        scope.borrow_mut().variables.push(Rc::new(RefCell::new(AstVariable {
-            kind: AstVariableKind::Storage,
-            name: context.field.name.to_string(),
-            ty: context.field.ty.clone(),
-        })));
+        scope.borrow_mut().add_variable(
+            project,
+            AstVariableKind::Storage,
+            &context.field.name,
+            &context.field.ty,
+        );
 
         for visitor in self.visitors.iter_mut() {
             visitor.visit_storage_field(context, scope.clone(), project)?;
@@ -3255,11 +3238,12 @@ impl AstVisitor for AstVisitorRecursive<'_> {
     }
 
     fn visit_configurable_field(&mut self, context: &ConfigurableFieldContext, scope: Rc<RefCell<AstScope>>, project: &mut Project) -> Result<(), Error> {
-        scope.borrow_mut().variables.push(Rc::new(RefCell::new(AstVariable {
-            kind: AstVariableKind::Configurable,
-            name: context.field.name.to_string(),
-            ty: context.field.ty.clone(),
-        })));
+        scope.borrow_mut().add_variable(
+            project,
+            AstVariableKind::Configurable,
+            &context.field.name,
+            &context.field.ty,
+        );
 
         for visitor in self.visitors.iter_mut() {
             visitor.visit_configurable_field(context, scope.clone(), project)?;
