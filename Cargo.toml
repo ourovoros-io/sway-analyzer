@@ -16,5 +16,4 @@ sway-ast = "0.56.1"
 sway-error = "0.56.1"
 sway-parse = "0.56.1"
 sway-types = "0.56.1"
-sway-ast-stubs = { path = "../sway-ast-stubs/" }
-# sway-ast-stubs = { git = "https://github.com/ourovoros-io/sway-ast-stubs.git", commit = "425a74d" }
+sway-ast-stubs = { git = "https://github.com/ourovoros-io/sway-ast-stubs.git", commit = "425a74d" }
