@@ -1404,6 +1404,77 @@ pub fn use_tree_to_name(mut use_tree: &UseTree, path: &str) -> Option<String> {
     }
 }
 
+pub fn flatten_use_tree(prefix: Option<&PathExpr>, use_tree: &UseTree) -> Vec<PathExpr> {
+    match use_tree {
+        UseTree::Group { imports } => {
+            let mut result = vec![];
+            for import in &imports.inner {
+                result.extend(flatten_use_tree(prefix, import));
+            }
+            result
+        },
+        UseTree::Name { name } => {
+            let mut prefix = prefix.cloned();
+            if prefix.is_none() {
+                prefix = Some(PathExpr { 
+                    root_opt: None, 
+                    prefix: PathExprSegment { 
+                        name: name.clone(), 
+                        generics_opt: None 
+                    }, 
+                    suffix: vec![], 
+                    incomplete_suffix: false 
+                });
+            } else {
+                prefix.as_mut().unwrap().suffix.push((DoubleColonToken::default(), PathExprSegment { 
+                    name: name.clone(), 
+                    generics_opt: None 
+                }));
+            }
+
+            if prefix.as_ref().map(|x| x.suffix.last().map(|l| l.1.name.as_str() == "self").unwrap_or(false)).unwrap_or(false) {
+                prefix.as_mut().unwrap().suffix.pop();
+            } 
+            vec![prefix.unwrap()]
+        },
+        UseTree::Rename { alias, .. } => {
+            let prefix = PathExpr { 
+                root_opt: None, 
+                prefix: PathExprSegment { 
+                    name: alias.clone(), 
+                    generics_opt: None 
+                }, 
+                suffix: vec![], 
+                incomplete_suffix: false 
+            };
+            vec![prefix]
+        },
+        UseTree::Glob { .. } => vec![],
+        UseTree::Path { prefix: inner_prefix, suffix , .. } => {
+            let mut prefix = prefix.cloned();
+            if prefix.is_none() {
+                prefix = Some(PathExpr { 
+                    root_opt: None, 
+                    prefix: PathExprSegment { 
+                        name: inner_prefix.clone(), 
+                        generics_opt: None 
+                    }, 
+                    suffix: vec![], 
+                    incomplete_suffix: false 
+                });
+            } else {
+                prefix.as_mut().unwrap().suffix.push((DoubleColonToken::default(), PathExprSegment { 
+                    name: inner_prefix.clone(), 
+                    generics_opt: None 
+                }));
+            }
+
+            flatten_use_tree(prefix.as_ref(), suffix)
+        },
+        UseTree::Error { .. } => panic!("Encountered error while expanding use tree"),
+    }
+}
+
 pub fn expr_binary_operands(expr: &Expr) -> Option<(&Expr, &Expr)> {
     match expr {
         Expr::Mul { lhs, rhs, .. } => Some((lhs.as_ref(), rhs.as_ref())),

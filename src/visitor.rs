@@ -828,6 +828,8 @@ impl AstVisitor for AstVisitorRecursive<'_> {
     }
 
     fn visit_struct(&mut self, context: &StructContext, scope: Rc<RefCell<AstScope>>, project: &mut Project) -> Result<(), Error> {
+        scope.borrow_mut().add_struct(project, context.item_struct);
+
         for visitor in self.visitors.iter_mut() {
             visitor.visit_struct(context, scope.clone(), project)?;
         }
@@ -2937,6 +2939,8 @@ impl AstVisitor for AstVisitorRecursive<'_> {
     }
 
     fn visit_trait(&mut self, context: &TraitContext, scope: Rc<RefCell<AstScope>>, project: &mut Project) -> Result<(), Error> {
+        scope.borrow_mut().add_trait(project, context.item_trait);
+        
         for visitor in self.visitors.iter_mut() {
             visitor.visit_trait(context, scope.clone(), project)?;
         }
@@ -3036,6 +3040,8 @@ impl AstVisitor for AstVisitorRecursive<'_> {
     }
 
     fn visit_abi(&mut self, context: &AbiContext, scope: Rc<RefCell<AstScope>>, project: &mut Project) -> Result<(), Error> {
+        scope.borrow_mut().add_abi(project, context.item_abi);
+
         for visitor in self.visitors.iter_mut() {
             visitor.visit_abi(context, scope.clone(), project)?;
         }
@@ -3285,6 +3291,8 @@ impl AstVisitor for AstVisitorRecursive<'_> {
     }
 
     fn visit_type_alias(&mut self, context: &TypeAliasContext, scope: Rc<RefCell<AstScope>>, project: &mut Project) -> Result<(), Error> {
+        scope.borrow_mut().add_type_alias(project, context.item_type_alias);
+
         for visitor in self.visitors.iter_mut() {
             visitor.visit_type_alias(context, scope.clone(), project)?;
         }

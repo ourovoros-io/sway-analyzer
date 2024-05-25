@@ -1,7 +1,7 @@
-use crate::project::Project;
+use crate::{project::Project, utils::flatten_use_tree};
 use std::{cell::RefCell, rc::Rc};
 use sway_ast::{
-    brackets::SquareBrackets, keywords::{CloseAngleBracketToken, Keyword, OpenAngleBracketToken, StrToken, Token}, ty::{TyArrayDescriptor, TyTupleDescriptor}, AngleBrackets, Braces, CommaToken, DoubleColonToken, Expr, ExprArrayDescriptor, ExprTupleDescriptor, FnArg, FnArgs, FnSignature, GenericArgs, ItemUse, Literal, MatchBranchKind, Parens, PathExpr, PathExprSegment, PathType, PathTypeSegment, Pattern, Punctuated, Traits, Ty, UseTree, WhereBound, WhereClause
+    brackets::SquareBrackets, keywords::{CloseAngleBracketToken, Keyword, OpenAngleBracketToken, StarToken, StrToken, Token}, ty::{TyArrayDescriptor, TyTupleDescriptor}, AngleBrackets, Braces, CommaToken, DoubleColonToken, Expr, ExprArrayDescriptor, ExprTupleDescriptor, FnArg, FnArgs, FnSignature, GenericArgs, ItemAbi, ItemKind, ItemStruct, ItemTrait, ItemTypeAlias, ItemUse, Literal, MatchBranchKind, Parens, PathExpr, PathExprSegment, PathType, PathTypeSegment, Pattern, Punctuated, Traits, Ty, UseTree, WhereBound, WhereClause
 };
 use sway_types::{BaseIdent, Span};
 
@@ -27,6 +27,10 @@ pub struct AstScope {
     uses: Vec<ItemUse>,
     variables: Vec<Rc<RefCell<AstVariable>>>,
     functions: Vec<Rc<RefCell<FnSignature>>>,
+    structs: Vec<ItemStruct>,
+    abis: Vec<ItemAbi>,
+    traits: Vec<ItemTrait>,
+    types_aliases: Vec<ItemTypeAlias>,
 }
 
 #[inline]
@@ -55,34 +59,13 @@ impl AstScope {
         self.uses.iter()
     }
 
-    pub fn add_use(&mut self, project: &mut Project, item_use: &ItemUse) {
+    pub fn add_use(&mut self, _project: &mut Project, item_use: &ItemUse) {
         //
-        // TODO:
-        // Resolve full use path before adding.
-        //
-        // Example:
-        // ```
-        // use sway_ast as sway;
-        // use sway::Ty;
-        // ```
-        //
-        // Here, `sway` is an alias for `sway_ast`.
-        // We need to turn `use sway::Ty` into `use sway_ast::Ty`.
+        // TODO: ensure the use is not already declared
         //
 
-        for tree in self.expand_use_tree(project, None, &item_use.tree) {
-            //
-            // TODO: ensure the use is not already declared
-            //
-
-            self.uses.push(ItemUse {
-                visibility: item_use.visibility.clone(),
-                use_token: item_use.use_token.clone(),
-                root_import: item_use.root_import.clone(),
-                tree,
-                semicolon_token: item_use.semicolon_token.clone(),
-            });
-        }
+        self.uses.push(item_use.clone());
+        
     }
 
     #[inline]
@@ -282,6 +265,43 @@ impl AstScope {
         //
 
         todo!()
+    }
+
+
+    #[inline]
+    pub fn structs(&self) -> impl Iterator<Item = &ItemStruct> {
+        self.structs.iter()
+    }
+
+    pub fn add_struct(&mut self, project: &mut Project, item_struct: &ItemStruct) {
+        self.structs.push(item_struct.clone());
+    }
+
+    #[inline]
+    pub fn abis(&self) -> impl Iterator<Item = &ItemAbi> {
+        self.abis.iter()
+    }
+
+    pub fn add_abi(&mut self, project: &mut Project, item_abi: &ItemAbi) {
+        self.abis.push(item_abi.clone());
+    }
+
+    #[inline]
+    pub fn traits(&self) -> impl Iterator<Item = &ItemTrait> {
+        self.traits.iter()
+    }
+
+    pub fn add_trait(&mut self, project: &mut Project, item_trait: &ItemTrait) {
+        self.traits.push(item_trait.clone());
+    }
+
+    #[inline]
+    pub fn type_aliases(&self) -> impl Iterator<Item = &ItemTypeAlias> {
+        self.types_aliases.iter()
+    }
+
+    pub fn add_type_alias(&mut self, project: &mut Project, item_type_alias: &ItemTypeAlias) {
+        self.types_aliases.push(item_type_alias.clone());
     }
 
     pub fn get_expr_ty(&self, expr: &Expr, project: &mut Project) -> Ty {
@@ -600,7 +620,7 @@ impl AstScope {
         match pattern {
             Pattern::Or { lhs, pipe_token, rhs } => todo!(),
             Pattern::Wildcard { underscore_token } => todo!(),
-            Pattern::AmbiguousSingleIdent(_) => todo!(),
+            Pattern::AmbiguousSingleIdent(base_ident) => Pattern::AmbiguousSingleIdent(base_ident.clone()),
             Pattern::Var { reference, mutable, name } => todo!(),
             Pattern::Literal(_) => todo!(),
             Pattern::Constant(_) => todo!(),
@@ -611,107 +631,8 @@ impl AstScope {
         }
     }
     
-    fn expand_use_tree(
-        &self,
-        project: &mut Project,
-        use_prefix: Option<&PathExpr>,
-        tree: &UseTree,
-    ) -> Vec<UseTree> {
-        match tree {
-            UseTree::Group { imports } => {
-                let mut result = vec![];
 
-                for tree in &imports.inner {
-                    result.extend(self.expand_use_tree(project, use_prefix, tree));
-                }
-                
-                result
-            }
-
-            UseTree::Name { name } => {
-                let path_expr = match use_prefix.as_ref() {
-                    Some(prefix) => {
-                        let mut result = (*prefix).clone();
-                        
-                        result.suffix.push(
-                            (
-                                DoubleColonToken::new(Span::dummy()),
-                                PathExprSegment {
-                                    name: name.clone(),
-                                    generics_opt: None,
-                                }
-                            )
-                        );
-
-                        result.incomplete_suffix = false;
-
-                        result
-                    }
-
-                    None => PathExpr {
-                        root_opt: None,
-                        prefix: PathExprSegment {
-                            name: name.clone(),
-                            generics_opt: None,
-                        },
-                        suffix: vec![],
-                        incomplete_suffix: false,
-                    },
-                };
-
-                let path_expr = self.expand_path_expr(project, &path_expr);
-
-                todo!("{path_expr:#?}")
-            }
-            
-            UseTree::Rename { name, as_token, alias } => todo!(),
-
-            UseTree::Glob { star_token } => {
-                //
-                // TODO: import everything individually?
-                //
-
-                todo!()
-            }
-
-            UseTree::Path { prefix, suffix, .. } => {
-                match use_prefix.as_ref() {
-                    Some(use_prefix) => {
-                        let mut use_prefix = (*use_prefix).clone();
-                        
-                        use_prefix.suffix.push(
-                            (
-                                DoubleColonToken::new(Span::dummy()),
-                                PathExprSegment {
-                                    name: prefix.clone(),
-                                    generics_opt: None,
-                                }
-                            )
-                        );
-
-                        self.expand_use_tree(project, Some(&use_prefix), suffix)
-                    }
-
-                    None => {
-                        let use_prefix = PathExpr {
-                            root_opt: None,
-                            prefix: PathExprSegment {
-                                name: prefix.clone(),
-                                generics_opt: None,
-                            },
-                            suffix: vec![],
-                            incomplete_suffix: false,
-                        };
-
-                        self.expand_use_tree(project, Some(&use_prefix), suffix)
-                    }
-                }
-            }
-
-            UseTree::Error { spans } => todo!(),
-        }
-    }
-
+    
     fn expand_path_expr(&self, project: &mut Project, path_expr: &PathExpr) -> PathExpr {
         //
         // TODO: resolve full path expr
@@ -746,9 +667,7 @@ impl AstScope {
 
                 let mut result = result.unwrap();
 
-                for suffix in path_expr.suffix.iter() {
-                    todo!("{suffix:#?}")
-                }
+                result.suffix.extend(path_expr.suffix.clone());
 
                 result
             }
@@ -761,8 +680,303 @@ impl AstScope {
         // Turn relative path into full path, i.e: `StorageKey<Option<T>>` => `core::storage::StorageKey<std::option::Option<T>>`
         // We should check the `core::prelude` and `std::prelude` modules first before checking the `use` statements in scope.
         //
+        match path_type.root_opt.as_ref() {
+            Some(_) => {
+                //
+                // TODO: find the module in the project
+                //
 
-        todo!()
+                todo!()
+            }
+
+            None => {
+                // Look for a library
+                let resolver = project.resolver.clone();
+
+                // Check if we are looking for a standard type
+
+
+                // 1. Look for a type in the current module
+                match path_type.prefix.generics_opt.as_ref() {
+                    None => {
+                        // Check for a type alias in the current module
+                        if let Some(ItemTypeAlias{  ty: Ty::Path(path_ty), .. }) = self.types_aliases.iter().find(|alias| {
+                            alias.name.as_str() == path_type.prefix.name.as_str()
+                        }) {
+                            return self.expand_path_type(project, path_ty);
+                        }
+
+                        // Check for a abi in the current module 
+                        if let Some(item_abi) = self.abis.iter().find(|alias| {
+                            alias.name.as_str() == path_type.prefix.name.as_str()
+                        }) {
+                            return PathType { 
+                                root_opt: None, 
+                                prefix: PathTypeSegment { 
+                                    name: item_abi.name.clone(), 
+                                    generics_opt: None 
+                                }, 
+                                suffix: vec![] 
+                            };
+                        }
+                    }
+
+                    Some((_, generics)) => {
+                        // Count the number of generic parameters
+                        let mut input_count = 0;
+                        for _ in &generics.parameters.inner {
+                            input_count += 1;
+                        }
+
+                        // Check for a struct in the current module
+                        if let Some(item_struct) = self.structs.iter().find(|x| {
+                            x.name.as_str() == path_type.prefix.name.as_str() && x.generics.as_ref().map(|x| {
+                                let mut count = 0;
+                                for _ in &x.parameters.inner {
+                                    count += 1;
+                                }
+                                count == input_count
+                            }).unwrap_or(false) 
+                        }) {
+                            return PathType { 
+                                root_opt: None, 
+                                prefix: PathTypeSegment { 
+                                    name: item_struct.name.clone(), 
+                                    generics_opt: Some((None, generics.clone())) 
+                                }, 
+                                suffix: vec![] 
+                            };
+                        }  
+
+                        // Check for a trait in the current module
+                        if let Some(item_trait) = self.traits.iter().find(|x| {
+                            x.name.as_str() == path_type.prefix.name.as_str() && x.generics.as_ref().map(|x| {
+                                let mut count = 0;
+                                for _ in &x.parameters.inner {
+                                    count += 1;
+                                }
+                                count == input_count
+                            }).unwrap_or(false) 
+                        }) {
+                            return PathType { 
+                                root_opt: None, 
+                                prefix: PathTypeSegment { 
+                                    name: item_trait.name.clone(), 
+                                    generics_opt: Some((None, generics.clone())) 
+                                }, 
+                                suffix: vec![] 
+                            };
+                        }  
+                    }
+                }
+                
+                // 2. Look an explicit `use` statement in the current module
+                if self.uses.iter().find(|item_use| {
+                    let flatten_use_tree = flatten_use_tree(None, &item_use.tree);
+
+                    for path_expr in &flatten_use_tree {
+                        if path_expr.prefix.name.as_str() == path_type.prefix.name.as_str() {
+                            return true;
+                        }
+                    }
+                    return false;
+                }).is_some() {
+                    return path_type.clone();
+                }
+
+                let mut check_library = |library_name: &str| -> Option<PathType> {
+                    if let Some(library) = resolver.borrow().libraries.iter().find(|lib| lib.name == library_name) {
+                        let Some(prelude) = library.modules.iter().find(|module| {
+                            module.name.as_str() == "prelude"
+                        }) else {
+                            panic!("std::prelude not found");
+                        };
+                        
+                        match path_type.prefix.generics_opt.as_ref() {                        
+                            None => {
+                                // Check for a type alias in the current module
+                                for item in &prelude.inner.items {
+                                    let ItemKind::TypeAlias(item_type_alias) = &item.value else {
+                                        continue;
+                                    };
+                                    if item_type_alias.name.as_str() == path_type.prefix.name.as_str() {
+                                        let mut expanded_path_type = self.expand_path_type(project, path_type);
+                                        let prefix = expanded_path_type.prefix.clone();
+                                        
+                                        expanded_path_type.prefix = PathTypeSegment {
+                                            name: BaseIdent::new_no_span(library_name.to_string()),
+                                            generics_opt: None
+                                        };
+                                        
+                                        expanded_path_type.suffix.insert(0, (DoubleColonToken::new(Span::dummy()), prefix));
+                                        
+                                        return Some(expanded_path_type);
+                                    }
+                                }
+    
+                                // Check for a abi in the current module
+                                for item in &prelude.inner.items {
+                                    let ItemKind::Abi(item_abi) = &item.value else {
+                                        continue;
+                                    };
+                                    if item_abi.name.as_str() == path_type.prefix.name.as_str() {
+                                        let mut expanded_path_type = self.expand_path_type(project, path_type);
+                                        let prefix = expanded_path_type.prefix.clone();
+                                        
+                                        expanded_path_type.prefix = PathTypeSegment {
+                                            name: BaseIdent::new_no_span(library_name.to_string()),
+                                            generics_opt: None
+                                        };
+                                        
+                                        expanded_path_type.suffix.insert(0, (DoubleColonToken::new(Span::dummy()), prefix));
+                                        
+                                        return Some(expanded_path_type);
+                                    }
+                                }
+                            }
+    
+                            Some((_, generics)) => {
+                                // Count the number of generic parameters
+                                let mut input_count = 0;
+                                for _ in &generics.parameters.inner {
+                                    input_count += 1;
+                                }
+                                
+                                // Check for a struct in the current module
+                                for item in &prelude.inner.items {
+                                    let ItemKind::Struct(item_struct) = &item.value else {
+                                        continue;
+                                    };
+                                    if item_struct.name.as_str() == path_type.prefix.name.as_str() && item_struct.generics.as_ref().map(|x| {
+                                        let mut count = 0;
+                                        for _ in &x.parameters.inner {
+                                            count += 1;
+                                        }
+                                        count == input_count
+                                    }).unwrap_or(false) {
+                                        let mut expanded_path_type = PathType { 
+                                            root_opt: None, 
+                                            prefix: PathTypeSegment { 
+                                                name: item_struct.name.clone(), 
+                                                generics_opt: Some((None, generics.clone())) 
+                                            }, 
+                                            suffix: vec![] 
+                                        };
+                                        
+                                        let prefix = expanded_path_type.prefix.clone();
+                                        
+                                        expanded_path_type.prefix = PathTypeSegment {
+                                            name: BaseIdent::new_no_span(library_name.to_string()),
+                                            generics_opt: None
+                                        };
+                                        expanded_path_type.suffix.insert(0, (DoubleColonToken::new(Span::dummy()), prefix));
+                                        
+                                        return Some(expanded_path_type);
+                                    }
+                                }
+    
+                                // Check for a trait in the current module
+                                for item in &prelude.inner.items {
+                                    let ItemKind::Trait(item_trait) = &item.value else {
+                                        continue;
+                                    };
+                                    if item_trait.name.as_str() == path_type.prefix.name.as_str() && item_trait.generics.as_ref().map(|x| {
+                                        let mut count = 0;
+                                        for _ in &x.parameters.inner {
+                                            count += 1;
+                                        }
+                                        count == input_count
+                                    }).unwrap_or(false) {
+                                        let mut expanded_path_type = PathType { 
+                                            root_opt: None, 
+                                            prefix: PathTypeSegment { 
+                                                name: item_trait.name.clone(), 
+                                                generics_opt: Some((None, generics.clone())) 
+                                            }, 
+                                            suffix: vec![] 
+                                        };
+                                        
+                                        let prefix = expanded_path_type.prefix.clone();
+                                        expanded_path_type.prefix = PathTypeSegment {
+                                            name: BaseIdent::new_no_span(library_name.to_string()),
+                                            generics_opt: None
+                                        };
+                                        
+                                        expanded_path_type.suffix.insert(0, (DoubleColonToken::new(Span::dummy()), prefix));
+                                        
+                                        return Some(expanded_path_type);
+                                    }
+                                }
+                            }
+                        }
+                        
+                        for item in &prelude.inner.items {
+                            let ItemKind::Use(item_use) = &item.value else {
+                                continue;
+                            };
+
+                            let flatten_use_tree = flatten_use_tree(None, &item_use.tree);
+                            
+                            for path_expr in &flatten_use_tree {
+                                if path_expr.suffix.last().map(|(_,s)| s.name.as_str() == path_type.prefix.name.as_str()).unwrap_or(false) {
+                                    let mut expanded_path_type = path_type.clone();
+                    
+                                    if item_use.root_import.is_some() {
+                                        let prefix = expanded_path_type.prefix.clone();
+                                        expanded_path_type.prefix = PathTypeSegment {
+                                            name: BaseIdent::new_no_span(library_name.to_string()),
+                                            generics_opt: None
+                                        };
+
+                                        expanded_path_type.suffix.insert(0, (DoubleColonToken::new(Span::dummy()), prefix));
+                                    }
+                                    
+                                    return Some(path_type.clone());
+                                }
+                            }
+                        }
+                    }
+
+                    None
+                };
+
+                // 3. Check the std prelude
+                if let Some(result) = check_library("std") {
+                    return result;
+                }
+
+                // 4. Check the core prelude
+                if let Some(result) = check_library("core") {
+                    return result;
+                }
+
+                let mut result = None;
+                
+                for library in resolver.borrow().libraries.iter() {
+                    if library.name == path_type.prefix.name.as_str() {
+                        result = Some(PathType {
+                            root_opt: path_type.root_opt.clone(),
+                            prefix: path_type.prefix.clone(),
+                            suffix: vec![],
+                        });
+                        break;
+                    }
+                }
+
+                if result.is_none() && path_type.prefix.generics_opt.is_none()  && path_type.suffix.is_empty() {
+                    if let "u8" | "u16" | "u32" | "u64" | "u256" | "bool" | "str" | "b256" = path_type.prefix.name.as_str() {
+                        return path_type.clone();
+                    }
+                }
+
+                let mut result = result.unwrap();
+
+                result.suffix.extend(path_type.suffix.clone());
+
+                result
+            }
+        }
+        // todo!("path_type : {:#?}", path_type)
     }
 
     fn expand_ty(&self, project: &mut Project, ty: &Ty) -> Ty {
