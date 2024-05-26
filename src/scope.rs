@@ -1,7 +1,13 @@
-use crate::{project::Project, utils::{self, flatten_use_tree}};
+use crate::{project::Project, utils};
 use std::{cell::RefCell, rc::Rc};
 use sway_ast::{
-    brackets::SquareBrackets, keywords::{CloseAngleBracketToken, Keyword, OpenAngleBracketToken, StrToken, Token}, ty::{TyArrayDescriptor, TyTupleDescriptor}, AngleBrackets, Braces, CommaToken, DoubleColonToken, Expr, ExprArrayDescriptor, ExprTupleDescriptor, FnArg, FnArgs, FnSignature, GenericArgs, ItemAbi, ItemKind, ItemStruct, ItemTrait, ItemTraitItem, ItemTypeAlias, ItemUse, Literal, MatchBranchKind, Parens, PathExpr, PathExprSegment, PathType, PathTypeSegment, Pattern, PatternStructField, Punctuated, Traits, Ty, WhereBound, WhereClause
+    keywords::{CloseAngleBracketToken, Keyword, OpenAngleBracketToken, StrToken},
+    ty::TyTupleDescriptor,
+    AngleBrackets, Braces, CommaToken, DoubleColonToken, Expr, ExprArrayDescriptor,
+    ExprTupleDescriptor, FnArg, FnArgs, FnSignature, GenericArgs, ItemAbi, ItemKind, ItemStruct,
+    ItemTrait, ItemTraitItem, ItemTypeAlias, ItemUse, Literal, MatchBranchKind, Parens, PathExpr,
+    PathExprSegment, PathType, PathTypeSegment, Pattern, PatternStructField, Punctuated, Traits,
+    Ty, WhereBound, WhereClause,
 };
 use sway_types::{BaseIdent, Span, Spanned};
 
@@ -75,7 +81,7 @@ impl AstScope {
     }
     
     #[inline]
-    pub fn add_use(&mut self, _project: &mut Project, item_use: &ItemUse) {
+    pub fn add_use(&mut self, item_use: &ItemUse) {
         //
         // TODO: ensure the use is not already declared
         //
@@ -130,80 +136,7 @@ impl AstScope {
 
     #[inline]
     pub fn add_function(&mut self, project: &mut Project, fn_signature: &FnSignature) {
-        self.functions.push(Rc::new(RefCell::new(FnSignature {
-            visibility: fn_signature.visibility.clone(),
-            fn_token: fn_signature.fn_token.clone(),
-            name: fn_signature.name.clone(),
-            generics: fn_signature.generics.clone(),
-
-            arguments: Parens {
-                inner: match &fn_signature.arguments.inner {
-                    FnArgs::Static(args) => {
-                        let mut value_separator_pairs = vec![];
-
-                        for arg in args {
-                            value_separator_pairs.push((
-                                FnArg {
-                                    pattern: self.expand_pattern(project, &arg.pattern),
-                                    colon_token: arg.colon_token.clone(),
-                                    ty: self.expand_ty(project, &arg.ty),
-                                },
-                                CommaToken::default(),
-                            ));
-                        }
-
-                        let final_value_opt = value_separator_pairs.pop().map(|x| Box::new(x.0));
-
-                        FnArgs::Static(Punctuated {
-                            value_separator_pairs,
-                            final_value_opt,
-                        })
-                    }
-
-                    FnArgs::NonStatic {
-                        self_token,
-                        ref_self,
-                        mutable_self,
-                        args_opt,
-                    } => FnArgs::NonStatic {
-                        self_token: self_token.clone(),
-                        ref_self: ref_self.clone(),
-                        mutable_self: mutable_self.clone(),
-                        args_opt: args_opt.as_ref().map(|(comma, args)| {
-                            let mut value_separator_pairs = vec![];
-
-                            for arg in args {
-                                value_separator_pairs.push((
-                                    FnArg {
-                                        pattern: self.expand_pattern(project, &arg.pattern),
-                                        colon_token: arg.colon_token.clone(),
-                                        ty: self.expand_ty(project, &arg.ty),
-                                    },
-                                    CommaToken::default(),
-                                ));
-                            }
-
-                            let final_value_opt = value_separator_pairs.pop().map(|x| Box::new(x.0));
-
-                            (
-                                comma.clone(),
-                                Punctuated {
-                                    value_separator_pairs,
-                                    final_value_opt,
-                                },
-                            )
-                        }),
-                    },
-                },
-
-                span: fn_signature.arguments.span.clone(),
-            },
-
-            return_type_opt: fn_signature.return_type_opt.as_ref()
-                .map(|(arrow, ty)| (arrow.clone(), self.expand_ty(project, ty))),
-
-            where_clause_opt: fn_signature.where_clause_opt.as_ref().map(|where_clause| self.expand_where_clause(project, where_clause)),
-        })));
+        self.functions.push(Rc::new(RefCell::new(self.expand_fn_signature(project, fn_signature))));
     }
 
     pub fn get_fn_signature(
@@ -529,81 +462,19 @@ impl AstScope {
         for item in item_trait.trait_items.inner.iter_mut() {
             match &mut item.value {
                 ItemTraitItem::Fn(fn_signature, _) => {
-                    fn_signature.arguments = Parens {
-                        inner: match &fn_signature.arguments.inner {
-                            FnArgs::Static(args) => {
-                                let mut value_separator_pairs = vec![];
-        
-                                for arg in args {
-                                    value_separator_pairs.push((
-                                        FnArg {
-                                            pattern: self.expand_pattern(project, &arg.pattern),
-                                            colon_token: arg.colon_token.clone(),
-                                            ty: self.expand_ty(project, &arg.ty),
-                                        },
-                                        CommaToken::default(),
-                                    ));
-                                }
-        
-                                let final_value_opt = value_separator_pairs.pop().map(|x| Box::new(x.0));
-        
-                                FnArgs::Static(Punctuated {
-                                    value_separator_pairs,
-                                    final_value_opt,
-                                })
-                            }
-        
-                            FnArgs::NonStatic {
-                                self_token,
-                                ref_self,
-                                mutable_self,
-                                args_opt,
-                            } => FnArgs::NonStatic {
-                                self_token: self_token.clone(),
-                                ref_self: ref_self.clone(),
-                                mutable_self: mutable_self.clone(),
-                                args_opt: args_opt.as_ref().map(|(comma, args)| {
-                                    let mut value_separator_pairs = vec![];
-        
-                                    for arg in args {
-                                        value_separator_pairs.push((
-                                            FnArg {
-                                                pattern: self.expand_pattern(project, &arg.pattern),
-                                                colon_token: arg.colon_token.clone(),
-                                                ty: self.expand_ty(project, &arg.ty),
-                                            },
-                                            CommaToken::default(),
-                                        ));
-                                    }
-        
-                                    let final_value_opt = value_separator_pairs.pop().map(|x| Box::new(x.0));
-        
-                                    (
-                                        comma.clone(),
-                                        Punctuated {
-                                            value_separator_pairs,
-                                            final_value_opt,
-                                        },
-                                    )
-                                }),
-                            },
-                        },
-        
-                        span: fn_signature.arguments.span.clone(),
-                    };
-        
-                    fn_signature.return_type_opt = fn_signature.return_type_opt.as_ref()
-                        .map(|(arrow, ty)| (arrow.clone(), self.expand_ty(project, ty)));
-        
-                    fn_signature.where_clause_opt = fn_signature.where_clause_opt.as_ref().map(|where_clause| self.expand_where_clause(project, where_clause));
+                    *fn_signature = self.expand_fn_signature(project, fn_signature);
                 }
 
                 ItemTraitItem::Const(item_const, _) => {
-                    item_const.ty_opt = item_const.ty_opt.as_ref().map(|(c, ty)| (c.clone(), self.expand_ty(project, &ty)));
+                    if let Some((_, ty)) = item_const.ty_opt.as_mut() {
+                        *ty = self.expand_ty(project, ty);
+                    }
                 }
 
                 ItemTraitItem::Type(item_type, _) => {
-                    item_type.ty_opt = item_type.ty_opt.as_ref().map(|ty| self.expand_ty(project, &ty));
+                    if let Some(ty) = item_type.ty_opt.as_mut() {
+                        *ty = self.expand_ty(project, ty);
+                    }
                 }
 
                 ItemTraitItem::Error(_, _) => panic!("Encountered an error while parsing Sway AST"),
@@ -612,76 +483,7 @@ impl AstScope {
 
         if let Some(trait_defs) = item_trait.trait_defs_opt.as_mut() {
             for item_fn in trait_defs.inner.iter_mut() {
-                let fn_signature = &mut item_fn.value.fn_signature;
-
-                fn_signature.arguments = Parens {
-                    inner: match &fn_signature.arguments.inner {
-                        FnArgs::Static(args) => {
-                            let mut value_separator_pairs = vec![];
-    
-                            for arg in args {
-                                value_separator_pairs.push((
-                                    FnArg {
-                                        pattern: self.expand_pattern(project, &arg.pattern),
-                                        colon_token: arg.colon_token.clone(),
-                                        ty: self.expand_ty(project, &arg.ty),
-                                    },
-                                    CommaToken::default(),
-                                ));
-                            }
-    
-                            let final_value_opt = value_separator_pairs.pop().map(|x| Box::new(x.0));
-    
-                            FnArgs::Static(Punctuated {
-                                value_separator_pairs,
-                                final_value_opt,
-                            })
-                        }
-    
-                        FnArgs::NonStatic {
-                            self_token,
-                            ref_self,
-                            mutable_self,
-                            args_opt,
-                        } => FnArgs::NonStatic {
-                            self_token: self_token.clone(),
-                            ref_self: ref_self.clone(),
-                            mutable_self: mutable_self.clone(),
-                            args_opt: args_opt.as_ref().map(|(comma, args)| {
-                                let mut value_separator_pairs = vec![];
-    
-                                for arg in args {
-                                    value_separator_pairs.push((
-                                        FnArg {
-                                            pattern: self.expand_pattern(project, &arg.pattern),
-                                            colon_token: arg.colon_token.clone(),
-                                            ty: self.expand_ty(project, &arg.ty),
-                                        },
-                                        CommaToken::default(),
-                                    ));
-                                }
-    
-                                let final_value_opt = value_separator_pairs.pop().map(|x| Box::new(x.0));
-    
-                                (
-                                    comma.clone(),
-                                    Punctuated {
-                                        value_separator_pairs,
-                                        final_value_opt,
-                                    },
-                                )
-                            }),
-                        },
-                    },
-    
-                    span: fn_signature.arguments.span.clone(),
-                };
-    
-                fn_signature.return_type_opt = fn_signature.return_type_opt.as_ref()
-                    .map(|(arrow, ty)| (arrow.clone(), self.expand_ty(project, ty)));
-    
-                fn_signature.where_clause_opt = fn_signature.where_clause_opt.as_ref().map(|where_clause| self.expand_where_clause(project, where_clause));
-
+                item_fn.value.fn_signature = self.expand_fn_signature(project, &item_fn.value.fn_signature);
                 item_fn.value.body.inner.statements.clear();
                 item_fn.value.body.inner.final_expr_opt = None;
             }
@@ -1074,26 +876,28 @@ impl AstScope {
                 
                 if input_generic_count == 0 {
                     // 1. Check for a type alias in the current module
-                    if let Some(type_alias) = self.find_type_alias(|x| {
-                        if !matches!(x.borrow().ty, Ty::Path(_)) {
-                            return false;
-                        }
-                        x.borrow().name.as_str() == segment.name.as_str()
+                    if let Some(type_alias) = self.find_type_alias(|item_type_alias| {
+                        item_type_alias.borrow().name.as_str() == segment.name.as_str()
                     }) {
-                        let ItemTypeAlias { ty: Ty::Path(underlying_path_type), .. } = type_alias.borrow().clone() else { unreachable!() };
-                        let underlying_path_type = self.expand_path_type(project, &underlying_path_type);
-                        
-                        //
-                        // TODO: find absolute path of current module and include it below
-                        //
-                        
-                        return utils::path_type_to_path_expr(&underlying_path_type);
+                        let type_alias = type_alias.borrow();
+
+                        match &type_alias.ty {
+                            Ty::Path(path_type) => {
+                                return utils::path_type_to_path_expr(
+                                    &self.expand_path_type(project, path_type),
+                                );
+                            }
+
+                            _ => todo!("Handle non-path underlying type: {:#?}", type_alias),
+                        }
                     }
 
                     // 2. Check for an abi in the current module
-                    if let Some(item_abi) = self.find_abi(|x| {
-                        x.borrow().name.as_str() == segment.name.as_str()
+                    if let Some(item_abi) = self.find_abi(|item_abi| {
+                        item_abi.borrow().name.as_str() == segment.name.as_str()
                     }) {
+                        let item_abi = item_abi.borrow();
+
                         //
                         // TODO: find absolute path of current module and include it below
                         //
@@ -1101,7 +905,7 @@ impl AstScope {
                         return PathExpr {
                             root_opt: Some((None, DoubleColonToken::default())),
                             prefix: PathExprSegment {
-                                name: item_abi.borrow().name.clone(),
+                                name: item_abi.name.clone(),
                                 generics_opt: None,
                             },
                             suffix: vec![],
@@ -1111,23 +915,23 @@ impl AstScope {
                 }
 
                 // 3. Check for a struct in the current module
-                if let Some(item_struct) = self.find_struct(|x| {
-                    let x = x.borrow();
+                if let Some(item_struct) = self.find_struct(|item_struct| {
+                    let item_struct = item_struct.borrow();
                     
-                    if x.name.as_str() != segment.name.as_str() {
+                    if item_struct.name.as_str() != segment.name.as_str() {
                         return false;
                     }
                     
-                    input_generic_count == x.generics.as_ref()
-                        .map(|x| {
-                            let mut count = 0;
-                            for _ in &x.parameters.inner {
-                                count += 1;
-                            }
-                            count
-                        })
-                        .unwrap_or(0)
+                    item_struct.generics.as_ref().map(|x| {
+                        let mut count = 0;
+                        for _ in &x.parameters.inner {
+                            count += 1;
+                        }
+                        count
+                    }).unwrap_or(0) == input_generic_count
                 }) {
+                    let item_struct = item_struct.borrow();
+
                     //
                     // TODO: find absolute path of current module and include it below
                     //
@@ -1135,7 +939,7 @@ impl AstScope {
                     return PathExpr {
                         root_opt: None,
                         prefix: PathExprSegment {
-                            name: item_struct.borrow().name.clone(),
+                            name: item_struct.name.clone(),
                             generics_opt: segment.generics_opt.clone(),
                         },
                         suffix: vec![],
@@ -1144,23 +948,23 @@ impl AstScope {
                 }
 
                 // 4. Check for a trait in the current module
-                if let Some(item_trait) = self.find_trait(|x| {
-                    let x = x.borrow();
+                if let Some(item_trait) = self.find_trait(|item_trait| {
+                    let item_trait = item_trait.borrow();
                     
-                    if x.name.as_str() != segment.name.as_str() {
+                    if item_trait.name.as_str() != segment.name.as_str() {
                         return false;
                     }
 
-                    input_generic_count == x.generics.as_ref()
-                        .map(|x| {
-                            let mut count = 0;
-                            for _ in &x.parameters.inner {
-                                count += 1;
-                            }
-                            count
-                        })
-                        .unwrap_or(0)
+                    item_trait.generics.as_ref().map(|x| {
+                        let mut count = 0;
+                        for _ in &x.parameters.inner {
+                            count += 1;
+                        }
+                        count
+                    }).unwrap_or(0) == input_generic_count
                 }) {
+                    let item_trait = item_trait.borrow();
+
                     //
                     // TODO: find absolute path of current module and include it below
                     //
@@ -1168,7 +972,7 @@ impl AstScope {
                     return PathExpr {
                         root_opt: None,
                         prefix: PathExprSegment {
-                            name: item_trait.borrow().name.clone(),
+                            name: item_trait.name.clone(),
                             generics_opt: segment.generics_opt.clone(),
                         },
                         suffix: vec![],
@@ -1177,10 +981,10 @@ impl AstScope {
                 }
                 
                 // 5. Look an explicit `use` statement in the current module
-                if let Some(item_use) = self.find_use(|x| {
-                    let x = x.borrow();
+                if let Some(item_use) = self.find_use(|item_use| {
+                    let item_use = item_use.borrow();
 
-                    for use_path_expr in flatten_use_tree(None, &x.tree) {
+                    for use_path_expr in utils::flatten_use_tree(None, &item_use.tree) {
                         let lhs = if let Some(suffix) = use_path_expr.suffix.last() {
                             &suffix.1
                         } else {
@@ -1196,7 +1000,7 @@ impl AstScope {
                 }) {
                     let item_use = item_use.borrow();
 
-                    for path_expr in flatten_use_tree(None, &item_use.tree) {
+                    for path_expr in utils::flatten_use_tree(None, &item_use.tree) {
                         if path_expr.suffix.last().map(|(_, s)| s.name.as_str() == segment.name.as_str()).unwrap_or(false) {
                             let mut expanded_path = path_expr.clone();
 
@@ -1268,16 +1072,13 @@ impl AstScope {
                             continue;
                         }
     
-                        if input_generic_count == generics.as_ref()
-                            .map(|x| {
-                                let mut count = 0;
-                                for _ in &x.parameters.inner {
-                                    count += 1;
-                                }
-                                count
-                            })
-                            .unwrap_or(0)
-                        {
+                        if generics.as_ref().map(|x| {
+                            let mut count = 0;
+                            for _ in &x.parameters.inner {
+                                count += 1;
+                            }
+                            count
+                        }).unwrap_or(0) == input_generic_count {
                             let mut expanded_path = self.expand_path_expr(project, path_expr);
                             let prefix = expanded_path.prefix.clone();
 
@@ -1306,7 +1107,7 @@ impl AstScope {
                             continue;
                         };
 
-                        for path_expr in flatten_use_tree(None, &item_use.tree) {
+                        for path_expr in utils::flatten_use_tree(None, &item_use.tree) {
                             if path_expr.suffix.last().map(|(_, s)| s.name.as_str() == segment.name.as_str()).unwrap_or(false) {
                                 let mut expanded_path = path_expr.clone();
 
@@ -1367,169 +1168,154 @@ impl AstScope {
     }
 
     fn expand_ty(&self, project: &mut Project, ty: &Ty) -> Ty {
-        if project.resolver.borrow().resolve_ty(ty).is_some() {
-            return ty.clone();
+        let mut ty = ty.clone();
+
+        if project.resolver.borrow().resolve_ty(&ty).is_some() {
+            return ty;
         }
 
-        match ty {
-            Ty::Path(path_type) => Ty::Path(self.expand_path_type(project, path_type)),
+        match &mut ty {
+            Ty::Path(path_type) => {
+                *path_type = self.expand_path_type(project, path_type);
+            }
 
-            Ty::Tuple(tuple) => Ty::Tuple(Parens {
-                inner: match &tuple.inner {
-                    TyTupleDescriptor::Nil => TyTupleDescriptor::Nil,
+            Ty::Tuple(tuple) => {
+                if let TyTupleDescriptor::Cons { head, tail, .. } = &mut tuple.inner {
+                    *head.as_mut() = self.expand_ty(project, head.as_ref());
+                    
+                    for (ty, _) in tail.value_separator_pairs.iter_mut() {
+                        *ty = self.expand_ty(project, ty);
+                    }
 
-                    TyTupleDescriptor::Cons { head, comma_token, tail } => TyTupleDescriptor::Cons {
-                        head: Box::new(self.expand_ty(project, head)),
-                        comma_token: comma_token.clone(),
-                        tail: Punctuated {
-                            value_separator_pairs: tail.value_separator_pairs.iter()
-                                .map(|(ty, comma)| (self.expand_ty(project, ty), comma.clone()))
-                                .collect(),
-                            final_value_opt: tail.final_value_opt.as_ref()
-                                .map(|ty| Box::new(self.expand_ty(project, ty))),
-                        },
-                    },
-                },
-                span: tuple.span.clone(),
-            }),
+                    if let Some(ty) = tail.final_value_opt.as_mut() {
+                        *ty.as_mut() = self.expand_ty(project, ty);
+                    }
+                }
+            }
 
-            Ty::Array(array) => Ty::Array(SquareBrackets {
-                inner: TyArrayDescriptor {
-                    ty: Box::new(self.expand_ty(project, &array.inner.ty)),
-                    semicolon_token: array.inner.semicolon_token.clone(),
-                    length: array.inner.length.clone(),
-                },
-                span: array.span.clone(),
-            }),
+            Ty::Array(array) => {
+                *array.inner.ty.as_mut() = self.expand_ty(project, array.inner.ty.as_ref());
+            }
 
-            Ty::Ptr { ptr_token, ty } => Ty::Ptr {
-                ptr_token: ptr_token.clone(),
-                ty: SquareBrackets {
-                    inner: Box::new(self.expand_ty(project, &ty.inner)),
-                    span: ty.span.clone(),
-                },
-            },
+            Ty::Ptr { ty, .. } | Ty::Slice { ty, .. } => {
+                *ty.inner.as_mut() = self.expand_ty(project, ty.inner.as_ref());
+            }
 
-            Ty::Slice { slice_token, ty } => Ty::Slice {
-                slice_token: slice_token.clone(),
-                ty: SquareBrackets {
-                    inner: Box::new(self.expand_ty(project, &ty.inner)),
-                    span: ty.span.clone(),
-                },
-            },
+            Ty::Ref { ty, .. } => {
+                *ty.as_mut() = self.expand_ty(project, ty.as_ref());
+            }
 
-            Ty::Ref { ampersand_token, mut_token, ty } => Ty::Ref {
-                ampersand_token: ampersand_token.clone(),
-                mut_token: mut_token.clone(),
-                ty: Box::new(self.expand_ty(project, ty)),
-            },
+            _ => {}
+        }
 
-            Ty::StringSlice(_) | Ty::StringArray { .. } | Ty::Infer { .. } | Ty::Never { .. } => {
-                ty.clone()
+        ty
+    }
+
+    #[inline]
+    fn expand_fn_signature(&self, project: &mut Project, fn_signature: &FnSignature) -> FnSignature {
+        let mut fn_signature = fn_signature.clone();
+
+        if let Some(args) = match &mut fn_signature.arguments.inner {
+            FnArgs::Static(args) => Some(args),
+            FnArgs::NonStatic { args_opt, .. } => args_opt.as_mut().map(|(_, args)| args),
+        } {
+            for (arg, _) in args.value_separator_pairs.iter_mut() {
+                arg.pattern = self.expand_pattern(project, &arg.pattern);
+            }
+
+            if let Some(arg) = args.final_value_opt.as_mut() {
+                arg.pattern = self.expand_pattern(project, &arg.pattern);
             }
         }
+
+        if let Some((_, return_type)) = fn_signature.return_type_opt.as_mut() {
+            *return_type = self.expand_ty(project, return_type);
+        }
+
+        if let Some(where_clause) = fn_signature.where_clause_opt.as_mut() {
+            *where_clause = self.expand_where_clause(project, where_clause);
+        }
+
+        fn_signature
     }
 
     #[inline]
     fn expand_where_clause(&self, project: &mut Project, where_clause: &WhereClause) -> WhereClause {
-        let mut result = where_clause.clone();
-        result.bounds.value_separator_pairs.clear();
+        let mut where_clause = where_clause.clone();
 
-        for where_bound in &where_clause.bounds {
-            result.bounds.value_separator_pairs.push(
-                (
-                    WhereBound {
-                        ty_name: where_bound.ty_name.clone(),
-                        colon_token: where_bound.colon_token.clone(),
-                        bounds: Traits {
-                            prefix: self.expand_path_type(project, &where_bound.bounds.prefix),
-                            suffixes: where_bound.bounds.suffixes.iter().map(|(a, b)| (a.clone(), self.expand_path_type(project, b))).collect(),
-                        },
-                    },
-                    CommaToken::default()
-                )
-            );
+        for (where_bound, _) in where_clause.bounds.value_separator_pairs.iter_mut() {
+            where_bound.bounds.prefix = self.expand_path_type(project, &where_bound.bounds.prefix);
+
+            for (_, suffix) in where_bound.bounds.suffixes.iter_mut() {
+                *suffix = self.expand_path_type(project, suffix);
+            }
         }
 
-        result.bounds.final_value_opt = result.bounds.value_separator_pairs.pop().map(|(x, _)| Box::new(x));
+        if let Some(where_bound) = where_clause.bounds.final_value_opt.as_mut() {
+            where_bound.bounds.prefix = self.expand_path_type(project, &where_bound.bounds.prefix);
+
+            for (_, suffix) in where_bound.bounds.suffixes.iter_mut() {
+                *suffix = self.expand_path_type(project, suffix);
+            }
+        }
         
-        result
+        where_clause
     }
 
     fn expand_pattern(&self, project: &mut Project, pattern: &Pattern) -> Pattern {
-        match pattern {
-            Pattern::Or { lhs, pipe_token, rhs } => Pattern::Or {
-                lhs: Box::new(self.expand_pattern(project, lhs)),
-                pipe_token: pipe_token.clone(),
-                rhs: Box::new(self.expand_pattern(project, rhs)),
+        let mut pattern = pattern.clone();
+
+        match &mut pattern {
+            Pattern::Or { lhs, rhs, .. } => {
+                *lhs.as_mut() = self.expand_pattern(project, lhs);
+                *rhs.as_mut() = self.expand_pattern(project, rhs);
             },
 
-            Pattern::Wildcard { .. } => pattern.clone(),
-            Pattern::AmbiguousSingleIdent(_) => pattern.clone(),
-            Pattern::Var { .. } => pattern.clone(),
-            Pattern::Literal(_) => pattern.clone(),
+            Pattern::Constant(path_expr) => {
+                *path_expr = self.expand_path_expr(project, path_expr);
+            }
             
-            Pattern::Constant(path_expr) => Pattern::Constant(self.expand_path_expr(project, path_expr)),
-            
-            Pattern::Constructor { path, args } => Pattern::Constructor {
-                path: self.expand_path_expr(project, path),
-                args: Parens {
-                    inner: Punctuated {
-                        value_separator_pairs: args.inner.value_separator_pairs.iter().map(|(p, c)| (self.expand_pattern(project, p), c.clone())).collect(),
-                        final_value_opt: args.inner.final_value_opt.as_ref().map(|x| Box::new(self.expand_pattern(project, x))),
-                    },
-                    span: Span::dummy(),
-                },
-            },
+            Pattern::Constructor { path, args } => {
+                *path = self.expand_path_expr(project, path);
 
-            Pattern::Struct { path, fields } => Pattern::Struct {
-                path: self.expand_path_expr(project, path),
-                fields: Braces {
-                    inner: Punctuated {
-                        value_separator_pairs: fields.inner.value_separator_pairs.iter()
-                            .map(|(f, c)| {
-                                (
-                                    match f {
-                                        PatternStructField::Rest { token } => PatternStructField::Rest {
-                                            token: token.clone(),
-                                        },
-                                        PatternStructField::Field { field_name, pattern_opt } => PatternStructField::Field {
-                                            field_name: field_name.clone(),
-                                            pattern_opt: pattern_opt.as_ref()
-                                                .map(|(c, p)| (c.clone(), Box::new(self.expand_pattern(project, p)))),
-                                        },
-                                    },
-                                    c.clone()
-                                )
-                            }).collect(),
-                        
-                        final_value_opt: fields.inner.final_value_opt.as_ref()
-                            .map(|f| Box::new(
-                                match f.as_ref() {
-                                    PatternStructField::Rest { token } => PatternStructField::Rest {
-                                        token: token.clone(),
-                                    },
-                                    PatternStructField::Field { field_name, pattern_opt } => PatternStructField::Field {
-                                        field_name: field_name.clone(),
-                                        pattern_opt: pattern_opt.as_ref()
-                                            .map(|(c, p)| (c.clone(), Box::new(self.expand_pattern(project, p)))),
-                                    },
-                                }
-                            )),
-                    },
-                    span: Span::dummy(),
-                },
+                for (arg, _) in args.inner.value_separator_pairs.iter_mut() {
+                    *arg = self.expand_pattern(project, arg);
+                }
+                
+                if let Some(arg) = args.inner.final_value_opt.as_mut() {
+                    *arg.as_mut() = self.expand_pattern(project, arg);
+                }
+            }
+
+            Pattern::Struct { path, fields } => {
+                *path = self.expand_path_expr(project, path);
+                
+                for (field, _) in fields.inner.value_separator_pairs.iter_mut() {
+                    if let PatternStructField::Field { pattern_opt: Some((_, pattern)), .. } = field {
+                        *pattern.as_mut() = self.expand_pattern(project, pattern);
+                    }
+                }
+
+                if let Some(field) = fields.inner.final_value_opt.as_mut() {
+                    if let PatternStructField::Field { pattern_opt: Some((_, pattern)), .. } = field.as_mut() {
+                        *pattern.as_mut() = self.expand_pattern(project, pattern);
+                    }
+                }
             },
             
-            Pattern::Tuple(tuple) => Pattern::Tuple(Parens {
-                inner: Punctuated {
-                    value_separator_pairs: tuple.inner.value_separator_pairs.iter().map(|(p, c)| (self.expand_pattern(project, p), c.clone())).collect(),
-                    final_value_opt: tuple.inner.final_value_opt.as_ref().map(|x| Box::new(self.expand_pattern(project, x))),
-                },
-                span: Span::dummy(),
-            }),
+            Pattern::Tuple(tuple) => {
+                for (pattern, _) in tuple.inner.value_separator_pairs.iter_mut() {
+                    *pattern = self.expand_pattern(project, pattern);
+                }
 
-            Pattern::Error(_, _) => panic!("An error occurred while parsing Sway AST"),
+                if let Some(pattern) = tuple.inner.final_value_opt.as_mut() {
+                    *pattern.as_mut() = self.expand_pattern(project, pattern);
+                }
+            }
+
+            _ => {}
         }
+    
+        pattern
     }
 }

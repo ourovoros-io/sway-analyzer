@@ -802,7 +802,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
     }
 
     fn visit_use(&mut self, context: &UseContext, scope: Rc<RefCell<AstScope>>, project: &mut Project) -> Result<(), Error> {
-        scope.borrow_mut().add_use(project, context.item_use);
+        scope.borrow_mut().add_use(context.item_use);
         
         for visitor in self.visitors.iter_mut() {
             visitor.visit_use(context, scope.clone(), project)?;
