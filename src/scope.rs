@@ -3,11 +3,11 @@ use std::{cell::RefCell, rc::Rc};
 use sway_ast::{
     keywords::{CloseAngleBracketToken, Keyword, OpenAngleBracketToken, StrToken},
     ty::TyTupleDescriptor,
-    AngleBrackets, Braces, CommaToken, DoubleColonToken, Expr, ExprArrayDescriptor,
-    ExprTupleDescriptor, FnArg, FnArgs, FnSignature, GenericArgs, ItemAbi, ItemKind, ItemStruct,
-    ItemTrait, ItemTraitItem, ItemTypeAlias, ItemUse, Literal, MatchBranchKind, Parens, PathExpr,
-    PathExprSegment, PathType, PathTypeSegment, Pattern, PatternStructField, Punctuated, Traits,
-    Ty, WhereBound, WhereClause,
+    AngleBrackets, CommaToken, DoubleColonToken, Expr, ExprArrayDescriptor, ExprTupleDescriptor,
+    FnArg, FnArgs, FnSignature, GenericArgs, ItemAbi, ItemKind, ItemStruct, ItemTrait,
+    ItemTraitItem, ItemTypeAlias, ItemUse, Literal, MatchBranchKind, Parens, PathExpr,
+    PathExprSegment, PathType, PathTypeSegment, Pattern, PatternStructField, Punctuated, Ty,
+    WhereClause,
 };
 use sway_types::{BaseIdent, Span, Spanned};
 
@@ -141,9 +141,9 @@ impl AstScope {
 
     pub fn get_fn_signature(
         &self,
-        project: &mut Project,
-        fn_name: &PathExprSegment,
-        args: &Parens<Punctuated<Expr, CommaToken>>,
+        _project: &mut Project,
+        _fn_name: &PathExprSegment,
+        _args: &Parens<Punctuated<Expr, CommaToken>>,
     ) -> Option<&FnSignature> {
         //
         // TODO:
@@ -164,7 +164,7 @@ impl AstScope {
 
     pub fn get_impl_fn_signature(
         &self,
-        project: &mut Project,
+        _project: &mut Project,
         ty: &Ty,
         fn_name: &PathExprSegment,
         args: &Parens<Punctuated<Expr, CommaToken>>,
@@ -262,73 +262,7 @@ impl AstScope {
         for item in item_abi.abi_items.inner.iter_mut() {
             match &mut item.value {
                 ItemTraitItem::Fn(fn_signature, _) => {
-                    fn_signature.arguments = Parens {
-                        inner: match &fn_signature.arguments.inner {
-                            FnArgs::Static(args) => {
-                                let mut value_separator_pairs = vec![];
-        
-                                for arg in args {
-                                    value_separator_pairs.push((
-                                        FnArg {
-                                            pattern: self.expand_pattern(project, &arg.pattern),
-                                            colon_token: arg.colon_token.clone(),
-                                            ty: self.expand_ty(project, &arg.ty),
-                                        },
-                                        CommaToken::default(),
-                                    ));
-                                }
-        
-                                let final_value_opt = value_separator_pairs.pop().map(|x| Box::new(x.0));
-        
-                                FnArgs::Static(Punctuated {
-                                    value_separator_pairs,
-                                    final_value_opt,
-                                })
-                            }
-        
-                            FnArgs::NonStatic {
-                                self_token,
-                                ref_self,
-                                mutable_self,
-                                args_opt,
-                            } => FnArgs::NonStatic {
-                                self_token: self_token.clone(),
-                                ref_self: ref_self.clone(),
-                                mutable_self: mutable_self.clone(),
-                                args_opt: args_opt.as_ref().map(|(comma, args)| {
-                                    let mut value_separator_pairs = vec![];
-        
-                                    for arg in args {
-                                        value_separator_pairs.push((
-                                            FnArg {
-                                                pattern: self.expand_pattern(project, &arg.pattern),
-                                                colon_token: arg.colon_token.clone(),
-                                                ty: self.expand_ty(project, &arg.ty),
-                                            },
-                                            CommaToken::default(),
-                                        ));
-                                    }
-        
-                                    let final_value_opt = value_separator_pairs.pop().map(|x| Box::new(x.0));
-        
-                                    (
-                                        comma.clone(),
-                                        Punctuated {
-                                            value_separator_pairs,
-                                            final_value_opt,
-                                        },
-                                    )
-                                }),
-                            },
-                        },
-        
-                        span: fn_signature.arguments.span.clone(),
-                    };
-        
-                    fn_signature.return_type_opt = fn_signature.return_type_opt.as_ref()
-                        .map(|(arrow, ty)| (arrow.clone(), self.expand_ty(project, ty)));
-        
-                    fn_signature.where_clause_opt = fn_signature.where_clause_opt.as_ref().map(|where_clause| self.expand_where_clause(project, where_clause));
+                    *fn_signature = self.expand_fn_signature(project, fn_signature);
                 }
 
                 ItemTraitItem::Const(item_const, _) => {
@@ -569,7 +503,11 @@ impl AstScope {
 
             Expr::AbiCast { args, .. } => Ty::Path(args.inner.name.clone()),
 
-            Expr::Struct { path, fields } => {
+            Expr::Struct { path, fields: _ } => {
+                //
+                // TODO: check fields to make sure we are resolving the correct struct
+                //
+
                 let path_expr = self.expand_path_expr(project, path);
                 let path_type = utils::path_expr_to_path_type(&path_expr);
                 Ty::Path(path_type)
@@ -665,7 +603,7 @@ impl AstScope {
 
             Expr::While { .. } | Expr::For { .. } => empty_tuple_ty(),
 
-            Expr::FuncApp { func, args } => todo!("{expr:#?}"),
+            Expr::FuncApp { func: _, args: _ } => todo!("{expr:#?}"),
 
             Expr::Index { target, .. } => {
                 let target_type = self.get_expr_ty(target, project);
