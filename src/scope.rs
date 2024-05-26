@@ -74,6 +74,7 @@ impl AstScope {
         None
     }
     
+    #[inline]
     pub fn add_use(&mut self, _project: &mut Project, item_use: &ItemUse) {
         //
         // TODO: ensure the use is not already declared
@@ -87,6 +88,7 @@ impl AstScope {
         self.variables.iter()
     }
 
+    #[inline]
     pub fn add_variable(
         &mut self,
         project: &mut Project,
@@ -126,6 +128,7 @@ impl AstScope {
         self.functions.iter()
     }
 
+    #[inline]
     pub fn add_function(&mut self, project: &mut Project, fn_signature: &FnSignature) {
         self.functions.push(Rc::new(RefCell::new(FnSignature {
             visibility: fn_signature.visibility.clone(),
@@ -272,6 +275,7 @@ impl AstScope {
     }
 
     /// Adds a struct to the scope.
+    #[inline]
     pub fn add_struct(&mut self, project: &mut Project, item_struct: &ItemStruct) {
         let mut item_struct = item_struct.clone();
 
@@ -310,6 +314,7 @@ impl AstScope {
         None
     }
 
+    #[inline]
     pub fn add_abi(&mut self, project: &mut Project, item_abi: &ItemAbi) {
         let mut item_abi = item_abi.clone();
 
@@ -505,6 +510,7 @@ impl AstScope {
         None
     }
 
+    #[inline]
     pub fn add_trait(&mut self, project: &mut Project, item_trait: &ItemTrait) {
         let mut item_trait = item_trait.clone();
         
@@ -704,6 +710,7 @@ impl AstScope {
         None
     }
 
+    #[inline]
     pub fn add_type_alias(&mut self, project: &mut Project, item_type_alias: &ItemTypeAlias) {
         let mut item_type_alias = item_type_alias.clone();
         
@@ -761,25 +768,9 @@ impl AstScope {
             Expr::AbiCast { args, .. } => Ty::Path(args.inner.name.clone()),
 
             Expr::Struct { path, fields } => {
-                //
-                // TODO:
-                // 1. Resolve type using both `path` and `fields`
-                // 2. Resolve and return full type path (i.e: StorageKey<T> => std::storage::storage_key::StorageKey<T>)
-                //
-
-                let path = self.expand_path_expr(project, path);
-
-                Ty::Path(PathType {
-                    root_opt: path.root_opt.clone(),
-                    prefix: PathTypeSegment {
-                        name: path.prefix.name.clone(),
-                        generics_opt: path.prefix.generics_opt.clone().map(|(t, g)| (Some(t), g)),
-                    },
-                    suffix: path.suffix.iter().map(|(c, s)| (c.clone(), PathTypeSegment {
-                        name: s.name.clone(),
-                        generics_opt: s.generics_opt.as_ref().map(|(c, g)| (Some(c.clone()), g.clone())),
-                    })).collect(),
-                })
+                let path_expr = self.expand_path_expr(project, path);
+                let path_type = utils::path_expr_to_path_type(&path_expr);
+                Ty::Path(path_type)
             }
 
             Expr::Tuple(tuple) => match &tuple.inner {
@@ -921,7 +912,7 @@ impl AstScope {
                                     PathTypeSegment {
                                         name: BaseIdent::new_no_span("StorageKey".into()),
                                         generics_opt: Some((
-                                            None,
+                                            Some(DoubleColonToken::default()),
                                             GenericArgs {
                                                 parameters: AngleBrackets {
                                                     open_angle_bracket_token:
@@ -1032,124 +1023,38 @@ impl AstScope {
     }
 
     #[inline]
-    fn expand_where_clause(&self, project: &mut Project, where_clause: &WhereClause) -> WhereClause {
-        let mut result = where_clause.clone();
-        result.bounds.value_separator_pairs.clear();
-
-        for where_bound in &where_clause.bounds {
-            result.bounds.value_separator_pairs.push(
-                (
-                    WhereBound {
-                        ty_name: where_bound.ty_name.clone(),
-                        colon_token: where_bound.colon_token.clone(),
-                        bounds: Traits {
-                            prefix: self.expand_path_type(project, &where_bound.bounds.prefix),
-                            suffixes: where_bound.bounds.suffixes.iter().map(|(a, b)| (a.clone(), self.expand_path_type(project, b))).collect(),
-                        },
-                    },
-                    CommaToken::default()
-                )
-            );
-        }
-
-        result.bounds.final_value_opt = result.bounds.value_separator_pairs.pop().map(|(x, _)| Box::new(x));
-        
-        result
-    }
-
-    fn expand_pattern(&self, project: &mut Project, pattern: &Pattern) -> Pattern {
-        match pattern {
-            Pattern::Or { lhs, pipe_token, rhs } => Pattern::Or {
-                lhs: Box::new(self.expand_pattern(project, lhs)),
-                pipe_token: pipe_token.clone(),
-                rhs: Box::new(self.expand_pattern(project, rhs)),
-            },
-
-            Pattern::Wildcard { .. } => pattern.clone(),
-            Pattern::AmbiguousSingleIdent(_) => pattern.clone(),
-            Pattern::Var { .. } => pattern.clone(),
-            Pattern::Literal(_) => pattern.clone(),
-            
-            Pattern::Constant(path_expr) => Pattern::Constant(self.expand_path_expr(project, path_expr)),
-            
-            Pattern::Constructor { path, args } => Pattern::Constructor {
-                path: self.expand_path_expr(project, path),
-                args: Parens {
-                    inner: Punctuated {
-                        value_separator_pairs: args.inner.value_separator_pairs.iter().map(|(p, c)| (self.expand_pattern(project, p), c.clone())).collect(),
-                        final_value_opt: args.inner.final_value_opt.as_ref().map(|x| Box::new(self.expand_pattern(project, x))),
-                    },
-                    span: Span::dummy(),
-                },
-            },
-
-            Pattern::Struct { path, fields } => Pattern::Struct {
-                path: self.expand_path_expr(project, path),
-                fields: Braces {
-                    inner: Punctuated {
-                        value_separator_pairs: fields.inner.value_separator_pairs.iter()
-                            .map(|(f, c)| {
-                                (
-                                    match f {
-                                        PatternStructField::Rest { token } => PatternStructField::Rest {
-                                            token: token.clone(),
-                                        },
-                                        PatternStructField::Field { field_name, pattern_opt } => PatternStructField::Field {
-                                            field_name: field_name.clone(),
-                                            pattern_opt: pattern_opt.as_ref()
-                                                .map(|(c, p)| (c.clone(), Box::new(self.expand_pattern(project, p)))),
-                                        },
-                                    },
-                                    c.clone()
-                                )
-                            }).collect(),
-                        
-                        final_value_opt: fields.inner.final_value_opt.as_ref()
-                            .map(|f| Box::new(
-                                match f.as_ref() {
-                                    PatternStructField::Rest { token } => PatternStructField::Rest {
-                                        token: token.clone(),
-                                    },
-                                    PatternStructField::Field { field_name, pattern_opt } => PatternStructField::Field {
-                                        field_name: field_name.clone(),
-                                        pattern_opt: pattern_opt.as_ref()
-                                            .map(|(c, p)| (c.clone(), Box::new(self.expand_pattern(project, p)))),
-                                    },
-                                }
-                            )),
-                    },
-                    span: Span::dummy(),
-                },
-            },
-            
-            Pattern::Tuple(tuple) => Pattern::Tuple(Parens {
-                inner: Punctuated {
-                    value_separator_pairs: tuple.inner.value_separator_pairs.iter().map(|(p, c)| (self.expand_pattern(project, p), c.clone())).collect(),
-                    final_value_opt: tuple.inner.final_value_opt.as_ref().map(|x| Box::new(self.expand_pattern(project, x))),
-                },
-                span: Span::dummy(),
-            }),
-
-            Pattern::Error(_, _) => panic!("An error occurred while parsing Sway AST"),
-        }
+    fn expand_path_type(&self, project: &mut Project, path_type: &PathType) -> PathType {
+        utils::path_expr_to_path_type(
+            &self.expand_path_expr(
+                project,
+                &utils::path_type_to_path_expr(path_type),
+            ),
+        )
     }
 
     fn expand_path_expr(&self, project: &mut Project, path_expr: &PathExpr) -> PathExpr {
         let resolver = project.resolver.clone();
 
         // Get the last part of the path expression
-        let segment = if let Some((_, suffix)) = path_expr.suffix.last() {
-            suffix
-        } else {
-            &path_expr.prefix
+        let mut segment = match path_expr.suffix.last() {
+            Some((_, suffix)) => suffix.clone(),
+            None => path_expr.prefix.clone(),
         };
 
         // Count the number of generic parameters
         let mut input_generic_count = 0;
         
-        if let Some((_, generics)) = segment.generics_opt.as_ref() {
+        if let Some((_, generics)) = segment.generics_opt.as_mut() {
             for _ in &generics.parameters.inner {
                 input_generic_count += 1;
+            }
+
+            for (ty, _) in generics.parameters.inner.value_separator_pairs.iter_mut() {
+                *ty = self.expand_ty(project, ty);
+            }
+
+            if let Some(ty) = generics.parameters.inner.final_value_opt.as_mut() {
+                *ty = Box::new(self.expand_ty(project, ty.as_ref()));
             }
         }
         
@@ -1175,30 +1080,14 @@ impl AstScope {
                         }
                         x.borrow().name.as_str() == segment.name.as_str()
                     }) {
-                        let ItemTypeAlias { ty: Ty::Path(path_type), .. } = type_alias.borrow().clone() else { unreachable!() };
-                        let path_type = self.expand_path_type(project, &path_type);
+                        let ItemTypeAlias { ty: Ty::Path(underlying_path_type), .. } = type_alias.borrow().clone() else { unreachable!() };
+                        let underlying_path_type = self.expand_path_type(project, &underlying_path_type);
                         
                         //
                         // TODO: find absolute path of current module and include it below
                         //
                         
-                        return PathExpr {
-                            root_opt: path_type.root_opt.clone(),
-                            prefix: PathExprSegment {
-                                name: path_type.prefix.name.clone(),
-                                generics_opt: path_type.prefix.generics_opt.as_ref().map(|(_, x)| (DoubleColonToken::default(), x.clone())),
-                            },
-                            suffix: path_type.suffix.iter().map(|(d, x)| {
-                                (
-                                    d.clone(),
-                                    PathExprSegment {
-                                        name: x.name.clone(),
-                                        generics_opt: x.generics_opt.as_ref().map(|(_, x)| (DoubleColonToken::default(), x.clone())),
-                                    }
-                                )
-                            }).collect(),
-                            incomplete_suffix: false,
-                        };
+                        return utils::path_type_to_path_expr(&underlying_path_type);
                     }
 
                     // 2. Check for an abi in the current module
@@ -1477,71 +1366,6 @@ impl AstScope {
         }
     }
 
-    fn expand_path_type(&self, project: &mut Project, path_type: &PathType) -> PathType {
-        let path_expr = PathExpr {
-            root_opt: path_type.root_opt.clone(),
-            prefix: PathExprSegment {
-                name: path_type.prefix.name.clone(),
-                generics_opt: path_type.prefix.generics_opt.as_ref().map(|(_, x)| (DoubleColonToken::default(), GenericArgs {
-                    parameters: AngleBrackets {
-                        open_angle_bracket_token: OpenAngleBracketToken::default(),
-                        inner: Punctuated {
-                            value_separator_pairs: x.parameters.inner.value_separator_pairs.iter().map(|(ty, c)| (self.expand_ty(project, ty), c.clone())).collect(),
-                            final_value_opt: x.parameters.inner.final_value_opt.as_ref().map(|ty| Box::new(self.expand_ty(project, ty.as_ref()))),
-                        },
-                        close_angle_bracket_token: CloseAngleBracketToken::default(),
-                    },
-                })),
-            },
-            suffix: path_type.suffix.iter().map(|(c, s)| (c.clone(), PathExprSegment {
-                name: s.name.clone(),
-                generics_opt: s.generics_opt.as_ref().map(|(_, x)| (DoubleColonToken::default(), GenericArgs {
-                    parameters: AngleBrackets {
-                        open_angle_bracket_token: OpenAngleBracketToken::default(),
-                        inner: Punctuated {
-                            value_separator_pairs: x.parameters.inner.value_separator_pairs.iter().map(|(ty, c)| (self.expand_ty(project, ty), c.clone())).collect(),
-                            final_value_opt: x.parameters.inner.final_value_opt.as_ref().map(|ty| Box::new(self.expand_ty(project, ty.as_ref()))),
-                        },
-                        close_angle_bracket_token: CloseAngleBracketToken::default(),
-                    },
-                })),
-            })).collect(),
-            incomplete_suffix: false,
-        };
-
-        let path_expr = self.expand_path_expr(project, &path_expr);
-
-        PathType {
-            root_opt: path_expr.root_opt.clone(),
-            prefix: PathTypeSegment {
-                name: path_expr.prefix.name.clone(),
-                generics_opt: path_expr.prefix.generics_opt.as_ref().map(|(_, x)| (None, GenericArgs {
-                    parameters: AngleBrackets {
-                        open_angle_bracket_token: OpenAngleBracketToken::default(),
-                        inner: Punctuated {
-                            value_separator_pairs: x.parameters.inner.value_separator_pairs.iter().map(|(ty, c)| (self.expand_ty(project, ty), c.clone())).collect(),
-                            final_value_opt: x.parameters.inner.final_value_opt.as_ref().map(|ty| Box::new(self.expand_ty(project, ty.as_ref()))),
-                        },
-                        close_angle_bracket_token: CloseAngleBracketToken::default(),
-                    },
-                })),
-            },
-            suffix: path_expr.suffix.iter().map(|(c, s)| (c.clone(), PathTypeSegment {
-                name: s.name.clone(),
-                generics_opt: s.generics_opt.as_ref().map(|(_, x)| (None, GenericArgs {
-                    parameters: AngleBrackets {
-                        open_angle_bracket_token: OpenAngleBracketToken::default(),
-                        inner: Punctuated {
-                            value_separator_pairs: x.parameters.inner.value_separator_pairs.iter().map(|(ty, c)| (self.expand_ty(project, ty), c.clone())).collect(),
-                            final_value_opt: x.parameters.inner.final_value_opt.as_ref().map(|ty| Box::new(self.expand_ty(project, ty.as_ref()))),
-                        },
-                        close_angle_bracket_token: CloseAngleBracketToken::default(),
-                    },
-                })),
-            })).collect(),
-        }
-    }
-
     fn expand_ty(&self, project: &mut Project, ty: &Ty) -> Ty {
         if project.resolver.borrow().resolve_ty(ty).is_some() {
             return ty.clone();
@@ -1603,6 +1427,109 @@ impl AstScope {
             Ty::StringSlice(_) | Ty::StringArray { .. } | Ty::Infer { .. } | Ty::Never { .. } => {
                 ty.clone()
             }
+        }
+    }
+
+    #[inline]
+    fn expand_where_clause(&self, project: &mut Project, where_clause: &WhereClause) -> WhereClause {
+        let mut result = where_clause.clone();
+        result.bounds.value_separator_pairs.clear();
+
+        for where_bound in &where_clause.bounds {
+            result.bounds.value_separator_pairs.push(
+                (
+                    WhereBound {
+                        ty_name: where_bound.ty_name.clone(),
+                        colon_token: where_bound.colon_token.clone(),
+                        bounds: Traits {
+                            prefix: self.expand_path_type(project, &where_bound.bounds.prefix),
+                            suffixes: where_bound.bounds.suffixes.iter().map(|(a, b)| (a.clone(), self.expand_path_type(project, b))).collect(),
+                        },
+                    },
+                    CommaToken::default()
+                )
+            );
+        }
+
+        result.bounds.final_value_opt = result.bounds.value_separator_pairs.pop().map(|(x, _)| Box::new(x));
+        
+        result
+    }
+
+    fn expand_pattern(&self, project: &mut Project, pattern: &Pattern) -> Pattern {
+        match pattern {
+            Pattern::Or { lhs, pipe_token, rhs } => Pattern::Or {
+                lhs: Box::new(self.expand_pattern(project, lhs)),
+                pipe_token: pipe_token.clone(),
+                rhs: Box::new(self.expand_pattern(project, rhs)),
+            },
+
+            Pattern::Wildcard { .. } => pattern.clone(),
+            Pattern::AmbiguousSingleIdent(_) => pattern.clone(),
+            Pattern::Var { .. } => pattern.clone(),
+            Pattern::Literal(_) => pattern.clone(),
+            
+            Pattern::Constant(path_expr) => Pattern::Constant(self.expand_path_expr(project, path_expr)),
+            
+            Pattern::Constructor { path, args } => Pattern::Constructor {
+                path: self.expand_path_expr(project, path),
+                args: Parens {
+                    inner: Punctuated {
+                        value_separator_pairs: args.inner.value_separator_pairs.iter().map(|(p, c)| (self.expand_pattern(project, p), c.clone())).collect(),
+                        final_value_opt: args.inner.final_value_opt.as_ref().map(|x| Box::new(self.expand_pattern(project, x))),
+                    },
+                    span: Span::dummy(),
+                },
+            },
+
+            Pattern::Struct { path, fields } => Pattern::Struct {
+                path: self.expand_path_expr(project, path),
+                fields: Braces {
+                    inner: Punctuated {
+                        value_separator_pairs: fields.inner.value_separator_pairs.iter()
+                            .map(|(f, c)| {
+                                (
+                                    match f {
+                                        PatternStructField::Rest { token } => PatternStructField::Rest {
+                                            token: token.clone(),
+                                        },
+                                        PatternStructField::Field { field_name, pattern_opt } => PatternStructField::Field {
+                                            field_name: field_name.clone(),
+                                            pattern_opt: pattern_opt.as_ref()
+                                                .map(|(c, p)| (c.clone(), Box::new(self.expand_pattern(project, p)))),
+                                        },
+                                    },
+                                    c.clone()
+                                )
+                            }).collect(),
+                        
+                        final_value_opt: fields.inner.final_value_opt.as_ref()
+                            .map(|f| Box::new(
+                                match f.as_ref() {
+                                    PatternStructField::Rest { token } => PatternStructField::Rest {
+                                        token: token.clone(),
+                                    },
+                                    PatternStructField::Field { field_name, pattern_opt } => PatternStructField::Field {
+                                        field_name: field_name.clone(),
+                                        pattern_opt: pattern_opt.as_ref()
+                                            .map(|(c, p)| (c.clone(), Box::new(self.expand_pattern(project, p)))),
+                                    },
+                                }
+                            )),
+                    },
+                    span: Span::dummy(),
+                },
+            },
+            
+            Pattern::Tuple(tuple) => Pattern::Tuple(Parens {
+                inner: Punctuated {
+                    value_separator_pairs: tuple.inner.value_separator_pairs.iter().map(|(p, c)| (self.expand_pattern(project, p), c.clone())).collect(),
+                    final_value_opt: tuple.inner.final_value_opt.as_ref().map(|x| Box::new(self.expand_pattern(project, x))),
+                },
+                span: Span::dummy(),
+            }),
+
+            Pattern::Error(_, _) => panic!("An error occurred while parsing Sway AST"),
         }
     }
 }

@@ -1660,3 +1660,57 @@ pub fn ty_array_descriptor_to_string(ty_array_descriptor: &TyArrayDescriptor) ->
     result.push(']');
     result
 }
+
+#[inline]
+pub fn path_expr_to_path_type(path_expr: &PathExpr) -> PathType {
+    PathType {
+        root_opt: path_expr.root_opt.clone(),
+        
+        prefix: PathTypeSegment {
+            name: path_expr.prefix.name.clone(),
+            generics_opt: path_expr.prefix.generics_opt.as_ref()
+                .map(|(c, x)| (Some(c.clone()), x.clone())),
+        },
+
+        suffix: path_expr.suffix.iter()
+            .map(|(c, s)| {
+                (
+                    c.clone(),
+                    PathTypeSegment {
+                        name: s.name.clone(),
+                        generics_opt: s.generics_opt.as_ref()
+                            .map(|(c, x)| (Some(c.clone()), x.clone())),
+                    }
+                )
+            })
+            .collect(),
+    }
+}
+
+#[inline]
+pub fn path_type_to_path_expr(path_type: &PathType) -> PathExpr {
+    PathExpr {
+        root_opt: path_type.root_opt.clone(),
+
+        prefix: PathExprSegment {
+            name: path_type.prefix.name.clone(),
+            generics_opt: path_type.prefix.generics_opt.as_ref()
+                .map(|(_, x)| (DoubleColonToken::default(), x.clone())),
+        },
+
+        suffix: path_type.suffix.iter()
+            .map(|(c, s)| {
+                (
+                    c.clone(),
+                    PathExprSegment {
+                        name: s.name.clone(),
+                        generics_opt: s.generics_opt.as_ref()
+                            .map(|(_, x)| (DoubleColonToken::default(), x.clone())),
+                    }
+                )
+            })
+            .collect(),
+
+        incomplete_suffix: false,
+    }
+}
