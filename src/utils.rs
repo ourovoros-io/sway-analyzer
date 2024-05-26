@@ -1,4 +1,4 @@
-use sway_ast::{assignable::ElementAccess, attribute::{Annotated, Attribute}, *};
+use sway_ast::{assignable::ElementAccess, attribute::{Annotated, Attribute}, ty::{TyArrayDescriptor, TyTupleDescriptor}, *};
 use sway_types::{BaseIdent, Span, Spanned};
 
 pub fn fold_punctuated<T, P>(punctuated: &Punctuated<T, P>) -> Vec<&T> {
@@ -1506,4 +1506,157 @@ pub fn expr_negation_result(expr: &Expr) -> bool {
         Expr::Not { expr, .. } => !expr_negation_result(expr.as_ref()),
         _ => true,
     }
+}
+
+pub fn ty_to_string(ty: &Ty) -> String {
+    match ty {
+        Ty::Path(path_type) => path_type_to_string(path_type),
+        Ty::Tuple(tuple) => ty_tuple_descriptor_to_string(&tuple.inner),
+        Ty::Array(array) => ty_array_descriptor_to_string(&array.inner),
+        Ty::StringSlice(_) => "str".into(),
+        Ty::StringArray { length, .. } => format!("str[{}]", length.inner.span().as_str()),
+        Ty::Infer { .. } => "_".into(),
+        Ty::Ptr { ptr_token, ty } => format!("{}[{}]", ptr_token.span().as_str(), ty_to_string(ty.inner.as_ref())),
+        Ty::Slice { slice_token, ty } => format!("{}[{}]", slice_token.span().as_str(), ty_to_string(ty.inner.as_ref())),
+        
+        Ty::Ref { ampersand_token, mut_token, ty } => format!(
+            "{}{} {}",
+            ampersand_token.span().as_str(),
+            if let Some(x) = mut_token.as_ref() {
+                x.span().as_str().to_string()
+            } else {
+                String::new()
+            },
+            ty_to_string(ty.as_ref()),
+        ),
+
+        Ty::Never { .. } => "!".into(),
+    }
+}
+
+pub fn path_type_to_string(path_type: &PathType) -> String {
+    let mut result = String::new();
+
+    if let Some(root) = path_type.root_opt.as_ref() {
+        if let Some(qualified_root_path) = root.0.as_ref() {
+            result.push('<');
+            result.push_str(ty_to_string(qualified_root_path.inner.ty.as_ref()).as_str());
+            if let Some(as_trait) = qualified_root_path.inner.as_trait.as_ref() {
+                result.push_str(" as ");
+                result.push_str(path_type_to_string(as_trait.1.as_ref()).as_str());
+            }
+            result.push('>');
+        }
+
+        result.push_str("::");
+    }
+
+    result.push_str(path_type_segment_to_string(&path_type.prefix).as_str());
+
+    for suffix in path_type.suffix.iter() {
+        result.push_str("::");
+        result.push_str(&path_type_segment_to_string(&suffix.1).as_str());
+    }
+
+    result
+}
+
+pub fn path_type_segment_to_string(path_type_segment: &PathTypeSegment) -> String {
+    let mut result = String::new();
+
+    result.push_str(path_type_segment.name.as_str());
+
+    if let Some(generics) = path_type_segment.generics_opt.as_ref() {
+        if generics.0.is_some() {
+            result.push_str("::");
+        }
+        result.push_str(generic_args_to_string(&generics.1).as_str());
+    }
+    
+    result
+}
+
+pub fn path_expr_to_string(path_expr: &PathExpr) -> String {
+    let mut result = String::new();
+
+    if let Some(root) = path_expr.root_opt.as_ref() {
+        if let Some(qualified_root_path) = root.0.as_ref() {
+            result.push('<');
+            result.push_str(ty_to_string(qualified_root_path.inner.ty.as_ref()).as_str());
+            if let Some(as_trait) = qualified_root_path.inner.as_trait.as_ref() {
+                result.push_str(" as ");
+                result.push_str(path_type_to_string(as_trait.1.as_ref()).as_str());
+            }
+            result.push('>');
+        }
+
+        result.push_str("::");
+    }
+
+    result.push_str(path_expr_segment_to_string(&path_expr.prefix).as_str());
+
+    for suffix in path_expr.suffix.iter() {
+        result.push_str("::");
+        result.push_str(&path_expr_segment_to_string(&suffix.1).as_str());
+    }
+
+    result
+}
+
+pub fn path_expr_segment_to_string(path_expr_segment: &PathExprSegment) -> String {
+    let mut result = String::new();
+
+    result.push_str(path_expr_segment.name.as_str());
+
+    if let Some(generics) = path_expr_segment.generics_opt.as_ref() {
+        result.push_str("::");
+        result.push_str(generic_args_to_string(&generics.1).as_str());
+    }
+    
+    result
+}
+
+pub fn generic_args_to_string(generic_args: &GenericArgs) -> String {
+    let mut result = String::new();
+
+    result.push('<');
+
+    for parameter in generic_args.parameters.inner.value_separator_pairs.iter() {
+        result.push_str(ty_to_string(&parameter.0).as_str());
+        result.push_str(", ");
+    }
+
+    if let Some(parameter) = generic_args.parameters.inner.final_value_opt.as_ref() {
+        result.push_str(ty_to_string(parameter.as_ref()).as_str());
+    }
+
+    result.push('>');
+    result
+}
+
+pub fn ty_tuple_descriptor_to_string(ty_tuple_descriptor: &TyTupleDescriptor) -> String {
+    let mut result = String::new();
+
+    result.push('(');
+
+    if let TyTupleDescriptor::Cons { head, tail, .. } = ty_tuple_descriptor {
+        result.push_str(ty_to_string(head.as_ref()).as_str());
+        result.push_str(", ");
+        for ty in tail {
+            result.push_str(ty_to_string(ty).as_str());
+        }
+    }
+
+    result.push(')');
+    result
+}
+
+pub fn ty_array_descriptor_to_string(ty_array_descriptor: &TyArrayDescriptor) -> String {
+    let mut result = String::new();
+    result.push('[');
+    result.push_str(ty_to_string(&ty_array_descriptor.ty).as_str());
+    result.push_str("; ");
+    result.push_str(ty_array_descriptor.length.span().as_str());
+    result.push(']');
+    result
 }
