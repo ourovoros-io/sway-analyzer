@@ -1449,7 +1449,31 @@ pub fn flatten_use_tree(prefix: Option<&PathExpr>, use_tree: &UseTree) -> Vec<Pa
             };
             vec![prefix]
         },
-        UseTree::Glob { .. } => vec![],
+        UseTree::Glob { .. } => {
+            let mut prefix = prefix.cloned();
+            let name = BaseIdent::new_no_span("*".to_string());
+            if prefix.is_none() {
+                prefix = Some(PathExpr { 
+                    root_opt: None, 
+                    prefix: PathExprSegment { 
+                        name: name.clone(), 
+                        generics_opt: None 
+                    }, 
+                    suffix: vec![], 
+                    incomplete_suffix: false 
+                });
+            } else {
+                prefix.as_mut().unwrap().suffix.push((DoubleColonToken::default(), PathExprSegment { 
+                    name: name.clone(), 
+                    generics_opt: None 
+                }));
+            }
+
+            if prefix.as_ref().map(|x| x.suffix.last().map(|l| l.1.name.as_str() == "self").unwrap_or(false)).unwrap_or(false) {
+                prefix.as_mut().unwrap().suffix.pop();
+            } 
+            vec![prefix.unwrap()]
+        },
         UseTree::Path { prefix: inner_prefix, suffix , .. } => {
             let mut prefix = prefix.cloned();
             if prefix.is_none() {

@@ -1,13 +1,7 @@
 use crate::{project::Project, utils};
 use std::{cell::RefCell, rc::Rc};
 use sway_ast::{
-    keywords::{CloseAngleBracketToken, Keyword, OpenAngleBracketToken, StrToken},
-    ty::TyTupleDescriptor,
-    AngleBrackets, CommaToken, DoubleColonToken, Expr, ExprArrayDescriptor, ExprTupleDescriptor,
-    FnArg, FnArgs, FnSignature, GenericArgs, ItemAbi, ItemKind, ItemStruct, ItemTrait,
-    ItemTraitItem, ItemTypeAlias, ItemUse, Literal, MatchBranchKind, Parens, PathExpr,
-    PathExprSegment, PathType, PathTypeSegment, Pattern, PatternStructField, Punctuated, Ty,
-    WhereClause,
+    keywords::{CloseAngleBracketToken, Keyword, OpenAngleBracketToken, StrToken}, ty::TyTupleDescriptor, AngleBrackets, CommaToken, DoubleColonToken, Expr, ExprArrayDescriptor, ExprTupleDescriptor, FnArg, FnArgs, FnSignature, GenericArgs, ItemAbi, ItemImplItem, ItemKind, ItemStruct, ItemTrait, ItemTraitItem, ItemTypeAlias, ItemUse, Literal, MatchBranchKind, Parens, PathExpr, PathExprSegment, PathType, PathTypeSegment, Pattern, PatternStructField, Punctuated, Ty, WhereClause
 };
 use sway_types::{BaseIdent, Span, Spanned};
 
@@ -142,7 +136,7 @@ impl AstScope {
     pub fn get_fn_signature(
         &self,
         _project: &mut Project,
-        _fn_name: &PathExprSegment,
+        fn_name: &PathExprSegment,
         _args: &Parens<Punctuated<Expr, CommaToken>>,
     ) -> Option<&FnSignature> {
         //
@@ -158,17 +152,19 @@ impl AstScope {
         //
         // Once we find the `fn`, return the signature of the `fn`
         //
-
+        let fn_name = fn_name.name.span();
+        let function_name = fn_name.as_str();
+        println!("Looking for function: {}", function_name);
         todo!()
     }
 
     pub fn get_impl_fn_signature(
         &self,
-        _project: &mut Project,
+        project: &mut Project,
         ty: &Ty,
         fn_name: &PathExprSegment,
         args: &Parens<Punctuated<Expr, CommaToken>>,
-    ) -> Option<&FnSignature> {
+    ) -> Option<FnSignature> {
         //
         // TODO:
         //
@@ -176,13 +172,127 @@ impl AstScope {
         // We need to ensure the argument types of the `fn` match the types of the supplied `args`.
         //
         // If the `impl` is not defined in the current module, we need to find a `use` statement that imports a valid `impl` containing the `fn`:
-        // 1. Check `prelude` module of the `core` library
-        // 2. Check `prelude` module of the `std` library
-        // 3. Check all explicit `use` statements
+        // 1. Check all explicit `use` statements
+        // 2. Check `prelude` module of the `core` library
+        // 3. Check `prelude` module of the `std` library
+        // 
         //
         // Once we find the `impl` containing the `fn`, return the signature of the `fn`
         //
 
+        let mut args_types = vec![];
+
+        for arg in &args.inner {
+            args_types.push(self.get_expr_ty(arg, project));
+        }
+
+        let get_glob_use = |uses: &mut dyn Iterator<Item = &Rc<RefCell<ItemUse>>>| -> Vec<PathExpr> { 
+            let mut out = vec![];
+            for item_use in uses {
+                let flatten_tree = utils::flatten_use_tree(None, &item_use.borrow().tree);
+                for tree in flatten_tree {
+                    let suffix = if let Some(suffix) = tree.suffix.last() {
+                        &suffix.1
+                    } else {
+                        &tree.prefix
+                    };
+                    if suffix.name.as_str() == "*" {
+                        out.push(tree);
+                    }
+                }
+            }
+            out
+        };
+
+        let mut check_scope = |scope: &AstScope| -> Option<FnSignature> {
+            for mut use_tree in get_glob_use(&mut scope.uses()) {
+                if let Some(suffix) = use_tree.suffix.last() {
+                    if suffix.1.name.as_str() == "*" {
+                        use_tree.suffix.pop();
+                    }
+                }
+                let resolver = project.resolver.clone();
+                let resolver = resolver.borrow();
+
+                let Some(module) = resolver.resolve_module(&use_tree) else { continue };
+
+                for item in module.inner.items.iter() {
+                    let ItemKind::Impl(impl_item) = &item.value else { continue };
+                    let impl_ty = self.expand_ty(project, &impl_item.ty);
+                    if !self.is_ty_equivalent(&impl_ty, &ty) {
+                        continue;
+                    }
+                    
+                    for i in &impl_item.contents.inner {
+                        let ItemImplItem::Fn(function) = &i.value else { continue };
+
+                        if function.fn_signature.name.span().as_str() != fn_name.name.span().as_str() {
+                            continue;
+                        }
+                        
+                        let args = match &function.fn_signature.arguments.inner {
+                            FnArgs::Static(args) => Some(args),
+                            FnArgs::NonStatic { args_opt, .. } => args_opt.as_ref().map(|(_, args)| args),
+                        };
+
+                        if let Some(args) = args {
+                            let mut fn_arg_types = vec![];
+                            
+                            for arg in args {
+                                fn_arg_types.push(self.expand_ty(project, &arg.ty));
+                            }
+                            
+                            if fn_arg_types.len() != args_types.len() {
+                                continue;
+                            }
+
+                            if fn_arg_types.iter().zip(args_types.iter()).all(|(a, b)| self.is_ty_equivalent(a, b)) {
+                                return Some(self.expand_fn_signature(project, &function.fn_signature));
+                            }
+                        }
+                    }
+                }
+            }
+            None
+        };
+
+        if let Some(fn_signature) = check_scope(self) {
+            return Some(fn_signature);
+        }
+
+        let mut parent = self.parent.clone();
+        while let Some(scope) = parent {
+            if let Some(fn_signature) = check_scope(&scope.borrow()) {
+                return Some(fn_signature);
+            }
+            parent = scope.borrow().parent.clone();
+        }
+
+        
+        for lib in project.resolver.borrow().libraries.iter() {
+            for module in &lib.modules {
+                for item in &module.inner.items {
+                    match &item.value {
+                        ItemKind::Impl(impl_item) => {
+                            for i in &impl_item.contents.inner {
+                                match &i.value {
+                                    ItemImplItem::Fn(function) => {
+                                        if function.fn_signature.name.span().as_str() == fn_name.name.span().as_str() {
+                                            
+                                        }
+                                    },
+                                    _ => {}
+                                }
+                            }
+                        }
+                        _ => {
+                            // Check the use statements
+                        }
+                    }
+                }
+            }
+        }
+        
         todo!("Get function signature for {}::{}{}", utils::ty_to_string(ty), fn_name.name.span().as_str(), args.span.as_str())
     }
 
@@ -1100,7 +1210,7 @@ impl AstScope {
                     }
                 }
 
-                panic!("Failed to expand path expression: {path_expr:#?}")
+                todo!("Failed to resolve path expression: {:#?}", path_expr)
             }
         }
     }
@@ -1255,5 +1365,140 @@ impl AstScope {
         }
     
         pattern
+    }
+
+    fn is_ty_equivalent(&self, lhs: &Ty, rhs: &Ty) -> bool {
+        match (lhs, rhs) {
+            (Ty::Path(lhs), Ty::Path(rhs)) => {
+                if lhs.suffix.len() != rhs.suffix.len() {
+                    return false;
+                }
+
+                let is_path_type_segment_equivalent = |lhs: &PathTypeSegment, rhs: &PathTypeSegment| -> bool {
+                    if lhs.name.as_str() != rhs.name.as_str() {
+                        return false;
+                    }
+                    if lhs.generics_opt.is_some() != rhs.generics_opt.is_some() {
+                        return false;
+                    }
+    
+                    match (lhs.generics_opt.as_ref(), rhs.generics_opt.as_ref()) {
+                        (Some(lhs), Some(rhs)) => {
+                            if lhs.1.parameters.inner.value_separator_pairs.len() != rhs.1.parameters.inner.value_separator_pairs.len() {
+                                return false;
+                            }
+    
+                            if lhs.1.parameters.inner.final_value_opt.is_some() != rhs.1.parameters.inner.final_value_opt.is_some() {
+                                return false;
+                            }
+    
+                            for ((lhs, _), (rhs, _)) in lhs.1.parameters.inner.value_separator_pairs.iter().zip(rhs.1.parameters.inner.value_separator_pairs.iter()) {
+                                if !self.is_ty_equivalent(&lhs, &rhs) {
+                                    return false;
+                                }
+                            }
+    
+                            if let (Some(lhs), Some(rhs)) = (&lhs.1.parameters.inner.final_value_opt, &rhs.1.parameters.inner.final_value_opt) {
+                                if !self.is_ty_equivalent(lhs, rhs) {
+                                    return false;
+                                }
+                            }
+                            true
+                        },
+                        (None, None) => true,
+                        _ => false,
+                    }
+                };
+
+                if !is_path_type_segment_equivalent(&lhs.prefix, &rhs.prefix) {
+                    return false;
+                }
+
+                for ((_, lhs), (_, rhs)) in lhs.suffix.iter().zip(rhs.suffix.iter()) {
+                    if !is_path_type_segment_equivalent(lhs, rhs) {
+                        return false;
+                    }
+                }
+
+                true
+            },
+            (Ty::Tuple(lhs), Ty::Tuple(rhs)) => {
+                match (&lhs.inner, &rhs.inner) {
+                    (TyTupleDescriptor::Nil, TyTupleDescriptor::Nil) => true,
+                    (TyTupleDescriptor::Cons { head: lhs_head, tail: lhs_tail, .. }, TyTupleDescriptor::Cons { head: rhs_head, tail: rhs_tail, .. }) => {
+                        self.is_ty_equivalent(lhs_head, rhs_head) 
+                        && lhs_tail.value_separator_pairs.iter().zip(rhs_tail.value_separator_pairs.iter()).all(|(lhs, rhs)| {
+                            self.is_ty_equivalent(&lhs.0, &rhs.0)
+                        })
+                        && lhs_tail.final_value_opt.as_ref().map(|lhs| {
+                            rhs_tail.final_value_opt.as_ref().map(|rhs| {
+                                self.is_ty_equivalent(lhs, rhs)
+                            }).unwrap_or(false)
+                        }).unwrap_or(false)
+                    },
+                    _ => false,
+                }
+            },
+            (Ty::Array(lhs), Ty::Array(rhs)) => {
+                self.is_expr_equivalent(lhs.inner.length.as_ref(), rhs.inner.length.as_ref())
+                && self.is_ty_equivalent(lhs.inner.ty.as_ref(), rhs.inner.ty.as_ref())
+            },
+            (Ty::StringSlice(_), Ty::StringSlice(_)) => true,
+            (Ty::StringArray { length: lhs_length, .. }, Ty::StringArray { length: rhs_length, .. }) => {
+                self.is_expr_equivalent(lhs_length.inner.as_ref(), rhs_length.inner.as_ref())
+            },
+            (Ty::Infer { .. }, Ty::Infer { .. }) => true,
+            (Ty::Ptr { ty: lhs_ty, .. }, Ty::Ptr { ty: rhs_ty, .. }) => {
+                self.is_ty_equivalent(lhs_ty.inner.as_ref(), rhs_ty.inner.as_ref())
+            },
+            (Ty::Slice { ty: lhs_ty, .. }, Ty::Slice { ty: rhs_ty, .. }) => {
+                self.is_ty_equivalent(lhs_ty.inner.as_ref(), rhs_ty.inner.as_ref())
+            },
+            (Ty::Ref { ty: lhs_ty, .. }, Ty::Ref { ty: rhs_ty, .. }) => {
+                self.is_ty_equivalent(lhs_ty.as_ref(), rhs_ty.as_ref())
+            },
+            (Ty::Never { .. }, Ty::Never { .. }) => true,
+            _ => false,
+        }
+    }
+
+    fn is_expr_equivalent(&self, lhs: &Expr, rhs: &Expr) -> bool { 
+        match (lhs, rhs) {
+            (Expr::Path(_), Expr::Path(_)) => todo!(),
+            (Expr::Literal(lhs), Expr::Literal(rhs)) => {
+                match (lhs, rhs) {
+                    (Literal::String(lhs), Literal::String(rhs)) => lhs.parsed == rhs.parsed,
+                    (Literal::Char(lhs), Literal::Char(rhs)) => lhs.parsed == rhs.parsed,
+                    (Literal::Int(lhs), Literal::Int(rhs)) => lhs.parsed == rhs.parsed,
+                    (Literal::Bool(lhs), Literal::Bool(rhs)) => lhs.kind == rhs.kind,
+                    _ => false,
+                }
+            },
+            (Expr::Not { expr: lhs_expr, .. }, Expr::Not { expr: rhs_expr, .. }) => {
+                self.is_expr_equivalent(lhs_expr.as_ref(), rhs_expr.as_ref())
+            },
+            (Expr::Mul { lhs: lhs_lhs, rhs: lhs_rhs, .. }, Expr::Mul { lhs: rhs_lhs, rhs: rhs_rhs, .. }) |
+            (Expr::Div { lhs: lhs_lhs, rhs: lhs_rhs, .. }, Expr::Div { lhs: rhs_lhs, rhs: rhs_rhs, .. }) |
+            (Expr::Pow { lhs: lhs_lhs, rhs: lhs_rhs, .. }, Expr::Pow { lhs: rhs_lhs, rhs: rhs_rhs, .. }) |
+            (Expr::Modulo { lhs: lhs_lhs, rhs: lhs_rhs, .. }, Expr::Modulo { lhs: rhs_lhs, rhs: rhs_rhs, .. }) |
+            (Expr::Add { lhs: lhs_lhs, rhs: lhs_rhs, .. }, Expr::Add { lhs: rhs_lhs, rhs: rhs_rhs, .. }) |
+            (Expr::Sub { lhs: lhs_lhs, rhs: lhs_rhs, .. }, Expr::Sub { lhs: rhs_lhs, rhs: rhs_rhs, .. }) |
+            (Expr::Shl { lhs: lhs_lhs, rhs: lhs_rhs, .. }, Expr::Shl { lhs: rhs_lhs, rhs: rhs_rhs, .. }) |
+            (Expr::Shr { lhs: lhs_lhs, rhs: lhs_rhs, .. }, Expr::Shr { lhs: rhs_lhs, rhs: rhs_rhs, .. }) |
+            (Expr::BitAnd { lhs: lhs_lhs, rhs: lhs_rhs, .. }, Expr::BitAnd { lhs: rhs_lhs, rhs: rhs_rhs, .. }) |
+            (Expr::BitXor { lhs: lhs_lhs, rhs: lhs_rhs, .. }, Expr::BitXor { lhs: rhs_lhs, rhs: rhs_rhs, .. }) |
+            (Expr::BitOr { lhs: lhs_lhs, rhs: lhs_rhs, .. }, Expr::BitOr { lhs: rhs_lhs, rhs: rhs_rhs, .. }) |
+            (Expr::Equal { lhs: lhs_lhs, rhs: lhs_rhs, .. }, Expr::Equal { lhs: rhs_lhs, rhs: rhs_rhs, .. }) |
+            (Expr::NotEqual { lhs: lhs_lhs, rhs: lhs_rhs, .. }, Expr::NotEqual { lhs: rhs_lhs, rhs: rhs_rhs, .. }) |
+            (Expr::LessThan { lhs: lhs_lhs, rhs: lhs_rhs, .. }, Expr::LessThan { lhs: rhs_lhs, rhs: rhs_rhs, .. }) |
+            (Expr::GreaterThan { lhs: lhs_lhs, rhs: lhs_rhs, .. }, Expr::GreaterThan { lhs: rhs_lhs, rhs: rhs_rhs, .. }) |
+            (Expr::LessThanEq { lhs: lhs_lhs, rhs: lhs_rhs, .. }, Expr::LessThanEq { lhs: rhs_lhs, rhs: rhs_rhs, .. }) |
+            (Expr::GreaterThanEq { lhs: lhs_lhs, rhs: lhs_rhs, .. }, Expr::GreaterThanEq { lhs: rhs_lhs, rhs: rhs_rhs, .. }) |
+            (Expr::LogicalAnd { lhs: lhs_lhs, rhs: lhs_rhs, .. }, Expr::LogicalAnd { lhs: rhs_lhs, rhs: rhs_rhs, .. }) |
+            (Expr::LogicalOr { lhs: lhs_lhs, rhs: lhs_rhs, .. }, Expr::LogicalOr { lhs: rhs_lhs, rhs: rhs_rhs, .. }) => {
+                self.is_expr_equivalent(lhs_lhs.as_ref(), rhs_lhs.as_ref()) && self.is_expr_equivalent(lhs_rhs.as_ref(), rhs_rhs.as_ref())
+            },
+            _ => false,
+        }
     }
 }
