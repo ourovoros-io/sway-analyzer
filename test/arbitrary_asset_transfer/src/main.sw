@@ -4,6 +4,7 @@ use std::asset::{force_transfer_to_contract, transfer, transfer_to_address};
 use std::low_level_call::{call_with_function_selector, CallParams};
 use std::bytes::Bytes;
 use std::context::msg_amount;
+use std::storage::storage_key::*;
 
 abi TestArbitraryAssetTransfer {
     #[storage(read, write)]

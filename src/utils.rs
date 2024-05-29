@@ -1738,3 +1738,23 @@ pub fn path_type_to_path_expr(path_type: &PathType) -> PathExpr {
         incomplete_suffix: false,
     }
 }
+
+#[inline]
+pub fn empty_tuple_ty() -> Ty {
+    Ty::Tuple(Parens {
+        inner: TyTupleDescriptor::Nil,
+        span: Span::dummy(),
+    })
+}
+
+#[inline]
+pub fn create_ident_ty(name: &str) -> Ty {
+    Ty::Path(PathType {
+        root_opt: None,
+        prefix: PathTypeSegment {
+            name: BaseIdent::new_no_span(name.into()),
+            generics_opt: None,
+        },
+        suffix: vec![],
+    })
+}

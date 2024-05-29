@@ -830,6 +830,12 @@ impl AstVisitor for AstVisitorRecursive<'_> {
     fn visit_struct(&mut self, context: &StructContext, scope: Rc<RefCell<AstScope>>, project: &mut Project) -> Result<(), Error> {
         scope.borrow_mut().add_struct(project, context.item_struct);
 
+        let scope = Rc::new(RefCell::new(AstScope::new(Some(scope.clone()))));
+        
+        if let Some(generics) = context.item_struct.generics.as_ref() {
+            scope.borrow_mut().add_generic_params(project, generics, context.item_struct.where_clause_opt.as_ref());
+        }
+        
         for visitor in self.visitors.iter_mut() {
             visitor.visit_struct(context, scope.clone(), project)?;
         }
@@ -893,6 +899,14 @@ impl AstVisitor for AstVisitorRecursive<'_> {
     }
 
     fn visit_enum(&mut self, context: &EnumContext, scope: Rc<RefCell<AstScope>>, project: &mut Project) -> Result<(), Error> {
+        scope.borrow_mut().add_enum(project, context.item_enum);
+
+        let scope = Rc::new(RefCell::new(AstScope::new(Some(scope.clone()))));
+        
+        if let Some(generics) = context.item_enum.generics.as_ref() {
+            scope.borrow_mut().add_generic_params(project, generics, context.item_enum.where_clause_opt.as_ref());
+        }
+        
         for visitor in self.visitors.iter_mut() {
             visitor.visit_enum(context, scope.clone(), project)?;
         }
@@ -956,8 +970,14 @@ impl AstVisitor for AstVisitorRecursive<'_> {
     }
 
     fn visit_fn(&mut self, context: &FnContext, scope: Rc<RefCell<AstScope>>, project: &mut Project) -> Result<(), Error> {
-        scope.borrow_mut().add_function(project, &context.item_fn.fn_signature);
+        scope.borrow_mut().add_fn_signature(project, &context.item_fn.fn_signature);
         
+        let scope = Rc::new(RefCell::new(AstScope::new(Some(scope.clone()))));
+        
+        if let Some(generics) = context.item_fn.fn_signature.generics.as_ref() {
+            scope.borrow_mut().add_generic_params(project, generics, context.item_fn.fn_signature.where_clause_opt.as_ref());
+        }
+
         let args = match &context.item_fn.fn_signature.arguments.inner {
             FnArgs::Static(args) => Some(args),
 
@@ -1009,8 +1029,6 @@ impl AstVisitor for AstVisitorRecursive<'_> {
             block: &context.item_fn.body,
         };
 
-        let scope = Rc::new(RefCell::new(AstScope::new(Some(scope.clone()))));
-        
         self.visit_block(&body_context, scope.clone(), project)?;
         self.leave_block(&body_context, scope.clone(), project)?;
         
@@ -2941,6 +2959,12 @@ impl AstVisitor for AstVisitorRecursive<'_> {
     fn visit_trait(&mut self, context: &TraitContext, scope: Rc<RefCell<AstScope>>, project: &mut Project) -> Result<(), Error> {
         scope.borrow_mut().add_trait(project, context.item_trait);
         
+        let scope = Rc::new(RefCell::new(AstScope::new(Some(scope.clone()))));
+        
+        if let Some(generics) = context.item_trait.generics.as_ref() {
+            scope.borrow_mut().add_generic_params(project, generics, context.item_trait.where_clause_opt.as_ref());
+        }
+        
         for visitor in self.visitors.iter_mut() {
             visitor.visit_trait(context, scope.clone(), project)?;
         }
@@ -2965,6 +2989,14 @@ impl AstVisitor for AstVisitorRecursive<'_> {
     }
 
     fn visit_impl(&mut self, context: &ImplContext, scope: Rc<RefCell<AstScope>>, project: &mut Project) -> Result<(), Error> {
+        scope.borrow_mut().add_impl(project, context.item_impl);
+
+        let scope = Rc::new(RefCell::new(AstScope::new(Some(scope.clone()))));
+        
+        if let Some(generics) = context.item_impl.generic_params_opt.as_ref() {
+            scope.borrow_mut().add_generic_params(project, generics, context.item_impl.where_clause_opt.as_ref());
+        }
+        
         for visitor in self.visitors.iter_mut() {
             visitor.visit_impl(context, scope.clone(), project)?;
         }
