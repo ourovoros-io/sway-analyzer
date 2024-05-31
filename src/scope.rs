@@ -83,8 +83,6 @@ impl AstScope {
 
             for module_item in module.inner.items.iter() {
                 match &module_item.value {
-                    ItemKind::Submodule(_) => {}
-
                     ItemKind::Use(item_use) => {
                         let mut item_use = item_use.clone();
 
@@ -125,21 +123,40 @@ impl AstScope {
                         scope.borrow_mut().add_enum(project, item_enum);
                     }
 
-                    ItemKind::Fn(item_fn) => {
-                        scope.borrow_mut().add_fn_signature(project, &item_fn.fn_signature);
-                    }
-
                     ItemKind::Trait(item_trait) => {
                         scope.borrow_mut().add_trait(project, item_trait);
-                    }
-
-                    ItemKind::Impl(item_impl) => {
-                        scope.borrow_mut().add_impl(project, item_impl);
                     }
 
                     ItemKind::Abi(item_abi) => {
                         scope.borrow_mut().add_abi(project, item_abi);
                     }
+
+                    ItemKind::TypeAlias(item_type_alias) => {
+                        scope.borrow_mut().add_type_alias(project, item_type_alias);
+                    }
+
+                    _ => {}
+                }
+            }
+
+            for module_item in module.inner.items.iter() {
+                match &module_item.value {
+                    ItemKind::Submodule(_) => {}
+                    ItemKind::Use(_) => {}
+                    ItemKind::Struct(_) => {}
+                    ItemKind::Enum(_) => {}
+
+                    ItemKind::Fn(item_fn) => {
+                        scope.borrow_mut().add_fn_signature(project, &item_fn.fn_signature);
+                    }
+
+                    ItemKind::Trait(_) => {}
+
+                    ItemKind::Impl(item_impl) => {
+                        scope.borrow_mut().add_impl(project, item_impl);
+                    }
+
+                    ItemKind::Abi(item_abi) => {}
 
                     ItemKind::Const(item_const) => {
                         scope.borrow_mut().add_variable(
@@ -172,9 +189,7 @@ impl AstScope {
                         }
                     }
                     
-                    ItemKind::TypeAlias(item_type_alias) => {
-                        scope.borrow_mut().add_type_alias(project, item_type_alias);
-                    }
+                    ItemKind::TypeAlias(_) => {}
 
                     ItemKind::Error(_, _) => panic!("Encountered an error while parsing Sway AST"),
                 }
@@ -1569,15 +1584,6 @@ impl AstScope {
                             return expanded_path;
                         }
                     }
-                }
-
-                println!("{:#?}", self.uses);
-
-                let mut parent_scope = self.parent.clone();
-
-                while let Some(scope) = parent_scope {
-                    println!("{:#?}", scope.borrow().uses);
-                    parent_scope = scope.borrow().parent.clone();
                 }
 
                 todo!("Failed to resolve path expression: {:#?}", path_expr)
