@@ -3,6 +3,7 @@ use std::{cell::RefCell, rc::Rc};
 use sway_ast::{
     keywords::{CloseAngleBracketToken, Keyword, OpenAngleBracketToken, StrToken}, ty::TyTupleDescriptor, AngleBrackets, CommaToken, DoubleColonToken, Expr, ExprArrayDescriptor, ExprTupleDescriptor, FnArg, FnArgs, FnSignature, GenericArgs, GenericParams, ItemAbi, ItemEnum, ItemImpl, ItemImplItem, ItemKind, ItemStruct, ItemTrait, ItemTraitItem, ItemTypeAlias, ItemUse, Literal, MatchBranchKind, Parens, PathExpr, PathExprSegment, PathType, PathTypeSegment, Pattern, PatternStructField, Punctuated, Ty, UseTree, WhereClause
 };
+use sway_ast_stubs::AstModule;
 use sway_types::{BaseIdent, Span, Spanned};
 
 #[derive(Clone, Debug, PartialEq)]
@@ -77,11 +78,27 @@ impl AstScope {
                 );
             }
 
-            // println!("Module: {}", utils::path_expr_to_string(&module_path));
+            println!("Module: {}", utils::path_expr_to_string(&module_path));
 
             let scope = Rc::new(RefCell::new(AstScope::default()));
 
             for module_item in module.inner.items.iter() {
+                // match &module_item.value {
+                //     ItemKind::Submodule(_) => println!("Submodule"),
+                //     ItemKind::Use(_) => println!("Use"),
+                //     ItemKind::Struct(_) => println!("Struct"),
+                //     ItemKind::Enum(_) => println!("Enum"),
+                //     ItemKind::Fn(_) => println!("Fn"),
+                //     ItemKind::Trait(_) => println!("Trait"),
+                //     ItemKind::Impl(_) => println!("Impl"),
+                //     ItemKind::Abi(_) => println!("Abi"),
+                //     ItemKind::Const(_) => println!("Const"),
+                //     ItemKind::Storage(_) => println!("Storage"),
+                //     ItemKind::Configurable(_) => println!("Configurable"),
+                //     ItemKind::TypeAlias(_) => println!("TypeAlias"),
+                //     ItemKind::Error(_, _) => println!("Error"),
+                // }
+                
                 match &module_item.value {
                     ItemKind::Use(item_use) => {
                         let mut item_use = item_use.clone();
@@ -153,6 +170,10 @@ impl AstScope {
                     ItemKind::Trait(_) => {}
 
                     ItemKind::Impl(item_impl) => {
+                        // let mut impl_stub = item_impl.clone();
+                        // impl_stub.contents.inner.clear();
+                        // println!("Adding impl: {impl_stub:#?}");
+
                         scope.borrow_mut().add_impl(project, item_impl);
                     }
 
@@ -1195,10 +1216,6 @@ impl AstScope {
             }
 
             None => {
-                //
-                // Look for a type in the current module
-                //
-                
                 if input_generic_count == 0 {
                     // 1. Check for a type alias in the current module
                     if let Some(type_alias) = self.find_type_alias(|item_type_alias| {
@@ -1379,24 +1396,68 @@ impl AstScope {
                     let resolver = resolver.borrow();
                     let library = resolver.libraries.iter().find(|lib| lib.name == library_name)?;
                     
-                    let Some(prelude) = library.modules.iter().find(|module| module.name.as_str() == "prelude") else {
+                    let Some(module) = library.modules.iter().find(|module| module.name.as_str() == "prelude") else {
                         panic!("Failed to find `{library_name}::prelude` module");
                     };
 
-                    // 1. Check for a type alias or an abi defined in the prelude module
-                    if input_generic_count == 0 {
-                        for item in &prelude.inner.items {
+                    let mut check_module = |module: &AstModule| -> Option<PathExpr> {
+                        // 1. Check for a type alias or an abi defined in the module
+                        if input_generic_count == 0 {
+                            for item in &module.inner.items {
+                                let (
+                                    ItemKind::TypeAlias(ItemTypeAlias { name, .. })
+                                    | ItemKind::Abi(ItemAbi { name, .. })
+                                ) = &item.value else {
+                                    continue;
+                                };
+    
+                                if name.as_str() == segment.name.as_str() {
+                                    let mut expanded_path = self.expand_path_expr(project, path_expr, generic_idents);
+                                    let prefix = expanded_path.prefix.clone();
+    
+                                    let expanded_segment = if let Some((_, segment)) = expanded_path.suffix.last_mut() {
+                                        segment
+                                    } else {
+                                        &mut expanded_path.prefix
+                                    };
+        
+                                    *expanded_segment = segment.clone();
+                                    
+                                    expanded_path.prefix = PathExprSegment {
+                                        name: BaseIdent::new_no_span(library_name.to_string()),
+                                        generics_opt: None,
+                                    };
+    
+                                    expanded_path.suffix.insert(0, (DoubleColonToken::default(), prefix));
+    
+                                    return Some(expanded_path);
+                                }
+                            }
+                        }
+    
+                        // 2. Check for a struct or trait defined in the module
+                        for item in &module.inner.items {
                             let (
-                                ItemKind::TypeAlias(ItemTypeAlias { name, .. })
-                                | ItemKind::Abi(ItemAbi { name, .. })
+                                ItemKind::Struct(ItemStruct { name, generics, .. })
+                                | ItemKind::Trait(ItemTrait { name, generics, .. })
                             ) = &item.value else {
                                 continue;
                             };
-
-                            if name.as_str() == segment.name.as_str() {
+    
+                            if name.as_str() != segment.name.as_str() {
+                                continue;
+                            }
+        
+                            if generics.as_ref().map(|x| {
+                                let mut count = 0;
+                                for _ in &x.parameters.inner {
+                                    count += 1;
+                                }
+                                count
+                            }).unwrap_or(0) == input_generic_count {
                                 let mut expanded_path = self.expand_path_expr(project, path_expr, generic_idents);
                                 let prefix = expanded_path.prefix.clone();
-
+    
                                 let expanded_segment = if let Some((_, segment)) = expanded_path.suffix.last_mut() {
                                     segment
                                 } else {
@@ -1409,86 +1470,109 @@ impl AstScope {
                                     name: BaseIdent::new_no_span(library_name.to_string()),
                                     generics_opt: None,
                                 };
-
+    
                                 expanded_path.suffix.insert(0, (DoubleColonToken::default(), prefix));
-
+    
                                 return Some(expanded_path);
                             }
                         }
-                    }
-
-                    // 2. Check for a struct or trait defined in the prelude module
-                    for item in &prelude.inner.items {
-                        let (
-                            ItemKind::Struct(ItemStruct { name, generics, .. })
-                            | ItemKind::Trait(ItemTrait { name, generics, .. })
-                        ) = &item.value else {
-                            continue;
-                        };
-
-                        if name.as_str() != segment.name.as_str() {
-                            continue;
+                        
+                        // 3. Check for an explicit use declared in the module
+                        for item in &module.inner.items {
+                            let ItemKind::Use(item_use) = &item.value else {
+                                continue;
+                            };
+    
+                            for path_expr in utils::flatten_use_tree(None, &item_use.tree) {
+                                if path_expr.suffix.last().map(|(_, s)| s.name.as_str() == segment.name.as_str()).unwrap_or(false) {
+                                    let mut expanded_path = path_expr.clone();
+    
+                                    let expanded_segment = if let Some((_, segment)) = expanded_path.suffix.last_mut() {
+                                        segment
+                                    } else {
+                                        &mut expanded_path.prefix
+                                    };
+        
+                                    *expanded_segment = segment.clone();
+                                    
+                                    if item_use.root_import.is_some() {
+                                        let prefix = expanded_path.prefix.clone();
+    
+                                        expanded_path.prefix = PathExprSegment {
+                                            name: BaseIdent::new_no_span(library_name.to_string()),
+                                            generics_opt: None,
+                                        };
+    
+                                        expanded_path.suffix.insert(0, (DoubleColonToken::default(), prefix));
+                                    }
+    
+                                    return Some(expanded_path);
+                                }
+                            }
                         }
     
-                        if generics.as_ref().map(|x| {
-                            let mut count = 0;
-                            for _ in &x.parameters.inner {
-                                count += 1;
-                            }
-                            count
-                        }).unwrap_or(0) == input_generic_count {
-                            let mut expanded_path = self.expand_path_expr(project, path_expr, generic_idents);
-                            let prefix = expanded_path.prefix.clone();
+                        None
+                    };
 
-                            let expanded_segment = if let Some((_, segment)) = expanded_path.suffix.last_mut() {
-                                segment
-                            } else {
-                                &mut expanded_path.prefix
-                            };
-
-                            *expanded_segment = segment.clone();
-                            
-                            expanded_path.prefix = PathExprSegment {
-                                name: BaseIdent::new_no_span(library_name.to_string()),
-                                generics_opt: None,
-                            };
-
-                            expanded_path.suffix.insert(0, (DoubleColonToken::default(), prefix));
-
-                            return Some(expanded_path);
-                        }
+                    // 1. Check the prelude module
+                    if let Some(path_expr) = check_module(module) {
+                        return Some(path_expr);
                     }
-                    
-                    // 3. Check for an explicit use declared in the prelude module
-                    for item in &prelude.inner.items {
-                        let ItemKind::Use(item_use) = &item.value else {
-                            continue;
-                        };
+
+                    // 2. Check glob imports in the prelude module
+                    for item in &module.inner.items {
+                        let ItemKind::Use(item_use) = &item.value else { continue };
 
                         for path_expr in utils::flatten_use_tree(None, &item_use.tree) {
-                            if path_expr.suffix.last().map(|(_, s)| s.name.as_str() == segment.name.as_str()).unwrap_or(false) {
-                                let mut expanded_path = path_expr.clone();
+                            println!("Checking {}", utils::path_expr_to_string(&path_expr));
 
-                                let expanded_segment = if let Some((_, segment)) = expanded_path.suffix.last_mut() {
-                                    segment
-                                } else {
-                                    &mut expanded_path.prefix
-                                };
-    
-                                *expanded_segment = segment.clone();
-                                
-                                if item_use.root_import.is_some() {
-                                    let prefix = expanded_path.prefix.clone();
+                            let segment = if let Some((_, segment)) = path_expr.suffix.last() {
+                                segment
+                            } else {
+                                &path_expr.prefix
+                            };
 
-                                    expanded_path.prefix = PathExprSegment {
-                                        name: BaseIdent::new_no_span(library_name.to_string()),
-                                        generics_opt: None,
-                                    };
+                            if segment.name.as_str() != "*" {
+                                continue;
+                            }
 
-                                    expanded_path.suffix.insert(0, (DoubleColonToken::default(), prefix));
+                            let mut module = None;
+
+                            let suffix = path_expr.suffix.clone();
+
+                            if suffix.is_empty() {
+                                break;
+                            }
+        
+                            let mut suffix_iter = suffix.into_iter();
+                            let mut module_name = String::new();
+        
+                            while let Some((_, suffix_part)) = suffix_iter.next() {
+                                if suffix_part.name.as_str() == "*" {
+                                    break;
                                 }
 
-                                return Some(expanded_path);
+                                if !module_name.is_empty() {
+                                    module_name.push_str("::");
+                                }
+        
+                                module_name.push_str(utils::path_expr_segment_to_string(&suffix_part).as_str());
+        
+                                if let Some(found_module) = library.modules.iter().find(|m| m.name == module_name) {
+                                    module = Some(found_module);
+                                }
+                            }
+
+                            let Some(module) = module else { continue };
+                            
+                            let suffix = suffix_iter.collect::<Vec<_>>();
+                            
+                            if !suffix.is_empty() {
+                                todo!("Check for an item that has a name matching the remaining suffix")
+                            }
+                            
+                            if let Some(path_expr) = check_module(module) {
+                                return Some(path_expr);
                             }
                         }
                     }
@@ -1508,9 +1592,40 @@ impl AstScope {
 
                 // 9. Check any available libraries
                 for library in resolver.borrow().libraries.iter() {
-                    if library.name == segment.name.as_str() {
+                    if library.name != path_expr.prefix.name.as_str() {
+                        continue;
+                    }
+
+                    let mut module = None;
+
+                    let suffix = path_expr.suffix.clone();
+
+                    if suffix.is_empty() {
+                        break;
+                    }
+
+                    let mut suffix_iter = suffix.into_iter();
+                    let mut module_name = String::new();
+
+                    while let Some((_, suffix_part)) = suffix_iter.next() {
+                        if !module_name.is_empty() {
+                            module_name.push_str("::");
+                        }
+
+                        module_name.push_str(utils::path_expr_segment_to_string(&suffix_part).as_str());
+
+                        if let Some(found_module) = library.modules.iter().find(|m| m.name == module_name) {
+                            module = Some(found_module);
+                        }
+                    }
+
+                    let suffix = suffix_iter.collect::<Vec<_>>();
+
+                    if suffix.is_empty() {
                         return path_expr.clone();
                     }
+
+                    todo!("Check for an item that has a name matching the remaining suffix")
                 }
 
                 if path_expr.prefix.generics_opt.is_none() && path_expr.suffix.is_empty() {
