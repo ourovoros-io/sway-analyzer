@@ -188,9 +188,9 @@ impl Project<'_> {
         let mut module_paths = modules.borrow().keys().cloned().collect::<Vec<_>>();
         module_paths.sort();
 
-        let core = AstScope::from_library(self, "core");
+        // let core = AstScope::from_library(self, "core");
         
-        let std = AstScope::from_library(self, "std");
+        // let std = AstScope::from_library(self, "std");
         
         for path in module_paths {
             println!("{}", path.to_string_lossy());
