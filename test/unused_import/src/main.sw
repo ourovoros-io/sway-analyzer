@@ -1,6 +1,6 @@
 contract;
 
-use std::constants::{BASE_ASSET_ID, ZERO_B256};
+use std::constants::{DEFAULT_SUB_ID, ZERO_B256};
 
 use std::logging::log;
 use std::asset::transfer;
@@ -18,7 +18,7 @@ use std::storage::storage_vec::*;
 
 configurable {
     ZERO_ADDRESS: b256 = ZERO_B256,
-    NATIVE_ASSET: AssetId = BASE_ASSET_ID,
+    NATIVE_ASSET: AssetId = DEFAULT_SUB_ID.into(),
 }
 
 trait HasValue {
@@ -30,12 +30,11 @@ impl HasValue for Contract {
 }
 
 abi TestUnusedImport {
-    fn test_redundant_import();
+    fn test_redundant_import(asset: AssetId);
 }
 
 impl TestUnusedImport for Contract {
-    fn test_redundant_import() {
-        let asset = BASE_ASSET_ID;
+    fn test_redundant_import(asset: AssetId) {
         let to = Identity::Address(Address::from(ZERO_B256));
         log(asset);
         log(to);

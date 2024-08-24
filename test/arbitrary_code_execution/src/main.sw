@@ -20,38 +20,38 @@ storage {
 
 impl TestArbitraryCodeExecution for Contract {
     fn test_ldc_unrestricted() {
-        asm(r1: 0, r2: 0, r3: 0) {
+        asm(r1: 0, r2: 0, r3: 0, i0: 0) {
             // Report entry should be created:
             // L26: The `Contract::test_ldc_unrestricted` function uses the `LDC` instruction without access restriction: `ldc r1 r2 r3`. Consider checking against `msg_sender()` in order to limit access.
-            ldc r1 r2 r3;
-        };
+            ldc r1 r2 r3 i0;
+        }
     }
 
     #[storage(read)]
     fn test_ldc_restricted_1() {
         require(msg_sender().unwrap() == storage.owner.read(), "Only owner");
-        asm(r1: 0, r2: 0, r3: 0) {
+        asm(r1: 0, r2: 0, r3: 0, i0: 0) {
             // Report entry should not be created
-            ldc r1 r2 r3;
-        };
+            ldc r1 r2 r3 i0;
+        }
     }
 
     #[storage(read)]
     fn test_ldc_restricted_2() {
         require(imported_msg_sender().unwrap() == storage.owner.read(), "Only owner");
-        asm(r1: 0, r2: 0, r3: 0) {
+        asm(r1: 0, r2: 0, r3: 0, i0: 0) {
             // Report entry should not be created
-            ldc r1 r2 r3;
-        };
+            ldc r1 r2 r3 i0;
+        }
     }
 
     #[storage(read)]
     fn test_ldc_restricted_3() {
         require(std::auth::msg_sender().unwrap() == storage.owner.read(), "Only owner");
-        asm(r1: 0, r2: 0, r3: 0) {
+        asm(r1: 0, r2: 0, r3: 0, i0: 0) {
             // Report entry should not be created
-            ldc r1 r2 r3;
-        };
+            ldc r1 r2 r3 i0;
+        }
     }
 
     #[storage(read)]
@@ -59,10 +59,10 @@ impl TestArbitraryCodeExecution for Contract {
         if msg_sender().unwrap() != storage.owner.read() {
             revert(0);
         }
-        asm(r1: 0, r2: 0, r3: 0) {
+        asm(r1: 0, r2: 0, r3: 0, i0: 0) {
             // Report entry should not be created
-            ldc r1 r2 r3;
-        };
+            ldc r1 r2 r3 i0;
+        }
     }
 
     #[storage(read)]
@@ -70,10 +70,10 @@ impl TestArbitraryCodeExecution for Contract {
         if imported_msg_sender().unwrap() != storage.owner.read() {
             revert(0);
         }
-        asm(r1: 0, r2: 0, r3: 0) {
+        asm(r1: 0, r2: 0, r3: 0, i0: 0) {
             // Report entry should not be created
-            ldc r1 r2 r3;
-        };
+            ldc r1 r2 r3 i0;
+        }
     }
 
     #[storage(read)]
@@ -81,10 +81,10 @@ impl TestArbitraryCodeExecution for Contract {
         if std::auth::msg_sender().unwrap() != storage.owner.read() {
             revert(0);
         }
-        asm(r1: 0, r2: 0, r3: 0) {
+        asm(r1: 0, r2: 0, r3: 0, i0: 0) {
             // Report entry should not be created
-            ldc r1 r2 r3;
-        };
+            ldc r1 r2 r3 i0;
+        }
     }
 }
 

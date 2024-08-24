@@ -1270,7 +1270,7 @@ pub fn collect_storage_fields(module: &Module) -> Vec<&StorageField> {
         ..
     }) = module.items.iter().find(|x| matches!(x.value, ItemKind::Storage(_))) else { return vec![] };
 
-    fold_punctuated(&storage.fields.inner).iter().map(|x| &x.value).collect()
+    fold_punctuated(&storage.entries.inner).iter().map(|x| x.value.field.as_ref().unwrap()).collect()
 }
 
 pub fn is_boolean_literal_or_negation(expr: &Expr) -> bool {
@@ -1541,7 +1541,7 @@ pub fn ty_to_string(ty: &Ty) -> String {
         Ty::StringArray { length, .. } => format!("str[{}]", length.inner.span().as_str()),
         Ty::Infer { .. } => "_".into(),
         Ty::Ptr { ptr_token, ty } => format!("{}[{}]", ptr_token.span().as_str(), ty_to_string(ty.inner.as_ref())),
-        Ty::Slice { slice_token, ty } => format!("{}[{}]", slice_token.span().as_str(), ty_to_string(ty.inner.as_ref())),
+        Ty::Slice { slice_token, ty } => format!("{}[{}]", slice_token.as_ref().unwrap().span().as_str(), ty_to_string(ty.inner.as_ref())),
         
         Ty::Ref { ampersand_token, mut_token, ty } => format!(
             "{}{} {}",

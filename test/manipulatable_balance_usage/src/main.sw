@@ -1,8 +1,9 @@
 contract;
 
-use std::asset::{force_transfer_to_contract, transfer, transfer_to_address};
+use std::asset::transfer;
 use std::low_level_call::{call_with_function_selector, CallParams};
 use std::bytes::Bytes;
+use std::hash::Hash;
 
 abi TestManipulatableBalanceUsage {
     fn manipulatable_balance_usage_1(to: Identity, asset_id: AssetId, amount: u64);
@@ -10,8 +11,8 @@ abi TestManipulatableBalanceUsage {
     
     fn manipulatable_balance_usage_3(
         to_ident: Identity,
-        to_address: Address,
-        to_contract: ContractId,
+        to_address: Identity,
+        to_contract: Identity,
         asset_id: AssetId,
         amount: u64,
         target: ContractId,
@@ -29,7 +30,7 @@ storage {
 
 impl TestManipulatableBalanceUsage for Contract {
     fn manipulatable_balance_usage_1(to: Identity, asset_id: AssetId, amount: u64) {
-        let balance = storage.balance;
+        let balance = storage.balance.try_read().unwrap_or(0);
         let out_amount = balance / 2;
         
         // Report entry should be created:
@@ -49,8 +50,8 @@ impl TestManipulatableBalanceUsage for Contract {
     
     fn manipulatable_balance_usage_3(
         to_ident: Identity,
-        to_address: Address,
-        to_contract: ContractId,
+        to_address: Identity,
+        to_contract: Identity,
         asset_id: AssetId,
         amount: u64,
         target: ContractId,
@@ -69,11 +70,11 @@ impl TestManipulatableBalanceUsage for Contract {
         
         // Report entry should be created:
         // L72: The `Contract::manipulatable_balance_usage_3` function contains manipulatable balance usage: `transfer_to_address(to_address, asset_id, amount)`
-        transfer_to_address(to_address, asset_id, amount);
+        transfer(to_address, asset_id, amount);
         
         // Report entry should be created:
         // L76: The `Contract::manipulatable_balance_usage_3` function contains manipulatable balance usage: `force_transfer_to_contract(to_contract, asset_id, amount)`
-        force_transfer_to_contract(to_contract, asset_id, amount);
+        transfer(to_contract, asset_id, amount);
 
         // Report entry should not be created
         call_with_function_selector(target, function_selector, calldata, single_value_type_arg, call_params);
