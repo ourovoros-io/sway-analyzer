@@ -189,12 +189,12 @@ impl AstScope {
                     }
 
                     ItemKind::Storage(item_storage) => {
-                        for field in &item_storage.fields.inner {
+                        for field in &item_storage.entries.inner {
                             scope.borrow_mut().add_variable(
                                 project,
                                 AstVariableKind::Storage,
                                 &field.value.name,
-                                &field.value.ty,
+                                &field.value.field.as_ref().unwrap().ty,
                             );
                         }
                     }

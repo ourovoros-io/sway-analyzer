@@ -1,5 +1,7 @@
 contract;
 
+use std::context::msg_amount;
+
 abi TestLockedNativeAsset {
     #[payable, storage(read, write)]
     fn deposit();
@@ -10,7 +12,7 @@ abi TestLockedNativeAsset {
 }
 
 storage {
-    balance: u64 = 0;
+    balance: u64 = 0,
 }
 
 impl TestLockedNativeAsset for Contract {
@@ -19,15 +21,19 @@ impl TestLockedNativeAsset for Contract {
     #[payable, storage(read, write)]
     fn deposit() {
         assert(msg_amount() > 0);
-        storage.balance = storage.balance + msg_amount();
+        let balance = storage.balance.try_read().unwrap_or(0);
+        let new_balance = balance + msg_amount();
+        storage.balance.write(new_balance);
     }
 
     // Report entry should be created
-    // L28: The `Contract::deposit2` function will lock native assets. Consider adding a withdraw function.   
+    // L30: The `Contract::deposit2` function will lock native assets. Consider adding a withdraw function.   
     #[payable, storage(read, write)]
     fn deposit2() {
         assert(msg_amount() > 0);
-        storage.balance = storage.balance + msg_amount();
+        let balance = storage.balance.try_read().unwrap_or(0);
+        let new_balance = balance + msg_amount();
+        storage.balance.write(new_balance);
     }
 
     fn withdraw() {

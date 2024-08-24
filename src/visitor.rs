@@ -3159,7 +3159,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
             hook(context, scope.clone(), project)?;
         }
 
-        for field in &context.item_storage.fields.inner {
+        for field in &context.item_storage.entries.inner {
             let context = StorageFieldContext {
                 path: context.path,
                 module: context.module,
@@ -3167,7 +3167,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                 storage_attributes: context.attributes,
                 item_storage: context.item_storage,
                 field_attributes: field.attribute_list.as_slice(),
-                field: &field.value,
+                field: &field.value.field.as_ref().unwrap(),
             };
 
             self.visit_storage_field(&context, scope.clone(), project)?;

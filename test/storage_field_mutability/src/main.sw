@@ -1,5 +1,7 @@
 contract;
 
+use std::hash::Hash;
+
 abi TestStorageFieldMutability {
     #[storage(write)]
     fn initialize();

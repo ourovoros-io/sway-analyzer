@@ -77,7 +77,7 @@ impl AstVisitor for ManipulatableBalanceUsageVisitor {
         // Get the module state
         let module_state = self.module_states.get_mut(context.path).unwrap();
 
-        for field in &context.item_storage.fields.inner {
+        for field in &context.item_storage.entries.inner {
             if field.value.span().as_str().contains("balance") {
                 module_state.balances.insert(field.value.span(), field.value.name.span().as_str().to_string());
             }
