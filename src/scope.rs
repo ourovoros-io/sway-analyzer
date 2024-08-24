@@ -189,13 +189,15 @@ impl AstScope {
                     }
 
                     ItemKind::Storage(item_storage) => {
-                        for field in &item_storage.entries.inner {
-                            scope.borrow_mut().add_variable(
-                                project,
-                                AstVariableKind::Storage,
-                                &field.value.name,
-                                &field.value.field.as_ref().unwrap().ty,
-                            );
+                        for entry in &item_storage.entries.inner {
+                            if let Some(field) = entry.value.field.as_ref() {
+                                scope.borrow_mut().add_variable(
+                                    project,
+                                    AstVariableKind::Storage,
+                                    &entry.value.name,
+                                    &field.ty,
+                                );
+                            }
                         }
                     }
 
