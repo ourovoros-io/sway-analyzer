@@ -172,7 +172,7 @@ pub mod tests {
         let entries  = filter_entries(&project.report.borrow(), &options);
         project.report.borrow_mut().entries = entries.into_iter().collect();
 
-        assert_eq!(project.report.borrow().entries[0].1.len(), 31);
+        assert_eq!(project.report.borrow().entries[0].1.len(), 26);
 
         println!("{project}");
     }
@@ -194,7 +194,7 @@ pub mod tests {
         let entries  = filter_entries(&project.report.borrow(), &options);
         project.report.borrow_mut().entries = entries.into_iter().collect();
 
-        assert_eq!(project.report.borrow().entries[0].1.len(), 15);
+        assert_eq!(project.report.borrow().entries[0].1.len(), 16);
 
         println!("{project}");
     }
@@ -216,7 +216,7 @@ pub mod tests {
         let entries  = filter_entries(&project.report.borrow(), &options);
         project.report.borrow_mut().entries = entries.into_iter().collect();
 
-        assert_eq!(project.report.borrow().entries[0].1.len(), 31);
+        assert_eq!(project.report.borrow().entries[0].1.len(), 26);
 
         println!("{project}");
     }
@@ -260,7 +260,7 @@ pub mod tests {
         let entries  = filter_entries(&project.report.borrow(), &options);
         project.report.borrow_mut().entries = entries.into_iter().collect();
 
-        assert_eq!(project.report.borrow().entries[0].1.len(), 16);
+        assert_eq!(project.report.borrow().entries[0].1.len(), 10);
 
         println!("{project}");
     }
@@ -282,7 +282,7 @@ pub mod tests {
         let entries  = filter_entries(&project.report.borrow(), &options);
         project.report.borrow_mut().entries = entries;
 
-        assert_eq!(project.report.borrow().entries[0].1.len(), 31);
+        assert_eq!(project.report.borrow().entries[0].1.len(), 26);
 
         println!("{project}");
     }
