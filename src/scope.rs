@@ -1,7 +1,7 @@
 use crate::{project::Project, utils};
 use std::{cell::RefCell, rc::Rc};
 use sway_ast::{
-    keywords::{CloseAngleBracketToken, Keyword, OpenAngleBracketToken, StrToken}, ty::TyTupleDescriptor, AngleBrackets, CommaToken, DoubleColonToken, Expr, ExprArrayDescriptor, ExprTupleDescriptor, FnArg, FnArgs, FnSignature, GenericArgs, GenericParams, ItemAbi, ItemEnum, ItemImpl, ItemImplItem, ItemKind, ItemStruct, ItemTrait, ItemTraitItem, ItemTypeAlias, ItemUse, Literal, MatchBranchKind, Parens, PathExpr, PathExprSegment, PathType, PathTypeSegment, Pattern, PatternStructField, Punctuated, Ty, UseTree, WhereClause
+    generics::GenericParam, keywords::{CloseAngleBracketToken, Keyword, OpenAngleBracketToken, StrToken}, ty::TyTupleDescriptor, AngleBrackets, CommaToken, DoubleColonToken, Expr, ExprArrayDescriptor, ExprTupleDescriptor, FnArg, FnArgs, FnSignature, GenericArgs, GenericParams, ItemAbi, ItemEnum, ItemImpl, ItemImplItem, ItemKind, ItemStruct, ItemTrait, ItemTraitItem, ItemTypeAlias, ItemUse, Literal, MatchBranchKind, Parens, PathExpr, PathExprSegment, PathType, PathTypeSegment, Pattern, PatternStructField, Punctuated, Ty, UseTree, WhereClause
 };
 use sway_ast_stubs::AstModule;
 use sway_types::{BaseIdent, Span, Spanned};
@@ -177,7 +177,7 @@ impl AstScope {
                         scope.borrow_mut().add_impl(project, item_impl);
                     }
 
-                    ItemKind::Abi(item_abi) => {}
+                    ItemKind::Abi(_) => {}
 
                     ItemKind::Const(item_const) => {
                         scope.borrow_mut().add_variable(
@@ -702,45 +702,45 @@ impl AstScope {
     pub fn add_impl(&mut self, project: &mut Project, item_impl: &ItemImpl) {
         let mut item_impl = item_impl.clone();
 
-        let generic_idents = match item_impl.generic_params_opt.as_ref() {
+        let generic_params = match item_impl.generic_params_opt.as_ref() {
             Some(generics) => {
-                let mut generic_idents = vec![];
+                let mut generic_params = vec![];
                 for generic in &generics.parameters.inner {
-                    generic_idents.push(generic.clone());
+                    generic_params.push(generic.clone());
                 }
-                generic_idents
+                generic_params
             }
 
             None => vec![],
         };
         
         if let Some((path_type, _)) = item_impl.trait_opt.as_mut() {
-            *path_type = self.expand_path_type(project, path_type, &generic_idents);
+            *path_type = self.expand_path_type(project, path_type, &generic_params);
         }
 
-        item_impl.ty = self.expand_ty(project, &item_impl.ty, &generic_idents);
+        item_impl.ty = self.expand_ty(project, &item_impl.ty, &generic_params);
         
         if let Some(where_clause) = item_impl.where_clause_opt.as_mut() {
-            *where_clause = self.expand_where_clause(project, where_clause, &generic_idents);
+            *where_clause = self.expand_where_clause(project, where_clause, &generic_params);
         }
 
         for item in item_impl.contents.inner.iter_mut() {
             match &mut item.value {
                 ItemImplItem::Fn(item_fn) => {
-                    item_fn.fn_signature = self.expand_fn_signature(project, &item_fn.fn_signature, &generic_idents);
+                    item_fn.fn_signature = self.expand_fn_signature(project, &item_fn.fn_signature, &generic_params);
                     item_fn.body.inner.statements.clear();
                     item_fn.body.inner.final_expr_opt = None;
                 }
 
                 ItemImplItem::Const(item_const) => {
                     if let Some((_, ty)) = item_const.ty_opt.as_mut() {
-                        *ty = self.expand_ty(project, ty, &generic_idents);
+                        *ty = self.expand_ty(project, ty, &generic_params);
                     }
                 }
 
                 ItemImplItem::Type(item_type) => {
                     if let Some(ty) = item_type.ty_opt.as_mut() {
-                        *ty = self.expand_ty(project, ty, &generic_idents);
+                        *ty = self.expand_ty(project, ty, &generic_params);
                     }
                 }
             }
@@ -752,284 +752,265 @@ impl AstScope {
     pub fn get_expr_ty(&self, expr: &Expr, project: &mut Project) -> Ty {
         match expr {
             Expr::Error(_, _) => todo!("{expr:#?}"),
-
             Expr::Path(path) => {
-                // Check if the path is a single identifier and look it up as a variable
-                if path.root_opt.is_none() && path.suffix.is_empty() {
-                    if let Some(variable) = self.get_variable(path.prefix.name.as_str(), false) {
-                        return variable.borrow().ty.clone();
+                        // Check if the path is a single identifier and look it up as a variable
+                        if path.root_opt.is_none() && path.suffix.is_empty() {
+                            if let Some(variable) = self.get_variable(path.prefix.name.as_str(), false) {
+                                return variable.borrow().ty.clone();
+                            }
+                        }
+
+                        todo!("{expr:#?}")
                     }
-                }
-
-                todo!("{expr:#?}")
-            }
-
             Expr::Literal(literal) => match literal {
-                Literal::String(_) => Ty::StringSlice(StrToken::new(Span::dummy())),
-                Literal::Char(_) => utils::create_ident_ty("char"),
-                Literal::Int(_) => utils::create_ident_ty("u64"),
-                Literal::Bool(_) => utils::create_ident_ty("bool"),
-            }
-
-            Expr::AbiCast { args, .. } => Ty::Path(args.inner.name.clone()),
-
-            Expr::Struct { path, fields: _ } => {
-                //
-                // TODO: check fields to make sure we are resolving the correct struct
-                //
-
-                let path_expr = self.expand_path_expr(project, path, &[]);
-                let path_type = utils::path_expr_to_path_type(&path_expr);
-                Ty::Path(path_type)
-            }
-
-            Expr::Tuple(tuple) => match &tuple.inner {
-                ExprTupleDescriptor::Nil => utils::empty_tuple_ty(),
-
-                ExprTupleDescriptor::Cons { head, tail, .. } => {
-                    let mut value_separator_pairs = vec![];
-
-                    for expr in tail {
-                        value_separator_pairs.push((
-                            self.get_expr_ty(expr, project),
-                            CommaToken::default(),
-                        ));
+                        Literal::String(_) => Ty::StringSlice(StrToken::new(Span::dummy())),
+                        Literal::Char(_) => utils::create_ident_ty("char"),
+                        Literal::Int(_) => utils::create_ident_ty("u64"),
+                        Literal::Bool(_) => utils::create_ident_ty("bool"),
                     }
+            Expr::AbiCast { args, .. } => Ty::Path(args.inner.name.clone()),
+            Expr::Struct { path, fields: _ } => {
+                        //
+                        // TODO: check fields to make sure we are resolving the correct struct
+                        //
 
-                    let final_value_opt = value_separator_pairs.pop().map(|x| Box::new(x.0));
+                        let path_expr = self.expand_path_expr(project, path, &[]);
+                        let path_type = utils::path_expr_to_path_type(&path_expr);
+                        Ty::Path(path_type)
+                    }
+            Expr::Tuple(tuple) => match &tuple.inner {
+                        ExprTupleDescriptor::Nil => utils::empty_tuple_ty(),
 
-                    Ty::Tuple(Parens {
-                        inner: TyTupleDescriptor::Cons {
-                            head: Box::new(self.get_expr_ty(head, project)),
-                            comma_token: CommaToken::default(),
-                            tail: Punctuated {
-                                value_separator_pairs,
-                                final_value_opt,
-                            },
-                        },
-                        span: Span::dummy(),
-                    })
-                }
-            }
+                        ExprTupleDescriptor::Cons { head, tail, .. } => {
+                            let mut value_separator_pairs = vec![];
 
+                            for expr in tail {
+                                value_separator_pairs.push((
+                                    self.get_expr_ty(expr, project),
+                                    CommaToken::default(),
+                                ));
+                            }
+
+                            let final_value_opt = value_separator_pairs.pop().map(|x| Box::new(x.0));
+
+                            Ty::Tuple(Parens {
+                                inner: TyTupleDescriptor::Cons {
+                                    head: Box::new(self.get_expr_ty(head, project)),
+                                    comma_token: CommaToken::default(),
+                                    tail: Punctuated {
+                                        value_separator_pairs,
+                                        final_value_opt,
+                                    },
+                                },
+                                span: Span::dummy(),
+                            })
+                        }
+                    }
             Expr::Parens(parens) => self.get_expr_ty(parens.inner.as_ref(), project),
-
             Expr::Block(block) => match block.inner.final_expr_opt.as_ref() {
+                        Some(expr) => self.get_expr_ty(expr, project),
+                        None => utils::empty_tuple_ty(),
+                    }
+            Expr::Array(array) => match &array.inner {
+                        ExprArrayDescriptor::Sequence(sequence) => {
+                            if let Some((expr, _)) = sequence.value_separator_pairs.first() {
+                                self.get_expr_ty(expr, project)
+                            } else if let Some(expr) = sequence.final_value_opt.as_ref() {
+                                self.get_expr_ty(expr, project)
+                            } else {
+                                utils::empty_tuple_ty()
+                            }
+                        }
+
+                        ExprArrayDescriptor::Repeat { value, .. } => self.get_expr_ty(value, project),
+                    }
+            Expr::Asm(_) => {
+                        //
+                        // TODO: Get the type of the return value from the asm block if any
+                        //
+
+                        utils::empty_tuple_ty()
+                    }
+            Expr::Return { .. } => utils::empty_tuple_ty(),
+            Expr::If(if_expr) => {
+                        if let Some(expr) = if_expr.then_block.inner.final_expr_opt.as_ref() {
+                            return self.get_expr_ty(expr, project);
+                        }
+
+                        utils::empty_tuple_ty()
+                    }
+            Expr::Match { branches, .. } => {
+                        if let Some(branch) = branches.inner.first() {
+                            match &branch.kind {
+                                MatchBranchKind::Block { block, .. } => {
+                                    if let Some(expr) = block.inner.final_expr_opt.as_ref() {
+                                        return self.get_expr_ty(expr, project);
+                                    }
+
+                                    return utils::empty_tuple_ty();
+                                }
+
+                                MatchBranchKind::Expr { expr, .. } => {
+                                    return self.get_expr_ty(expr, project);
+                                }
+                            }
+                        }
+
+                        utils::empty_tuple_ty()
+                    }
+            Expr::While { .. } | Expr::For { .. } => utils::empty_tuple_ty(),
+            Expr::FuncApp { func: _, args: _ } => todo!("{expr:#?}"),
+            Expr::Index { target, .. } => {
+                        let target_type = self.get_expr_ty(target, project);
+
+                        let Ty::Array(target_type) = target_type else {
+                            panic!("Expected array type, got: {target_type:#?}");
+                        };
+
+                        target_type.inner.ty.as_ref().clone()
+                    }
+            Expr::MethodCall { target, path_seg, args, .. } => {
+                        let target_type = self.get_expr_ty(target, project);
+                        let fn_signature = self.get_impl_fn_signature(project, &target_type, path_seg, args).unwrap();
+
+                        let ty = fn_signature.return_type_opt.as_ref()
+                            .map(|(_, ty)| ty.clone())
+                            .unwrap_or_else(utils::empty_tuple_ty);
+
+                        self.expand_ty(project, &ty, &[])
+                    }
+            Expr::FieldProjection { target, name, .. } => {
+                        // Check if the field projection refers to a storage field and return a `core::storage::StorageKey<T>` type
+                        if let Expr::Path(PathExpr { root_opt, prefix, suffix, .. }) = target.as_ref() {
+                            if root_opt.is_none() && prefix.name.as_str() == "storage" && suffix.is_empty() {
+                                let variable = self.get_variable(name.as_str(), true).unwrap();
+                                let ty = self.expand_ty(project, &variable.borrow().ty, &[]);
+
+                                return Ty::Path(PathType {
+                                    root_opt: None,
+                                    prefix: PathTypeSegment {
+                                        name: BaseIdent::new_no_span("core".into()),
+                                        generics_opt: None,
+                                    },
+                                    suffix: vec![
+                                        (
+                                            DoubleColonToken::default(),
+                                            PathTypeSegment {
+                                                name: BaseIdent::new_no_span("storage".into()),
+                                                generics_opt: None,
+                                            },
+                                        ),
+                                        (
+                                            DoubleColonToken::default(),
+                                            PathTypeSegment {
+                                                name: BaseIdent::new_no_span("StorageKey".into()),
+                                                generics_opt: Some((
+                                                    Some(DoubleColonToken::default()),
+                                                    GenericArgs {
+                                                        parameters: AngleBrackets {
+                                                            open_angle_bracket_token:
+                                                                OpenAngleBracketToken::default(),
+                                                            inner: Punctuated {
+                                                                value_separator_pairs: vec![],
+                                                                final_value_opt: Some(Box::new(ty)),
+                                                            },
+                                                            close_angle_bracket_token:
+                                                                CloseAngleBracketToken::default(),
+                                                        },
+                                                    },
+                                                )),
+                                            },
+                                        ),
+                                    ],
+                                });
+                            }
+                        }
+
+                        todo!()
+                        // let target_type = self.get_expr_ty(target, project);
+
+                        // let resolver = project.resolver.borrow();
+                        // let resolved = resolver.resolve_ty(&target_type);
+
+                        // let Some(sway_ast::ItemKind::Struct(item_struct)) = resolved else {
+                        //     panic!("Expected struct, found: {resolved:#?}")
+                        // };
+
+                        // let mut fields = vec![];
+
+                        // for field in &item_struct.fields.inner {
+                        //     fields.push(field);
+                        // }
+
+                        // let Some(field) = fields.iter().find(|f| f.value.name == *name) else {
+                        //     todo!("{expr:#?}")
+                        // };
+
+                        // field.value.ty.clone()
+                    }
+            Expr::TupleFieldProjection { target, field, .. } => {
+                        let target_type = self.get_expr_ty(target, project);
+
+                        let Ty::Tuple(target_type) = target_type else {
+                            panic!("Expected tuple type, got: {target_type:#?}");
+                        };
+
+                        match &target_type.inner {
+                            TyTupleDescriptor::Nil => panic!("Field access on empty tuple: {expr:#?}"),
+
+                            TyTupleDescriptor::Cons { head, tail, .. } => {
+                                let index: usize = field.try_into().unwrap();
+
+                                if index == 0 {
+                                    return head.as_ref().clone();
+                                }
+
+                                let mut remaining = vec![];
+
+                                for ty in tail {
+                                    remaining.push(ty);
+                                }
+
+                                remaining[index - 1].clone()
+                            }
+                        }
+                    }
+            Expr::Ref { expr, .. } => self.get_expr_ty(expr, project),
+            Expr::Deref { expr, .. } => self.get_expr_ty(expr, project),
+            Expr::Not { expr, .. } => self.get_expr_ty(expr, project),
+            Expr::Mul { lhs, .. }
+                    | Expr::Div { lhs, .. }
+                    | Expr::Pow { lhs, .. }
+                    | Expr::Modulo { lhs, .. }
+                    | Expr::Add { lhs, .. }
+                    | Expr::Sub { lhs, .. }
+                    | Expr::Shl { lhs, .. }
+                    | Expr::Shr { lhs, .. }
+                    | Expr::BitAnd { lhs, .. }
+                    | Expr::BitXor { lhs, .. }
+                    | Expr::BitOr { lhs, .. } => self.get_expr_ty(lhs, project),
+            Expr::Equal { .. }
+                    | Expr::NotEqual { .. }
+                    | Expr::LessThan { .. }
+                    | Expr::GreaterThan { .. }
+                    | Expr::LessThanEq { .. }
+                    | Expr::GreaterThanEq { .. }
+                    | Expr::LogicalAnd { .. }
+                    | Expr::LogicalOr { .. } => Ty::Path(PathType {
+                        root_opt: None,
+                        prefix: PathTypeSegment {
+                            name: BaseIdent::new_no_span("bool".into()),
+                            generics_opt: None,
+                        },
+                        suffix: vec![],
+                    }),
+            Expr::Reassignment { .. } => utils::empty_tuple_ty(),
+            Expr::Break { .. } | Expr::Continue { .. } => utils::empty_tuple_ty(),
+            
+            Expr::Panic { expr_opt, .. } => match expr_opt.as_ref() {
                 Some(expr) => self.get_expr_ty(expr, project),
                 None => utils::empty_tuple_ty(),
             }
-
-            Expr::Array(array) => match &array.inner {
-                ExprArrayDescriptor::Sequence(sequence) => {
-                    if let Some((expr, _)) = sequence.value_separator_pairs.first() {
-                        self.get_expr_ty(expr, project)
-                    } else if let Some(expr) = sequence.final_value_opt.as_ref() {
-                        self.get_expr_ty(expr, project)
-                    } else {
-                        utils::empty_tuple_ty()
-                    }
-                }
-
-                ExprArrayDescriptor::Repeat { value, .. } => self.get_expr_ty(value, project),
-            }
-
-            Expr::Asm(_) => {
-                //
-                // TODO: Get the type of the return value from the asm block if any
-                //
-
-                utils::empty_tuple_ty()
-            }
-
-            Expr::Return { .. } => utils::empty_tuple_ty(),
-
-            Expr::If(if_expr) => {
-                if let Some(expr) = if_expr.then_block.inner.final_expr_opt.as_ref() {
-                    return self.get_expr_ty(expr, project);
-                }
-
-                utils::empty_tuple_ty()
-            }
-
-            Expr::Match { branches, .. } => {
-                if let Some(branch) = branches.inner.first() {
-                    match &branch.kind {
-                        MatchBranchKind::Block { block, .. } => {
-                            if let Some(expr) = block.inner.final_expr_opt.as_ref() {
-                                return self.get_expr_ty(expr, project);
-                            }
-
-                            return utils::empty_tuple_ty();
-                        }
-
-                        MatchBranchKind::Expr { expr, .. } => {
-                            return self.get_expr_ty(expr, project);
-                        }
-                    }
-                }
-
-                utils::empty_tuple_ty()
-            }
-
-            Expr::While { .. } | Expr::For { .. } => utils::empty_tuple_ty(),
-
-            Expr::FuncApp { func: _, args: _ } => todo!("{expr:#?}"),
-
-            Expr::Index { target, .. } => {
-                let target_type = self.get_expr_ty(target, project);
-
-                let Ty::Array(target_type) = target_type else {
-                    panic!("Expected array type, got: {target_type:#?}");
-                };
-
-                target_type.inner.ty.as_ref().clone()
-            }
-
-            Expr::MethodCall { target, path_seg, args, .. } => {
-                let target_type = self.get_expr_ty(target, project);
-                let fn_signature = self.get_impl_fn_signature(project, &target_type, path_seg, args).unwrap();
-
-                let ty = fn_signature.return_type_opt.as_ref()
-                    .map(|(_, ty)| ty.clone())
-                    .unwrap_or_else(utils::empty_tuple_ty);
-
-                self.expand_ty(project, &ty, &[])
-            }
-
-            Expr::FieldProjection { target, name, .. } => {
-                // Check if the field projection refers to a storage field and return a `core::storage::StorageKey<T>` type
-                if let Expr::Path(PathExpr { root_opt, prefix, suffix, .. }) = target.as_ref() {
-                    if root_opt.is_none() && prefix.name.as_str() == "storage" && suffix.is_empty() {
-                        let variable = self.get_variable(name.as_str(), true).unwrap();
-                        let ty = self.expand_ty(project, &variable.borrow().ty, &[]);
-
-                        return Ty::Path(PathType {
-                            root_opt: None,
-                            prefix: PathTypeSegment {
-                                name: BaseIdent::new_no_span("core".into()),
-                                generics_opt: None,
-                            },
-                            suffix: vec![
-                                (
-                                    DoubleColonToken::default(),
-                                    PathTypeSegment {
-                                        name: BaseIdent::new_no_span("storage".into()),
-                                        generics_opt: None,
-                                    },
-                                ),
-                                (
-                                    DoubleColonToken::default(),
-                                    PathTypeSegment {
-                                        name: BaseIdent::new_no_span("StorageKey".into()),
-                                        generics_opt: Some((
-                                            Some(DoubleColonToken::default()),
-                                            GenericArgs {
-                                                parameters: AngleBrackets {
-                                                    open_angle_bracket_token:
-                                                        OpenAngleBracketToken::default(),
-                                                    inner: Punctuated {
-                                                        value_separator_pairs: vec![],
-                                                        final_value_opt: Some(Box::new(ty)),
-                                                    },
-                                                    close_angle_bracket_token:
-                                                        CloseAngleBracketToken::default(),
-                                                },
-                                            },
-                                        )),
-                                    },
-                                ),
-                            ],
-                        });
-                    }
-                }
-
-                todo!()
-                // let target_type = self.get_expr_ty(target, project);
-
-                // let resolver = project.resolver.borrow();
-                // let resolved = resolver.resolve_ty(&target_type);
-
-                // let Some(sway_ast::ItemKind::Struct(item_struct)) = resolved else {
-                //     panic!("Expected struct, found: {resolved:#?}")
-                // };
-
-                // let mut fields = vec![];
-
-                // for field in &item_struct.fields.inner {
-                //     fields.push(field);
-                // }
-
-                // let Some(field) = fields.iter().find(|f| f.value.name == *name) else {
-                //     todo!("{expr:#?}")
-                // };
-
-                // field.value.ty.clone()
-            }
-
-            Expr::TupleFieldProjection { target, field, .. } => {
-                let target_type = self.get_expr_ty(target, project);
-
-                let Ty::Tuple(target_type) = target_type else {
-                    panic!("Expected tuple type, got: {target_type:#?}");
-                };
-
-                match &target_type.inner {
-                    TyTupleDescriptor::Nil => panic!("Field access on empty tuple: {expr:#?}"),
-
-                    TyTupleDescriptor::Cons { head, tail, .. } => {
-                        let index: usize = field.try_into().unwrap();
-
-                        if index == 0 {
-                            return head.as_ref().clone();
-                        }
-
-                        let mut remaining = vec![];
-
-                        for ty in tail {
-                            remaining.push(ty);
-                        }
-
-                        remaining[index - 1].clone()
-                    }
-                }
-            }
-
-            Expr::Ref { expr, .. } => self.get_expr_ty(expr, project),
-            Expr::Deref { expr, .. } => self.get_expr_ty(expr, project),
-
-            Expr::Not { expr, .. } => self.get_expr_ty(expr, project),
-
-            Expr::Mul { lhs, .. }
-            | Expr::Div { lhs, .. }
-            | Expr::Pow { lhs, .. }
-            | Expr::Modulo { lhs, .. }
-            | Expr::Add { lhs, .. }
-            | Expr::Sub { lhs, .. }
-            | Expr::Shl { lhs, .. }
-            | Expr::Shr { lhs, .. }
-            | Expr::BitAnd { lhs, .. }
-            | Expr::BitXor { lhs, .. }
-            | Expr::BitOr { lhs, .. } => self.get_expr_ty(lhs, project),
-
-            Expr::Equal { .. }
-            | Expr::NotEqual { .. }
-            | Expr::LessThan { .. }
-            | Expr::GreaterThan { .. }
-            | Expr::LessThanEq { .. }
-            | Expr::GreaterThanEq { .. }
-            | Expr::LogicalAnd { .. }
-            | Expr::LogicalOr { .. } => Ty::Path(PathType {
-                root_opt: None,
-                prefix: PathTypeSegment {
-                    name: BaseIdent::new_no_span("bool".into()),
-                    generics_opt: None,
-                },
-                suffix: vec![],
-            }),
-
-            Expr::Reassignment { .. } => utils::empty_tuple_ty(),
-
-            Expr::Break { .. } | Expr::Continue { .. } => utils::empty_tuple_ty(),
         }
     }
 
@@ -1172,17 +1153,17 @@ impl AstScope {
     }
 
     #[inline]
-    fn expand_path_type(&self, project: &mut Project, path_type: &PathType, generic_idents: &[BaseIdent]) -> PathType {
+    fn expand_path_type(&self, project: &mut Project, path_type: &PathType, generic_params: &[GenericParam]) -> PathType {
         utils::path_expr_to_path_type(
             &self.expand_path_expr(
                 project,
                 &utils::path_type_to_path_expr(path_type),
-                generic_idents,
+                generic_params,
             ),
         )
     }
 
-    fn expand_path_expr(&self, project: &mut Project, path_expr: &PathExpr, generic_idents: &[BaseIdent]) -> PathExpr {
+    fn expand_path_expr(&self, project: &mut Project, path_expr: &PathExpr, generic_params: &[GenericParam]) -> PathExpr {
         let resolver = project.resolver.clone();
 
         // Get the last part of the path expression
@@ -1200,11 +1181,11 @@ impl AstScope {
             }
 
             for (ty, _) in generics.parameters.inner.value_separator_pairs.iter_mut() {
-                *ty = self.expand_ty(project, ty, generic_idents);
+                *ty = self.expand_ty(project, ty, generic_params);
             }
 
             if let Some(ty) = generics.parameters.inner.final_value_opt.as_mut() {
-                *ty = Box::new(self.expand_ty(project, ty.as_ref(), generic_idents));
+                *ty = Box::new(self.expand_ty(project, ty.as_ref(), generic_params));
             }
         }
         
@@ -1228,7 +1209,7 @@ impl AstScope {
                         match &type_alias.ty {
                             Ty::Path(path_type) => {
                                 return utils::path_type_to_path_expr(
-                                    &self.expand_path_type(project, path_type, generic_idents),
+                                    &self.expand_path_type(project, path_type, generic_params),
                                 );
                             }
 
@@ -1414,7 +1395,7 @@ impl AstScope {
                                 };
     
                                 if name.as_str() == segment.name.as_str() {
-                                    let mut expanded_path = self.expand_path_expr(project, path_expr, generic_idents);
+                                    let mut expanded_path = self.expand_path_expr(project, path_expr, generic_params);
                                     let prefix = expanded_path.prefix.clone();
     
                                     let expanded_segment = if let Some((_, segment)) = expanded_path.suffix.last_mut() {
@@ -1457,7 +1438,7 @@ impl AstScope {
                                 }
                                 count
                             }).unwrap_or(0) == input_generic_count {
-                                let mut expanded_path = self.expand_path_expr(project, path_expr, generic_idents);
+                                let mut expanded_path = self.expand_path_expr(project, path_expr, generic_params);
                                 let prefix = expanded_path.prefix.clone();
     
                                 let expanded_segment = if let Some((_, segment)) = expanded_path.suffix.last_mut() {
@@ -1634,7 +1615,12 @@ impl AstScope {
                     // 10. Check for generic parameter types
                     if self.find_generic_params(|generic_params| {
                         for generic_param in &generic_params.borrow().0.parameters.inner {
-                            if generic_param.as_str() == segment.name.as_str() {
+                            let generic_ident = match generic_param {
+                                GenericParam::Trait { ident } => ident,
+                                GenericParam::Const { ident, .. } => ident,
+                            };
+
+                            if generic_ident.as_str() == segment.name.as_str() {
                                 return true;
                             }
                         }
@@ -1643,7 +1629,14 @@ impl AstScope {
                         return path_expr.clone();
                     }
 
-                    if generic_idents.iter().find(|x| x.as_str() == segment.name.as_str()).is_some() {
+                    if generic_params.iter().any(|x| {
+                        let x = match x {
+                            GenericParam::Trait { ident } => ident,
+                            GenericParam::Const { ident, .. } => ident,
+                        };
+
+                        x.as_str() == segment.name.as_str()
+                    }) {
                         return path_expr.clone();
                     }
 
@@ -1708,38 +1701,38 @@ impl AstScope {
         }
     }
 
-    fn expand_ty(&self, project: &mut Project, ty: &Ty, generic_idents: &[BaseIdent]) -> Ty {
+    fn expand_ty(&self, project: &mut Project, ty: &Ty, generic_params: &[GenericParam]) -> Ty {
         let mut ty = ty.clone();
 
         match &mut ty {
             Ty::Path(path_type) => {
-                *path_type = self.expand_path_type(project, path_type, generic_idents);
+                *path_type = self.expand_path_type(project, path_type, generic_params);
             }
 
             Ty::Tuple(tuple) => {
                 if let TyTupleDescriptor::Cons { head, tail, .. } = &mut tuple.inner {
-                    *head.as_mut() = self.expand_ty(project, head.as_ref(), generic_idents);
+                    *head.as_mut() = self.expand_ty(project, head.as_ref(), generic_params);
                     
                     for (ty, _) in tail.value_separator_pairs.iter_mut() {
-                        *ty = self.expand_ty(project, ty, generic_idents);
+                        *ty = self.expand_ty(project, ty, generic_params);
                     }
 
                     if let Some(ty) = tail.final_value_opt.as_mut() {
-                        *ty.as_mut() = self.expand_ty(project, ty, generic_idents);
+                        *ty.as_mut() = self.expand_ty(project, ty, generic_params);
                     }
                 }
             }
 
             Ty::Array(array) => {
-                *array.inner.ty.as_mut() = self.expand_ty(project, array.inner.ty.as_ref(), generic_idents);
+                *array.inner.ty.as_mut() = self.expand_ty(project, array.inner.ty.as_ref(), generic_params);
             }
 
             Ty::Ptr { ty, .. } | Ty::Slice { ty, .. } => {
-                *ty.inner.as_mut() = self.expand_ty(project, ty.inner.as_ref(), generic_idents);
+                *ty.inner.as_mut() = self.expand_ty(project, ty.inner.as_ref(), generic_params);
             }
 
             Ty::Ref { ty, .. } => {
-                *ty.as_mut() = self.expand_ty(project, ty.as_ref(), generic_idents);
+                *ty.as_mut() = self.expand_ty(project, ty.as_ref(), generic_params);
             }
 
             _ => {}
@@ -1749,22 +1742,22 @@ impl AstScope {
     }
 
     #[inline]
-    fn expand_fn_arg(&self, project: &mut Project, fn_arg: &FnArg, generic_idents: &[BaseIdent]) -> FnArg {
+    fn expand_fn_arg(&self, project: &mut Project, fn_arg: &FnArg, generic_params: &[GenericParam]) -> FnArg {
         let mut fn_arg = fn_arg.clone();
-        fn_arg.pattern = self.expand_pattern(project, &fn_arg.pattern, generic_idents);
-        fn_arg.ty = self.expand_ty(project, &fn_arg.ty, generic_idents);
+        fn_arg.pattern = self.expand_pattern(project, &fn_arg.pattern, generic_params);
+        fn_arg.ty = self.expand_ty(project, &fn_arg.ty, generic_params);
         fn_arg
     }
 
     #[inline]
-    fn expand_fn_signature(&self, project: &mut Project, fn_signature: &FnSignature, generic_idents: &[BaseIdent]) -> FnSignature {
+    fn expand_fn_signature(&self, project: &mut Project, fn_signature: &FnSignature, generic_params: &[GenericParam]) -> FnSignature {
         let mut fn_signature = fn_signature.clone();
 
-        let mut generic_idents = generic_idents.iter().cloned().collect::<Vec<_>>();
+        let mut generic_params = generic_params.iter().cloned().collect::<Vec<_>>();
         
         if let Some(generics) = fn_signature.generics.as_ref() {
             for generic in &generics.parameters.inner {
-                generic_idents.push(generic.clone());
+                generic_params.push(generic.clone());
             }
         }
 
@@ -1773,96 +1766,96 @@ impl AstScope {
             FnArgs::NonStatic { args_opt, .. } => args_opt.as_mut().map(|(_, args)| args),
         } {
             for (arg, _) in args.value_separator_pairs.iter_mut() {
-                self.expand_fn_arg(project, arg, &generic_idents);
+                self.expand_fn_arg(project, arg, &generic_params);
             }
 
             if let Some(arg) = args.final_value_opt.as_mut() {
-                self.expand_fn_arg(project, arg, &generic_idents);
+                self.expand_fn_arg(project, arg, &generic_params);
             }
         }
 
         if let Some((_, return_type)) = fn_signature.return_type_opt.as_mut() {
-            *return_type = self.expand_ty(project, return_type, &generic_idents);
+            *return_type = self.expand_ty(project, return_type, &generic_params);
         }
 
         if let Some(where_clause) = fn_signature.where_clause_opt.as_mut() {
-            *where_clause = self.expand_where_clause(project, where_clause, &generic_idents);
+            *where_clause = self.expand_where_clause(project, where_clause, &generic_params);
         }
 
         fn_signature
     }
 
     #[inline]
-    fn expand_where_clause(&self, project: &mut Project, where_clause: &WhereClause, generic_idents: &[BaseIdent]) -> WhereClause {
+    fn expand_where_clause(&self, project: &mut Project, where_clause: &WhereClause, generic_params: &[GenericParam]) -> WhereClause {
         let mut where_clause = where_clause.clone();
 
         for (where_bound, _) in where_clause.bounds.value_separator_pairs.iter_mut() {
-            where_bound.bounds.prefix = self.expand_path_type(project, &where_bound.bounds.prefix, generic_idents);
+            where_bound.bounds.prefix = self.expand_path_type(project, &where_bound.bounds.prefix, generic_params);
 
             for (_, suffix) in where_bound.bounds.suffixes.iter_mut() {
-                *suffix = self.expand_path_type(project, suffix, generic_idents);
+                *suffix = self.expand_path_type(project, suffix, generic_params);
             }
         }
 
         if let Some(where_bound) = where_clause.bounds.final_value_opt.as_mut() {
-            where_bound.bounds.prefix = self.expand_path_type(project, &where_bound.bounds.prefix, generic_idents);
+            where_bound.bounds.prefix = self.expand_path_type(project, &where_bound.bounds.prefix, generic_params);
 
             for (_, suffix) in where_bound.bounds.suffixes.iter_mut() {
-                *suffix = self.expand_path_type(project, suffix, generic_idents);
+                *suffix = self.expand_path_type(project, suffix, generic_params);
             }
         }
         
         where_clause
     }
 
-    fn expand_pattern(&self, project: &mut Project, pattern: &Pattern, generic_idents: &[BaseIdent]) -> Pattern {
+    fn expand_pattern(&self, project: &mut Project, pattern: &Pattern, generic_params: &[GenericParam]) -> Pattern {
         let mut pattern = pattern.clone();
 
         match &mut pattern {
             Pattern::Or { lhs, rhs, .. } => {
-                *lhs.as_mut() = self.expand_pattern(project, lhs, generic_idents);
-                *rhs.as_mut() = self.expand_pattern(project, rhs, generic_idents);
+                *lhs.as_mut() = self.expand_pattern(project, lhs, generic_params);
+                *rhs.as_mut() = self.expand_pattern(project, rhs, generic_params);
             }
 
             Pattern::Constant(path_expr) => {
-                *path_expr = self.expand_path_expr(project, path_expr, generic_idents);
+                *path_expr = self.expand_path_expr(project, path_expr, generic_params);
             }
             
             Pattern::Constructor { path, args } => {
-                *path = self.expand_path_expr(project, path, generic_idents);
+                *path = self.expand_path_expr(project, path, generic_params);
 
                 for (arg, _) in args.inner.value_separator_pairs.iter_mut() {
-                    *arg = self.expand_pattern(project, arg, generic_idents);
+                    *arg = self.expand_pattern(project, arg, generic_params);
                 }
                 
                 if let Some(arg) = args.inner.final_value_opt.as_mut() {
-                    *arg.as_mut() = self.expand_pattern(project, arg, generic_idents);
+                    *arg.as_mut() = self.expand_pattern(project, arg, generic_params);
                 }
             }
 
             Pattern::Struct { path, fields } => {
-                *path = self.expand_path_expr(project, path, generic_idents);
+                *path = self.expand_path_expr(project, path, generic_params);
                 
                 for (field, _) in fields.inner.value_separator_pairs.iter_mut() {
                     if let PatternStructField::Field { pattern_opt: Some((_, pattern)), .. } = field {
-                        *pattern.as_mut() = self.expand_pattern(project, pattern, generic_idents);
+                        *pattern.as_mut() = self.expand_pattern(project, pattern, generic_params);
                     }
                 }
 
                 if let Some(field) = fields.inner.final_value_opt.as_mut() {
                     if let PatternStructField::Field { pattern_opt: Some((_, pattern)), .. } = field.as_mut() {
-                        *pattern.as_mut() = self.expand_pattern(project, pattern, generic_idents);
+                        *pattern.as_mut() = self.expand_pattern(project, pattern, generic_params);
                     }
                 }
             }
             
             Pattern::Tuple(tuple) => {
                 for (pattern, _) in tuple.inner.value_separator_pairs.iter_mut() {
-                    *pattern = self.expand_pattern(project, pattern, generic_idents);
+                    *pattern = self.expand_pattern(project, pattern, generic_params);
                 }
 
                 if let Some(pattern) = tuple.inner.final_value_opt.as_mut() {
-                    *pattern.as_mut() = self.expand_pattern(project, pattern, generic_idents);
+                    *pattern.as_mut() = self.expand_pattern(project, pattern, generic_params);
                 }
             }
 

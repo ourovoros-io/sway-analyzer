@@ -297,6 +297,10 @@ pub fn fold_element_access_idents(element_access: &ElementAccess) -> Vec<BaseIde
         ElementAccess::TupleFieldProjection { target, .. } => {
             result.extend(fold_element_access_idents(target));
         }
+
+        ElementAccess::Deref { target, .. } => {
+            result.extend(fold_element_access_idents(target.as_ref()));
+        }
     }
 
     result
@@ -1065,6 +1069,12 @@ pub fn find_storage_access_in_expr(expr: &Expr) -> Option<&Expr> {
         Expr::Reassignment { expr, .. } => find_storage_access_in_expr(expr.as_ref()),
         Expr::Break { .. } => None,
         Expr::Continue { .. } => None,
+
+        Expr::Panic { expr_opt, .. } => {
+            expr_opt.as_ref()
+                .map(|expr| find_storage_access_in_expr(expr))
+                .flatten()
+        }
     }
 }
 
@@ -1555,6 +1565,8 @@ pub fn ty_to_string(ty: &Ty) -> String {
         ),
 
         Ty::Never { .. } => "!".into(),
+
+        Ty::Expr(expr) => expr.span().as_str().into(),
     }
 }
 
@@ -1565,10 +1577,10 @@ pub fn path_type_to_string(path_type: &PathType) -> String {
         if let Some(qualified_root_path) = root.0.as_ref() {
             result.push('<');
             result.push_str(ty_to_string(qualified_root_path.inner.ty.as_ref()).as_str());
-            if let Some(as_trait) = qualified_root_path.inner.as_trait.as_ref() {
+            // if let Some(as_trait) = qualified_root_path.inner.as_trait.as_ref() {
                 result.push_str(" as ");
-                result.push_str(path_type_to_string(as_trait.1.as_ref()).as_str());
-            }
+                result.push_str(path_type_to_string(qualified_root_path.inner.as_trait.1.as_ref()).as_str());
+            // }
             result.push('>');
         }
 
@@ -1607,10 +1619,10 @@ pub fn path_expr_to_string(path_expr: &PathExpr) -> String {
         if let Some(qualified_root_path) = root.0.as_ref() {
             result.push('<');
             result.push_str(ty_to_string(qualified_root_path.inner.ty.as_ref()).as_str());
-            if let Some(as_trait) = qualified_root_path.inner.as_trait.as_ref() {
+            // if let Some(as_trait) = qualified_root_path.inner.as_trait.as_ref() {
                 result.push_str(" as ");
-                result.push_str(path_type_to_string(as_trait.1.as_ref()).as_str());
-            }
+                result.push_str(path_type_to_string(qualified_root_path.inner.as_trait.1.as_ref()).as_str());
+            // }
             result.push('>');
         }
 

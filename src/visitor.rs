@@ -554,7 +554,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
             let context = ItemContext {
                 path: context.path,
                 module: context.module,
-                attributes: item.attribute_list.as_slice(),
+                attributes: item.attributes.as_slice(),
                 item: &item.value,
                 impl_attributes: None,
                 item_impl: None,
@@ -851,7 +851,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                 item: context.item,
                 struct_attributes: context.struct_attributes,
                 item_struct: context.item_struct,
-                field_attributes: field.attribute_list.as_slice(),
+                field_attributes: field.attributes.as_slice(),
                 field: &field.value,
             };
 
@@ -922,7 +922,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                 item: context.item,
                 enum_attributes: context.attributes,
                 item_enum: context.item_enum,
-                field_attributes: field.attribute_list.as_slice(),
+                field_attributes: field.attributes.as_slice(),
                 field: &field.value,
             };
 
@@ -1079,7 +1079,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                 let context = ItemContext {
                     path: context.path,
                     module: context.module,
-                    attributes: item.attribute_list.as_slice(),
+                    attributes: item.attributes.as_slice(),
                     item: &item.value,
                     impl_attributes: context.impl_attributes,
                     item_impl: context.item_impl,
@@ -2380,6 +2380,25 @@ impl AstVisitor for AstVisitorRecursive<'_> {
 
             Expr::Break { .. } => {}
             Expr::Continue { .. } => {}
+
+            Expr::Panic { expr_opt, .. } => {
+                if let Some(expr) = expr_opt.as_ref() {
+                    let context = ExprContext {
+                        path: context.path,
+                        module: context.module,
+                        item: context.item,
+                        impl_attributes: context.impl_attributes,
+                        item_impl: context.item_impl,
+                        fn_attributes: context.fn_attributes,
+                        item_fn: context.item_fn,
+                        blocks: context.blocks.clone(),
+                        statement: context.statement,
+                        expr: expr.as_ref(),
+                    };
+    
+                    self.visit_expr(&context, scope.clone(), project)?;
+                }
+            }
         }
         
         Ok(())
@@ -3014,7 +3033,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                         item: &ItemKind::Fn(item_fn.clone()),
                         impl_attributes: Some(context.attributes),
                         item_impl: Some(context.item_impl),
-                        fn_attributes: item.attribute_list.as_slice(),
+                        fn_attributes: item.attributes.as_slice(),
                         item_fn,
                     };
                     
@@ -3031,7 +3050,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                         item_impl: Some(context.item_impl),
                         fn_attributes: None,
                         item_fn: None,
-                        const_attributes: item.attribute_list.as_slice(),
+                        const_attributes: item.attributes.as_slice(),
                         item_const,
                         blocks: context.blocks.clone(),
                         statement: context.statement,
@@ -3166,7 +3185,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                 item: context.item,
                 storage_attributes: context.attributes,
                 item_storage: context.item_storage,
-                field_attributes: field.attribute_list.as_slice(),
+                field_attributes: field.attributes.as_slice(),
                 field: &field.value.field.as_ref().unwrap(),
             };
 
@@ -3252,7 +3271,7 @@ impl AstVisitor for AstVisitorRecursive<'_> {
                 item: context.item,
                 configurable_attributes: context.attributes,
                 item_configurable: context.item_configurable,
-                field_attributes: field.attribute_list.as_slice(),
+                field_attributes: field.attributes.as_slice(),
                 field: &field.value,
             };
 

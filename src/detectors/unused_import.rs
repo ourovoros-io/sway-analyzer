@@ -107,9 +107,9 @@ impl ModuleState {
             if let Some(root) = root.0.as_ref() {
                 self.check_ty_usage(root.inner.ty.as_ref());
                 
-                if let Some(as_trait) = root.inner.as_trait.as_ref() {
-                    self.check_path_type_usage(as_trait.1.as_ref());
-                }
+                // if let Some(as_trait) = root.inner.as_trait.as_ref() {
+                    self.check_path_type_usage(root.inner.as_trait.1.as_ref());
+                // }
             }
         }
     }
@@ -149,6 +149,10 @@ impl ModuleState {
             }
 
             Ty::Never { .. } => {}
+
+            Ty::Expr(expr) => {
+                self.check_expr_usage(expr);
+            }
         }
     }
 }

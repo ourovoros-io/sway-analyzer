@@ -6,7 +6,6 @@ use std::{
     path::{Path, PathBuf},
     rc::Rc,
     str::FromStr,
-    sync::Arc,
 };
 use sway_ast::Module;
 use sway_ast_stubs::AstResolver;
@@ -137,8 +136,7 @@ impl Project<'_> {
         self.load_line_ranges(path.clone(), source.as_str());
 
         let handler = sway_error::handler::Handler::default();
-        let source = Arc::from(source.as_str());
-        let module = sway_parse::parse_file(&handler, source, None).map_err(|_| Error::ParseFailed(path.clone()))?;
+        let module = sway_parse::parse_file(&handler, source.as_str().into(), None, Default::default()).map_err(|_| Error::ParseFailed(path.clone()))?;
 
         self.modules.borrow_mut().insert(path, module.value);
 

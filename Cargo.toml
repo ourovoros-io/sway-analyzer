@@ -4,7 +4,7 @@ version = "0.1.7"
 edition = "2021"
 license-file = "LICENSE"
 description = "A security-focused static analyzer for Sway written in Rust."
-repository = "https://github.com/camden-smallwood/sway-analyzer"
+repository = "https://github.com/ourovoros-io/sway-analyzer"
 readme = "README.md"
 
 [dependencies]
@@ -12,8 +12,8 @@ colored = "2.1.0"
 serde = "1.0.201"
 serde_json = "1.0.117"
 structopt = { version = "0.3.26", default-features = false }
-sway-ast = "0.63.1"
-sway-error = "0.63.1"
-sway-parse = "0.63.1"
-sway-types = "0.63.1"
-sway-ast-stubs = { git = "https://github.com/ourovoros-io/sway-ast-stubs.git", rev = "b4f0b56ca9a7d9500cb84849b32cc36e3744913f" }
+sway-ast = "0.68.2"
+sway-error = "0.68.2"
+sway-parse = "0.68.2"
+sway-types = "0.68.2"
+sway-ast-stubs = { git = "https://github.com/ourovoros-io/sway-ast-stubs.git", rev = "a714196e82b02e4aa328a2cae6dc573a0ea3a25e" }
