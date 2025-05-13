@@ -24,14 +24,14 @@ impl AstVisitor for ExplicitReturnStatementVisitor {
                 Severity::Low,
                 if let Some(expr) = expr_opt.as_ref().map(Box::as_ref) {
                     format!(
-                        "The {} contains an explicit return expression, which is unnecessary. Consider replacing `return {}` with `{}`.",
+                        "{} contains an explicit return expression, which is unnecessary. Consider replacing `return {}` with `{}`.",
                         utils::get_item_location(context.item, &context.item_impl, &Some(context.item_fn)),
                         expr.span().as_str(),
                         expr.span().as_str(),
                     )
                 } else {
                     format!(
-                        "The {} contains an explicit return expression, which is unnecessary. Consider removing `return`.",
+                        "{} contains an explicit return expression, which is unnecessary. Consider removing `return`.",
                         utils::get_item_location(context.item, &context.item_impl, &Some(context.item_fn)),
                     )
                 },
@@ -46,14 +46,14 @@ impl AstVisitor for ExplicitReturnStatementVisitor {
                 Severity::Low,
                 if let Some(expr) = expr_opt.as_ref().map(Box::as_ref) {
                     format!(
-                        "The {} contains an explicit return statement, which is unnecessary. Consider replacing `return {};` with `{}`.",
+                        "{} contains an explicit return statement, which is unnecessary. Consider replacing `return {};` with `{}`.",
                         utils::get_item_location(context.item, &context.item_impl, &Some(context.item_fn)),
                         expr.span().as_str(),
                         expr.span().as_str(),
                     )
                 } else {
                     format!(
-                        "The {} contains an explicit return statement, which is unnecessary. Consider removing `return;`.",
+                        "{} contains an explicit return statement, which is unnecessary. Consider removing `return;`.",
                         utils::get_item_location(context.item, &context.item_impl, &Some(context.item_fn)),
                     )
                 },

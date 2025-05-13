@@ -9,12 +9,21 @@ abi TestUnprotectedInitialization {
 
     #[storage(read, write)]
     fn safe_init2(value: u64);
+
+    #[storage(read, write)]
+    fn safe_init3(value: u64);
 }
 
 storage {
     initialized: bool = false,
     value: u64 = 0,
 }
+
+#[storage(read)]
+fn ensure_secure() {
+    require(!storage.initialized.read(), "Already initialized");
+}
+
 
 impl TestUnprotectedInitialization for Contract {
     // Report entry should be created:
@@ -37,6 +46,13 @@ impl TestUnprotectedInitialization for Contract {
         if storage.initialized.read() {
             revert(0);
         }
+        storage.value.write(value);
+    }
+
+    // Report entry should not be created
+    #[storage(read, write)]
+    fn safe_init3(value: u64) {
+        ensure_secure();
         storage.value.write(value);
     }
 }
